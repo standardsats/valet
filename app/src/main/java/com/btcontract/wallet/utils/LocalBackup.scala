@@ -27,15 +27,15 @@ object LocalBackup { me =>
     case _ => "unknown"
   }
 
-  def getBackupFileUnsafe(chainHash: ByteVector32, seed: ByteVector): File = {
+  def getBackupFileUnsafe(context: Context, chainHash: ByteVector32, seed: ByteVector): File = {
     val specifics = s"${me getNetwork chainHash}-${Crypto.hash160(seed).take(4).toHex}"
-    new File(downloadsDir, s"$BACKUP_NAME-$specifics$BACKUP_EXTENSION")
+    new File(downloadsDir(context), s"$BACKUP_NAME-$specifics$BACKUP_EXTENSION")
   }
 
   final val LOCAL_BACKUP_REQUEST_NUMBER = 105
   def askPermission(activity: AppCompatActivity): Unit = ActivityCompat.requestPermissions(activity, Array(android.Manifest.permission.WRITE_EXTERNAL_STORAGE), LOCAL_BACKUP_REQUEST_NUMBER)
   def isAllowed(context: Context): Boolean = ContextCompat.checkSelfPermission(context, android.Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
-  def downloadsDir: File = getExternalStoragePublicDirectory(DIRECTORY_DOWNLOADS)
+  def downloadsDir(context: Context): File = context.getExternalFilesDir(DIRECTORY_DOWNLOADS) //getExternalStoragePublicDirectory(DIRECTORY_DOWNLOADS)
 
   // Prefixing by one byte to discern future backup types (full wallet backup / minimal channel backup etc)
   def encryptBackup(backup: ByteVector, seed: ByteVector): ByteVector = 0.toByte +: Tools.chaChaEncrypt(Crypto.sha256(seed), randomBytes(12), backup)
@@ -44,7 +44,7 @@ object LocalBackup { me =>
   def encryptAndWritePlainBackup(context: Context, dbFileName: String, chainHash: ByteVector32, seed: ByteVector): Unit = {
     val dataBaseFile = new File(context.getDatabasePath(dbFileName).getPath)
     val cipherBytes = encryptBackup(ByteVector.view(Files toByteArray dataBaseFile), seed)
-    atomicWrite(getBackupFileUnsafe(chainHash, seed), cipherBytes)
+    atomicWrite(getBackupFileUnsafe(context, chainHash, seed), cipherBytes)
   }
 
   // It is assumed that we try to decrypt a backup before running this and only proceed on success
@@ -58,7 +58,7 @@ object LocalBackup { me =>
 
   // Separate method because we save the same file both in Downloads and in local assets folders
   def getGraphResourceName(chainHash: ByteVector32): String = s"$GRAPH_NAME-${me getNetwork chainHash}$GRAPH_EXTENSION"
-  def getGraphFileUnsafe(chainHash: ByteVector32): File = new File(downloadsDir, me getGraphResourceName chainHash)
+  def getGraphFileUnsafe(context: Context, chainHash: ByteVector32): File = new File(downloadsDir(context), me getGraphResourceName chainHash)
 
   // Utils
 

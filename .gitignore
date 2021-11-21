@@ -6,3 +6,10 @@ app/.externalNativeBuild/
 app/build/
 app/release/
 local.properties
+.project
+.settings
+app/src/main/assets/graph.snapshot-mainnet.zlib
+build/
+build.sbt
+project/
+target/

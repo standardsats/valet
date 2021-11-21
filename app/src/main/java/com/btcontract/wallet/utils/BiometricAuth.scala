@@ -6,6 +6,7 @@ import com.btcontract.wallet.BaseActivity
 import androidx.core.content.ContextCompat
 import com.btcontract.wallet.R
 import android.view.View
+import androidx.biometric.BiometricManager.Authenticators
 
 
 abstract class BiometricAuth(view: View, host: BaseActivity) {
@@ -17,7 +18,7 @@ abstract class BiometricAuth(view: View, host: BaseActivity) {
   def onNoneEnrolled: Unit
   def onNoHardware: Unit
 
-  def checkAuth: Unit = biometricManager.canAuthenticate match {
+  def checkAuth: Unit = biometricManager.canAuthenticate(Authenticators.BIOMETRIC_WEAK) match {
     case BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE => onNoHardware
     case BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE => onHardwareUnavailable
     case BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED => onNoneEnrolled
@@ -29,7 +30,7 @@ abstract class BiometricAuth(view: View, host: BaseActivity) {
     val promptInfo: BiometricPrompt.PromptInfo =
       (new BiometricPrompt.PromptInfo.Builder)
         .setTitle(host getString R.string.settings_auth_title)
-        .setDeviceCredentialAllowed(true)
+        .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_WEAK)
         .build
 
     val callback: BiometricPrompt.AuthenticationCallback = new BiometricPrompt.AuthenticationCallback {

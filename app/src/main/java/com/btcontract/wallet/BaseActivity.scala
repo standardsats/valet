@@ -53,7 +53,7 @@ import scala.util.{Failure, Success, Try}
 
 object BaseActivity {
   implicit class StringOps(source: String) {
-    def html: Spanned = android.text.Html.fromHtml(source)
+    def html: Spanned = android.text.Html.fromHtml(source, 0)
     def humanFour: String = source.grouped(4).mkString(s"\u0020")
 
     def short: String = {

@@ -3,11 +3,10 @@ package com.btcontract.wallet
 import java.net.{InetSocketAddress, Socket}
 import java.text.{DecimalFormat, SimpleDateFormat}
 import java.util.Date
-
 import akka.actor.Props
 import android.app.{Application, NotificationChannel, NotificationManager}
 import android.content._
-import android.os.Build
+import android.os.{Build, VibrationEffect}
 import android.text.format.DateFormat
 import android.view.inputmethod.InputMethodManager
 import android.widget.{EditText, Toast}
@@ -316,7 +315,7 @@ object WalletApp {
 
 object Vibrator {
   private val vibrator = WalletApp.app.getSystemService(Context.VIBRATOR_SERVICE).asInstanceOf[android.os.Vibrator]
-  def vibrate: Unit = if (null != vibrator && vibrator.hasVibrator) vibrator.vibrate(Array(0L, 85, 200), -1)
+  def vibrate: Unit = if (null != vibrator && vibrator.hasVibrator) vibrator.vibrate(VibrationEffect.createWaveform(Array(0L, 85, 200), -1))
 }
 
 class WalletApp extends Application { me =>
