@@ -2,7 +2,6 @@ package com.btcontract.wallet
 
 import java.net.InetSocketAddress
 import java.util.TimerTask
-
 import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
 import android.graphics.{Bitmap, BitmapFactory}
@@ -47,6 +46,7 @@ import org.ndeftools.Message
 import org.ndeftools.util.activity.NfcReaderActivity
 import rx.lang.scala.{Observable, Subscription}
 import spray.json._
+import standardsats.wallet.FiatHostedCommits
 
 import scala.collection.JavaConverters._
 import scala.concurrent.Await
@@ -1007,12 +1007,16 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
   override def onException: PartialFunction[Malfunction, Unit] = {
     case (CMDException(_, _: CMD_CLOSE), _, _: HasNormalCommitments) => // Swallow this specific error here, it will be displayed on StatActivity
     case (CMDException(_, _: CMD_HOSTED_STATE_OVERRIDE), _, _: HostedCommits) => // Swallow this specific error here, it will be displayed on StatActivity
+    case (CMDException(_, _: CMD_HOSTED_STATE_OVERRIDE), _, _: FiatHostedCommits) => // Swallow this specific error here, it will be displayed on StatActivity
     case (error: ChannelTransitionFail, _, data: HasNormalCommitments) => chanError(data.channelId, getString(error_channel_closed).format(error.stackTraceAsString), data.commitments.remoteInfo)
     case (error: ChannelTransitionFail, _, hc: HostedCommits) if hc.error.isEmpty => chanError(hc.channelId, getString(error_channel_suspended).format(error.stackTraceAsString), hc.remoteInfo)
+    case (error: ChannelTransitionFail, _, hc: FiatHostedCommits) if hc.error.isEmpty => chanError(hc.channelId, getString(error_channel_suspended).format(error.stackTraceAsString), hc.remoteInfo)
     case (RemoteErrorException(details), _, data: HasNormalCommitments) => chanError(data.channelId, getString(error_channel_remote).format(details), data.commitments.remoteInfo)
     case (RemoteErrorException(details), _, hc: HostedCommits) if hc.error.isEmpty => chanError(hc.channelId, getString(error_channel_remote).format(details), hc.remoteInfo)
+    case (RemoteErrorException(details), _, hc: FiatHostedCommits) if hc.error.isEmpty => chanError(hc.channelId, getString(error_channel_remote).format(details), hc.remoteInfo)
     case (error, _, data: HasNormalCommitments) => chanError(data.channelId, error.stackTraceAsString, data.commitments.remoteInfo)
     case (error, _, hc: HostedCommits) => chanError(hc.channelId, error.stackTraceAsString, hc.remoteInfo)
+    case (error, _, hc: FiatHostedCommits) => chanError(hc.channelId, error.stackTraceAsString, hc.remoteInfo)
   }
 
   // Lifecycle methods

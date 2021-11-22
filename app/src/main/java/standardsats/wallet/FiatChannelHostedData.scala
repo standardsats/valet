@@ -11,11 +11,11 @@ import immortan.crypto.Tools.{Any2Some, hostedChanId}
 import scodec.bits.ByteVector
 
 
-case class WaitRemoteHostedReply(remoteInfo: RemoteNodeInfo, refundScriptPubKey: ByteVector, secret: ByteVector) extends ChannelData
+case class WaitRemoteFiatHostedReply(remoteInfo: RemoteNodeInfo, refundScriptPubKey: ByteVector, secret: ByteVector) extends ChannelData
 
-case class WaitRemoteHostedStateUpdate(remoteInfo: RemoteNodeInfo, hc: HostedCommits) extends ChannelData
+case class WaitRemoteFiatHostedStateUpdate(remoteInfo: RemoteNodeInfo, hc: FiatHostedCommits) extends ChannelData
 
-case class HostedCommits(remoteInfo: RemoteNodeInfo, localSpec: CommitmentSpec, lastCrossSignedState: LastCrossSignedState,
+case class FiatHostedCommits(remoteInfo: RemoteNodeInfo, localSpec: CommitmentSpec, lastCrossSignedState: LastCrossSignedState,
                          nextLocalUpdates: List[UpdateMessage], nextRemoteUpdates: List[UpdateMessage], updateOpt: Option[ChannelUpdate], postErrorOutgoingResolvedIds: Set[Long],
                          localError: Option[Fail], remoteError: Option[Fail], resizeProposal: Option[ResizeChannel] = None, overrideProposal: Option[StateOverride] = None,
                          extParams: List[ExtParams] = Nil, startedAt: Long = System.currentTimeMillis) extends PersistentChannelData with Commitments { me =>
@@ -55,10 +55,10 @@ case class HostedCommits(remoteInfo: RemoteNodeInfo, localSpec: CommitmentSpec, 
       nextLocalSpec.incomingAdds.toList.sortBy(_.id), nextLocalSpec.outgoingAdds.toList.sortBy(_.id), localSigOfRemote = ByteVector64.Zeroes,
       remoteSigOfLocal = ByteVector64.Zeroes)
 
-  def addLocalProposal(update: UpdateMessage): HostedCommits = copy(nextLocalUpdates = nextLocalUpdates :+ update)
-  def addRemoteProposal(update: UpdateMessage): HostedCommits = copy(nextRemoteUpdates = nextRemoteUpdates :+ update)
+  def addLocalProposal(update: UpdateMessage): FiatHostedCommits = copy(nextLocalUpdates = nextLocalUpdates :+ update)
+  def addRemoteProposal(update: UpdateMessage): FiatHostedCommits = copy(nextRemoteUpdates = nextRemoteUpdates :+ update)
 
-  type UpdatedHCAndAdd = (HostedCommits, UpdateAddHtlc)
+  type UpdatedHCAndAdd = (FiatHostedCommits, UpdateAddHtlc)
   def sendAdd(cmd: CMD_ADD_HTLC, blockHeight: Long): Either[LocalReject, UpdatedHCAndAdd] = {
     val completeAdd = cmd.incompleteAdd.copy(channelId = channelId, id = nextTotalLocal + 1)
     val commits1 = addLocalProposal(completeAdd)
@@ -72,8 +72,8 @@ case class HostedCommits(remoteInfo: RemoteNodeInfo, localSpec: CommitmentSpec, 
     Right(commits1, completeAdd)
   }
 
-  def receiveAdd(add: UpdateAddHtlc): HostedCommits = {
-    val commits1: HostedCommits = addRemoteProposal(add)
+  def receiveAdd(add: UpdateAddHtlc): FiatHostedCommits = {
+    val commits1: FiatHostedCommits = addRemoteProposal(add)
     // We do not check whether total incoming amount exceeds maxHtlcValueInFlightMsat becase we always accept up to channel capacity
     if (commits1.nextLocalSpec.incomingAdds.size > lastCrossSignedState.initHostedChannel.maxAcceptedHtlcs) throw ChannelTransitionFail(channelId, add)
     if (commits1.nextLocalSpec.toRemote < 0L.msat) throw ChannelTransitionFail(channelId, add)
@@ -89,7 +89,7 @@ case class HostedCommits(remoteInfo: RemoteNodeInfo, localSpec: CommitmentSpec, 
     case None => throw ChannelTransitionFail(channelId, fulfill)
   }
 
-  def withResize(resize: ResizeChannel): HostedCommits =
+  def withResize(resize: ResizeChannel): FiatHostedCommits =
     me.modify(_.lastCrossSignedState.initHostedChannel.maxHtlcValueInFlightMsat).setTo(resize.newCapacityMsatU64)
       .modify(_.lastCrossSignedState.initHostedChannel.channelCapacityMsat).setTo(resize.newCapacity.toMilliSatoshi)
       .modify(_.localSpec.toRemote).using(_ + resize.newCapacity - lastCrossSignedState.initHostedChannel.channelCapacityMsat)

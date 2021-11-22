@@ -19,6 +19,7 @@ import immortan.fsm.OutgoingPaymentMaster.CMDChanGotOnline
 import immortan.fsm._
 import immortan.utils.{PaymentRequestExt, Rx}
 import rx.lang.scala.Subject
+import standardsats.wallet.{FiatChannelHosted, FiatHostedCommits}
 
 import java.util.concurrent.atomic.AtomicLong
 import scala.collection.mutable
@@ -193,9 +194,13 @@ class ChannelMaster(val payBag: PaymentBag, val chanBag: ChannelBag, val dataBag
 
   def allHostedCommits: Iterable[HostedCommits] = all.values.flatMap(Channel.chanAndCommitsOpt).collect { case ChanAndCommits(_, commits: HostedCommits) => commits }
 
+  def allFiatHostedCommits: Iterable[FiatHostedCommits] = all.values.flatMap(Channel.chanAndCommitsOpt).collect { case ChanAndCommits(_, commits: FiatHostedCommits) => commits }
+
   def allFromNode(nodeId: PublicKey): Iterable[ChanAndCommits] = all.values.flatMap(Channel.chanAndCommitsOpt).filter(_.commits.remoteInfo.nodeId == nodeId)
 
   def hostedFromNode(nodeId: PublicKey): Option[ChannelHosted] = allFromNode(nodeId).collectFirst { case ChanAndCommits(chan: ChannelHosted, _) => chan }
+
+  def fiatHostedFromNode(nodeId: PublicKey): Option[FiatChannelHosted] = allFromNode(nodeId).collectFirst { case ChanAndCommits(chan: FiatChannelHosted, _) => chan }
 
   def allNormal: Iterable[ChannelNormal] = all.values.collect { case chan: ChannelNormal => chan }
 
@@ -280,6 +285,10 @@ class ChannelMaster(val payBag: PaymentBag, val chanBag: ChannelBag, val dataBag
     case (error: ChannelTransitionFail, chan: ChannelHosted, hc: HostedCommits) =>
       LNParams.logBag.put("hosted-channel-suspend", error.stackTraceAsString)
       chan.localSuspend(hc, ErrorCodes.ERR_HOSTED_MANUAL_SUSPEND)
+
+    case (error: ChannelTransitionFail, chan: FiatChannelHosted, hc: FiatHostedCommits) =>
+      LNParams.logBag.put("hosted-channel-suspend", error.stackTraceAsString)
+      chan.localSuspend(hc, ErrorCodes.ERR_HOSTED_MANUAL_SUSPEND)
   }
 
   override def onBecome: PartialFunction[Transition, Unit] = {
@@ -293,6 +302,17 @@ class ChannelMaster(val payBag: PaymentBag, val chanBag: ChannelBag, val dataBag
       next(stateUpdateStream)
 
     case (_, prevHc: HostedCommits, nextHc: HostedCommits, _, _)
+      if prevHc.error.nonEmpty && nextHc.error.isEmpty =>
+      // Previously suspended HC got operational
+      opm process CMDChanGotOnline
+      next(stateUpdateStream)
+
+    case (_, prevHc: FiatHostedCommits, nextHc: FiatHostedCommits, _, _)
+      if prevHc.error.isEmpty && nextHc.error.nonEmpty =>
+      // Previously operational HC got suspended
+      next(stateUpdateStream)
+
+    case (_, prevHc: FiatHostedCommits, nextHc: FiatHostedCommits, _, _)
       if prevHc.error.nonEmpty && nextHc.error.isEmpty =>
       // Previously suspended HC got operational
       opm process CMDChanGotOnline

@@ -8,7 +8,7 @@ import immortan.ChannelListener.{Malfunction, Transition}
 import immortan._
 import immortan.crypto.Tools
 import scodec.bits.ByteVector
-import standardsats.wallet.FiatChannelHosted
+import standardsats.wallet.{FiatChannelHosted, FiatHostedCommits, WaitRemoteFiatHostedReply}
 
 
 // Secret and refund pubKey are supplied externally because they may be different depending if we have a chain wallet or not
@@ -31,11 +31,11 @@ abstract class FiatHCOpenHandler(info: RemoteNodeInfo, peerSpecificSecret: ByteV
     override def onMessage(worker: CommsTower.Worker, message: LightningMessage): Unit = message match {
       case msg: HasChannelId if msg.channelId == channelId => freshChannel process msg
       case msg: ChannelUpdate => freshChannel process msg
-      case _ =>
+      case msg => print(s"$msg")
     }
 
     override def onBecome: PartialFunction[Transition, Unit] = {
-      case (_, _, hostedCommits: HostedCommits, WAIT_FOR_ACCEPT, OPEN) =>
+      case (_, _, hostedCommits: FiatHostedCommits, WAIT_FOR_ACCEPT, OPEN) =>
         onEstablished(hostedCommits, freshChannel)
         CommsTower.rmListenerNative(info, me)
     }
@@ -51,11 +51,11 @@ abstract class FiatHCOpenHandler(info: RemoteNodeInfo, peerSpecificSecret: ByteV
 
   if (cm.hostedFromNode(info.nodeId).isEmpty) {
     freshChannel.listeners = Set(makeChanListener)
-    freshChannel doProcess WaitRemoteHostedReply(info.safeAlias, peerSpecificRefundPubKey, peerSpecificSecret)
+    freshChannel doProcess WaitRemoteFiatHostedReply(info.safeAlias, peerSpecificRefundPubKey, peerSpecificSecret)
     CommsTower.listenNative(listeners1 = Set(makeChanListener), remoteInfo = info)
   } else {
     // Only one HC per remote peer is allowed, make sure this condition holds
-    val error = new RuntimeException("Hosted channel with peer exists already")
+    val error = new RuntimeException("Hosted fiat channel with peer exists already")
     onFailure(error)
   }
 }

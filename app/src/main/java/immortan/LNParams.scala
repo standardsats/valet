@@ -106,6 +106,7 @@ object LNParams {
       (ShutdownAnySegwit, FeatureSupport.Optional),
       (StaticRemoteKey, FeatureSupport.Optional),
       (HostedChannels, FeatureSupport.Optional),
+      (FiatHostedChannels, FeatureSupport.Optional),
       (PaymentSecret, FeatureSupport.Optional),
       (ChainSwap, FeatureSupport.Optional),
       (Wumbo, FeatureSupport.Optional)

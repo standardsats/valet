@@ -10,7 +10,7 @@ import fr.acinq.eclair.channel._
 import fr.acinq.eclair.payment.OutgoingPacket
 import fr.acinq.eclair.transactions._
 import fr.acinq.eclair.wire._
-import immortan.{Channel, ChannelBag, ChannelHosted, ChannelListener, CommsTower, ErrorExt, LNParams, RemoteNodeInfo, UpdateAddHtlcExt}
+import immortan.{Channel, ChannelBag, ChannelListener, CommsTower, ErrorExt, LNParams, RemoteNodeInfo, UpdateAddHtlcExt}
 import immortan.Channel._
 import immortan.ErrorCodes._
 import immortan.crypto.Tools._
@@ -18,16 +18,16 @@ import immortan.fsm.PreimageCheck
 import scodec.bits.ByteVector
 
 object FiatChannelHosted {
-  def make(initListeners: Set[ChannelListener], hostedData: HostedCommits, bag: ChannelBag): ChannelHosted = new ChannelHosted {
+  def make(initListeners: Set[ChannelListener], hostedData: FiatHostedCommits, bag: ChannelBag): FiatChannelHosted = new FiatChannelHosted {
     def SEND(msgs: LightningMessage*): Unit = CommsTower.sendMany(msgs.map(LightningMessageCodecs.prepareNormal), hostedData.remoteInfo.nodeSpecificPair)
     def STORE(hostedData: PersistentChannelData): PersistentChannelData = bag.put(hostedData)
     listeners = initListeners
     doProcess(hostedData)
   }
 
-  def restoreCommits(localLCSS: LastCrossSignedState, remoteInfo: RemoteNodeInfo): HostedCommits = {
+  def restoreCommits(localLCSS: LastCrossSignedState, remoteInfo: RemoteNodeInfo): FiatHostedCommits = {
     val inFlightHtlcs = localLCSS.incomingHtlcs.map(IncomingHtlc) ++ localLCSS.outgoingHtlcs.map(OutgoingHtlc)
-    HostedCommits(remoteInfo.safeAlias, CommitmentSpec(feeratePerKw = FeeratePerKw(0L.sat), localLCSS.localBalanceMsat, localLCSS.remoteBalanceMsat, inFlightHtlcs.toSet),
+    FiatHostedCommits(remoteInfo.safeAlias, CommitmentSpec(feeratePerKw = FeeratePerKw(0L.sat), localLCSS.localBalanceMsat, localLCSS.remoteBalanceMsat, inFlightHtlcs.toSet),
       localLCSS, nextLocalUpdates = Nil, nextRemoteUpdates = Nil, updateOpt = None, postErrorOutgoingResolvedIds = Set.empty, localError = None, remoteError = None)
   }
 }
@@ -36,12 +36,12 @@ abstract class FiatChannelHosted extends Channel { me =>
   def isOutOfSync(blockDay: Long): Boolean = math.abs(blockDay - LNParams.currentBlockDay) > 1
 
   def doProcess(change: Any): Unit = Tuple3(data, change, state) match {
-    case (wait: WaitRemoteHostedReply, CMD_SOCKET_ONLINE, WAIT_FOR_INIT) =>
+    case (wait: WaitRemoteFiatHostedReply, CMD_SOCKET_ONLINE, WAIT_FOR_INIT) =>
       me SEND InvokeHostedChannel(LNParams.chainHash, wait.refundScriptPubKey, wait.secret)
       BECOME(wait, WAIT_FOR_ACCEPT)
 
 
-    case (WaitRemoteHostedReply(remoteInfo, refundScriptPubKey, _), init: InitHostedChannel, WAIT_FOR_ACCEPT) =>
+    case (WaitRemoteFiatHostedReply(remoteInfo, refundScriptPubKey, _), init: InitHostedChannel, WAIT_FOR_ACCEPT) =>
       if (init.initialClientBalanceMsat > init.channelCapacityMsat) throw new RuntimeException(s"Their init balance for us=${init.initialClientBalanceMsat}, is larger than capacity")
       if (UInt64(100000000L) > init.maxHtlcValueInFlightMsat) throw new RuntimeException(s"Their max value in-flight=${init.maxHtlcValueInFlightMsat}, is too low")
       if (init.htlcMinimumMsat > 546000L.msat) throw new RuntimeException(s"Their minimal payment size=${init.htlcMinimumMsat}, is too high")
@@ -52,11 +52,11 @@ abstract class FiatChannelHosted extends Channel { me =>
         localSigOfRemote = ByteVector64.Zeroes, remoteSigOfLocal = ByteVector64.Zeroes).withLocalSigOfRemote(remoteInfo.nodeSpecificPrivKey)
 
       val localHalfSignedHC = FiatChannelHosted.restoreCommits(lcss, remoteInfo)
-      BECOME(WaitRemoteHostedStateUpdate(remoteInfo, localHalfSignedHC), WAIT_FOR_ACCEPT)
+      BECOME(WaitRemoteFiatHostedStateUpdate(remoteInfo, localHalfSignedHC), WAIT_FOR_ACCEPT)
       SEND(localHalfSignedHC.lastCrossSignedState.stateUpdate)
 
 
-    case (WaitRemoteHostedStateUpdate(_, localHalfSignedHC), remoteSU: StateUpdate, WAIT_FOR_ACCEPT) =>
+    case (WaitRemoteFiatHostedStateUpdate(_, localHalfSignedHC), remoteSU: StateUpdate, WAIT_FOR_ACCEPT) =>
       val localCompleteLCSS = localHalfSignedHC.lastCrossSignedState.copy(remoteSigOfLocal = remoteSU.localSigOfRemoteLCSS)
       val isRightRemoteUpdateNumber = localHalfSignedHC.lastCrossSignedState.remoteUpdates == remoteSU.localUpdates
       val isRightLocalUpdateNumber = localHalfSignedHC.lastCrossSignedState.localUpdates == remoteSU.remoteUpdates
@@ -71,7 +71,7 @@ abstract class FiatChannelHosted extends Channel { me =>
       StoreBecomeSend(localHalfSignedHC.copy(lastCrossSignedState = localCompleteLCSS), OPEN, askBrandingInfo)
 
 
-    case (wait: WaitRemoteHostedReply, remoteLCSS: LastCrossSignedState, WAIT_FOR_ACCEPT) =>
+    case (wait: WaitRemoteFiatHostedReply, remoteLCSS: LastCrossSignedState, WAIT_FOR_ACCEPT) =>
       val isLocalSigOk = remoteLCSS.verifyRemoteSig(wait.remoteInfo.nodeSpecificPubKey)
       val isRemoteSigOk = remoteLCSS.reverse.verifyRemoteSig(wait.remoteInfo.nodeId)
       val hc = FiatChannelHosted.restoreCommits(remoteLCSS.reverse, wait.remoteInfo)
@@ -89,7 +89,7 @@ abstract class FiatChannelHosted extends Channel { me =>
 
     // CHANNEL IS ESTABLISHED
 
-    case (hc: HostedCommits, CurrentBlockCount(tip), OPEN | SLEEPING) =>
+    case (hc: FiatHostedCommits, CurrentBlockCount(tip), OPEN | SLEEPING) =>
       // Keep in mind that we may have many outgoing HTLCs which have the same preimage
       val sentExpired = hc.allOutgoing.filter(tip > _.cltvExpiry.underlying).groupBy(_.paymentHash)
       val hasReceivedRevealedExpired = hc.revealedFulfills.exists(tip > _.theirAdd.cltvExpiry.underlying)
@@ -120,23 +120,23 @@ abstract class FiatChannelHosted extends Channel { me =>
       }
 
 
-    case (hc: HostedCommits, theirAdd: UpdateAddHtlc, OPEN) if hc.error.isEmpty =>
+    case (hc: FiatHostedCommits, theirAdd: UpdateAddHtlc, OPEN) if hc.error.isEmpty =>
       val theirAddExt = UpdateAddHtlcExt(theirAdd, hc.remoteInfo)
       BECOME(hc.receiveAdd(theirAdd), OPEN)
       events addReceived theirAddExt
 
 
-    case (hc: HostedCommits, msg: UpdateFailHtlc, OPEN) if hc.error.isEmpty => receiveHtlcFail(hc, msg, msg.id)
-    case (hc: HostedCommits, msg: UpdateFailMalformedHtlc, OPEN) if hc.error.isEmpty => receiveHtlcFail(hc, msg, msg.id)
+    case (hc: FiatHostedCommits, msg: UpdateFailHtlc, OPEN) if hc.error.isEmpty => receiveHtlcFail(hc, msg, msg.id)
+    case (hc: FiatHostedCommits, msg: UpdateFailMalformedHtlc, OPEN) if hc.error.isEmpty => receiveHtlcFail(hc, msg, msg.id)
 
 
-    case (hc: HostedCommits, msg: UpdateFulfillHtlc, OPEN | SLEEPING) if hc.error.isEmpty =>
+    case (hc: FiatHostedCommits, msg: UpdateFulfillHtlc, OPEN | SLEEPING) if hc.error.isEmpty =>
       val remoteFulfill = hc.makeRemoteFulfill(msg)
       BECOME(hc.addRemoteProposal(msg), state)
       events fulfillReceived remoteFulfill
 
 
-    case (hc: HostedCommits, msg: UpdateFulfillHtlc, OPEN | SLEEPING) if hc.error.isDefined =>
+    case (hc: FiatHostedCommits, msg: UpdateFulfillHtlc, OPEN | SLEEPING) if hc.error.isDefined =>
       // We may get into error state with this HTLC not expired yet so they may fulfill it afterwards
       val hc1 = hc.modify(_.postErrorOutgoingResolvedIds).using(_ + msg.id)
       // This will throw if HTLC has already been settled post-error
@@ -147,17 +147,17 @@ abstract class FiatChannelHosted extends Channel { me =>
       events.notifyResolvers
 
 
-    case (hc: HostedCommits, CMD_SIGN, OPEN) if (hc.nextLocalUpdates.nonEmpty || hc.resizeProposal.isDefined) && hc.error.isEmpty =>
+    case (hc: FiatHostedCommits, CMD_SIGN, OPEN) if (hc.nextLocalUpdates.nonEmpty || hc.resizeProposal.isDefined) && hc.error.isEmpty =>
       val nextLocalLCSS = hc.resizeProposal.map(hc.withResize).getOrElse(hc).nextLocalUnsignedLCSS(LNParams.currentBlockDay)
       SEND(nextLocalLCSS.withLocalSigOfRemote(hc.remoteInfo.nodeSpecificPrivKey).stateUpdate)
 
 
     // First attempt a normal state update, then a resized state update if original signature check fails and we have a pending resize proposal
-    case (hc: HostedCommits, remoteSU: StateUpdate, OPEN) if (remoteSU.localSigOfRemoteLCSS != hc.lastCrossSignedState.remoteSigOfLocal) && hc.error.isEmpty =>
+    case (hc: FiatHostedCommits, remoteSU: StateUpdate, OPEN) if (remoteSU.localSigOfRemoteLCSS != hc.lastCrossSignedState.remoteSigOfLocal) && hc.error.isEmpty =>
       attemptStateUpdate(remoteSU, hc)
 
 
-    case (hc: HostedCommits, cmd: CMD_ADD_HTLC, OPEN | SLEEPING) =>
+    case (hc: FiatHostedCommits, cmd: CMD_ADD_HTLC, OPEN | SLEEPING) =>
       hc.sendAdd(cmd, blockHeight = LNParams.blockCount.get) match {
         case _ if hc.error.isDefined => events addRejectedLocally ChannelNotAbleToSend(cmd.incompleteAdd)
         case _ if SLEEPING == state => events addRejectedLocally ChannelOffline(cmd.incompleteAdd)
@@ -177,62 +177,62 @@ abstract class FiatChannelHosted extends Channel { me =>
 
     // Fulfilling is allowed even in error state
     // CMD_SIGN will be sent from ChannelMaster strictly after outgoing FSM sends this command
-    case (hc: HostedCommits, cmd: CMD_FULFILL_HTLC, OPEN) if hc.nextLocalSpec.findIncomingHtlcById(cmd.theirAdd.id).isDefined =>
+    case (hc: FiatHostedCommits, cmd: CMD_FULFILL_HTLC, OPEN) if hc.nextLocalSpec.findIncomingHtlcById(cmd.theirAdd.id).isDefined =>
       val msg = UpdateFulfillHtlc(hc.channelId, cmd.theirAdd.id, cmd.preimage)
       StoreBecomeSend(hc.addLocalProposal(msg), OPEN, msg)
 
 
     // CMD_SIGN will be sent from ChannelMaster strictly after outgoing FSM sends this command
-    case (hc: HostedCommits, cmd: CMD_FAIL_HTLC, OPEN) if hc.nextLocalSpec.findIncomingHtlcById(cmd.theirAdd.id).isDefined && hc.error.isEmpty =>
+    case (hc: FiatHostedCommits, cmd: CMD_FAIL_HTLC, OPEN) if hc.nextLocalSpec.findIncomingHtlcById(cmd.theirAdd.id).isDefined && hc.error.isEmpty =>
       val msg = OutgoingPacket.buildHtlcFailure(cmd, theirAdd = cmd.theirAdd)
       StoreBecomeSend(hc.addLocalProposal(msg), OPEN, msg)
 
 
     // CMD_SIGN will be sent from ChannelMaster strictly after outgoing FSM sends this command
-    case (hc: HostedCommits, cmd: CMD_FAIL_MALFORMED_HTLC, OPEN) if hc.nextLocalSpec.findIncomingHtlcById(cmd.theirAdd.id).isDefined && hc.error.isEmpty =>
+    case (hc: FiatHostedCommits, cmd: CMD_FAIL_MALFORMED_HTLC, OPEN) if hc.nextLocalSpec.findIncomingHtlcById(cmd.theirAdd.id).isDefined && hc.error.isEmpty =>
       val msg = UpdateFailMalformedHtlc(hc.channelId, cmd.theirAdd.id, cmd.onionHash, cmd.failureCode)
       StoreBecomeSend(hc.addLocalProposal(msg), OPEN, msg)
 
 
-    case (hc: HostedCommits, CMD_SOCKET_ONLINE, SLEEPING) =>
+    case (hc: FiatHostedCommits, CMD_SOCKET_ONLINE, SLEEPING) =>
       val origRefundPubKey = hc.lastCrossSignedState.refundScriptPubKey
       val invokeMsg = InvokeHostedChannel(LNParams.chainHash, origRefundPubKey, ByteVector.empty)
       SEND(hc.error getOrElse invokeMsg)
 
 
-    case (hc: HostedCommits, CMD_SOCKET_OFFLINE, OPEN) => BECOME(hc, SLEEPING)
+    case (hc: FiatHostedCommits, CMD_SOCKET_OFFLINE, OPEN) => BECOME(hc, SLEEPING)
 
-    case (hc: HostedCommits, _: InitHostedChannel, SLEEPING) => SEND(hc.lastCrossSignedState)
+    case (hc: FiatHostedCommits, _: InitHostedChannel, SLEEPING) => SEND(hc.lastCrossSignedState)
 
-    case (hc: HostedCommits, remoteLCSS: LastCrossSignedState, SLEEPING) if hc.error.isEmpty => attemptInitResync(hc, remoteLCSS)
+    case (hc: FiatHostedCommits, remoteLCSS: LastCrossSignedState, SLEEPING) if hc.error.isEmpty => attemptInitResync(hc, remoteLCSS)
 
-    case (hc: HostedCommits, remoteInfo: RemoteNodeInfo, SLEEPING) if hc.remoteInfo.nodeId == remoteInfo.nodeId => StoreBecomeSend(hc.copy(remoteInfo = remoteInfo.safeAlias), SLEEPING)
+    case (hc: FiatHostedCommits, remoteInfo: RemoteNodeInfo, SLEEPING) if hc.remoteInfo.nodeId == remoteInfo.nodeId => StoreBecomeSend(hc.copy(remoteInfo = remoteInfo.safeAlias), SLEEPING)
 
 
-    case (hc: HostedCommits, update: ChannelUpdate, OPEN | SLEEPING) if hc.updateOpt.forall(_.core != update.core) && hc.error.isEmpty =>
+    case (hc: FiatHostedCommits, update: ChannelUpdate, OPEN | SLEEPING) if hc.updateOpt.forall(_.core != update.core) && hc.error.isEmpty =>
       val shortIdMatches = hostedShortChanId(hc.remoteInfo.nodeSpecificPubKey.value, hc.remoteInfo.nodeId.value) == update.shortChannelId
       if (shortIdMatches) StoreBecomeSend(hc.copy(updateOpt = update.asSome), state)
 
 
-    case (hc: HostedCommits, cmd: HC_CMD_RESIZE, OPEN | SLEEPING) if hc.resizeProposal.isEmpty && hc.error.isEmpty =>
+    case (hc: FiatHostedCommits, cmd: HC_CMD_RESIZE, OPEN | SLEEPING) if hc.resizeProposal.isEmpty && hc.error.isEmpty =>
       val capacitySat = hc.lastCrossSignedState.initHostedChannel.channelCapacityMsat.truncateToSatoshi
       val resize = ResizeChannel(capacitySat + cmd.delta).sign(hc.remoteInfo.nodeSpecificPrivKey)
       StoreBecomeSend(hc.copy(resizeProposal = resize.asSome), state, resize)
       process(CMD_SIGN)
 
 
-    case (hc: HostedCommits, resize: ResizeChannel, OPEN | SLEEPING) if hc.resizeProposal.isEmpty && hc.error.isEmpty =>
+    case (hc: FiatHostedCommits, resize: ResizeChannel, OPEN | SLEEPING) if hc.resizeProposal.isEmpty && hc.error.isEmpty =>
       // Can happen if we have sent a resize earlier, but then lost channel data and restored from their
       val isLocalSigOk: Boolean = resize.verifyClientSig(hc.remoteInfo.nodeSpecificPubKey)
       if (isLocalSigOk) StoreBecomeSend(hc.copy(resizeProposal = resize.asSome), state)
       else localSuspend(hc, ERR_HOSTED_INVALID_RESIZE)
 
 
-    case (hc: HostedCommits, remoteSO: StateOverride, OPEN | SLEEPING) if hc.error.isDefined && !hc.overrideProposal.contains(remoteSO) =>
+    case (hc: FiatHostedCommits, remoteSO: StateOverride, OPEN | SLEEPING) if hc.error.isDefined && !hc.overrideProposal.contains(remoteSO) =>
       StoreBecomeSend(hc.copy(overrideProposal = remoteSO.asSome), state)
 
 
-    case (hc: HostedCommits, cmd @ CMD_HOSTED_STATE_OVERRIDE(remoteSO), OPEN | SLEEPING) if hc.error.isDefined =>
+    case (hc: FiatHostedCommits, cmd @ CMD_HOSTED_STATE_OVERRIDE(remoteSO), OPEN | SLEEPING) if hc.error.isDefined =>
       val overriddenLocalBalance = hc.lastCrossSignedState.initHostedChannel.channelCapacityMsat - remoteSO.localBalanceMsat
       val completeLocalLCSS = hc.lastCrossSignedState.copy(incomingHtlcs = Nil, outgoingHtlcs = Nil, localBalanceMsat = overriddenLocalBalance,
         remoteBalanceMsat = remoteSO.localBalanceMsat, localUpdates = remoteSO.remoteUpdates, remoteUpdates = remoteSO.localUpdates, blockDay = remoteSO.blockDay,
@@ -252,7 +252,7 @@ abstract class FiatChannelHosted extends Channel { me =>
       events.notifyResolvers
 
 
-    case (hc: HostedCommits, remote: Fail, WAIT_FOR_ACCEPT | OPEN) if hc.remoteError.isEmpty =>
+    case (hc: FiatHostedCommits, remote: Fail, WAIT_FOR_ACCEPT | OPEN) if hc.remoteError.isEmpty =>
       StoreBecomeSend(data1 = hc.copy(remoteError = remote.asSome), OPEN)
       throw RemoteErrorException(ErrorExt extractDescription remote)
 
@@ -262,20 +262,20 @@ abstract class FiatChannelHosted extends Channel { me =>
       throw RemoteErrorException(ErrorExt extractDescription remote)
 
 
-    case (null, wait: WaitRemoteHostedReply, -1) => super.become(wait, WAIT_FOR_INIT)
-    case (null, hc: HostedCommits, -1) => super.become(hc, SLEEPING)
+    case (null, wait: WaitRemoteFiatHostedReply, -1) => super.become(wait, WAIT_FOR_INIT)
+    case (null, hc: FiatHostedCommits, -1) => super.become(hc, SLEEPING)
     case _ =>
   }
 
-  def rejectOverriddenOutgoingAdds(hc: HostedCommits, hc1: HostedCommits): Unit =
+  def rejectOverriddenOutgoingAdds(hc: FiatHostedCommits, hc1: FiatHostedCommits): Unit =
     for (add <- hc.allOutgoing -- hc1.allOutgoing) events addRejectedLocally InPrincipleNotSendable(add)
 
-  def localSuspend(hc: HostedCommits, errCode: String): Unit = {
+  def localSuspend(hc: FiatHostedCommits, errCode: String): Unit = {
     val localError = Fail(data = ByteVector.fromValidHex(errCode), channelId = hc.channelId)
     if (hc.localError.isEmpty) StoreBecomeSend(hc.copy(localError = localError.asSome), state, localError)
   }
 
-  def attemptInitResync(hc: HostedCommits, remoteLCSS: LastCrossSignedState): Unit = {
+  def attemptInitResync(hc: FiatHostedCommits, remoteLCSS: LastCrossSignedState): Unit = {
     val hc1 = hc.resizeProposal.filter(_ isRemoteResized remoteLCSS).map(hc.withResize).getOrElse(hc) // They may have a resized LCSS
     val weAreEven = hc.lastCrossSignedState.remoteUpdates == remoteLCSS.localUpdates && hc.lastCrossSignedState.localUpdates == remoteLCSS.remoteUpdates
     val weAreAhead = hc.lastCrossSignedState.remoteUpdates > remoteLCSS.localUpdates || hc.lastCrossSignedState.localUpdates > remoteLCSS.remoteUpdates
@@ -317,7 +317,7 @@ abstract class FiatChannelHosted extends Channel { me =>
     }
   }
 
-  def attemptStateUpdate(remoteSU: StateUpdate, hc: HostedCommits): Unit = {
+  def attemptStateUpdate(remoteSU: StateUpdate, hc: FiatHostedCommits): Unit = {
     val lcss1 = hc.nextLocalUnsignedLCSS(remoteSU.blockDay).copy(remoteSigOfLocal = remoteSU.localSigOfRemoteLCSS).withLocalSigOfRemote(hc.remoteInfo.nodeSpecificPrivKey)
     val hc1 = hc.copy(lastCrossSignedState = lcss1, localSpec = hc.nextLocalSpec, nextLocalUpdates = Nil, nextRemoteUpdates = Nil)
     val isRemoteSigOk = lcss1.verifyRemoteSig(hc.remoteInfo.nodeId)
@@ -347,7 +347,7 @@ abstract class FiatChannelHosted extends Channel { me =>
     }
   }
 
-  def receiveHtlcFail(hc: HostedCommits, msg: UpdateMessage, id: Long): Unit =
+  def receiveHtlcFail(hc: FiatHostedCommits, msg: UpdateMessage, id: Long): Unit =
     hc.localSpec.findOutgoingHtlcById(id) match {
       case None if hc.nextLocalSpec.findOutgoingHtlcById(id).isDefined => disconnectAndBecomeSleeping(hc)
       case _ if hc.postErrorOutgoingResolvedIds.contains(id) => throw ChannelTransitionFail(hc.channelId, msg)
@@ -355,7 +355,7 @@ abstract class FiatChannelHosted extends Channel { me =>
       case _ => BECOME(hc.addRemoteProposal(msg), OPEN)
     }
 
-  def disconnectAndBecomeSleeping(hc: HostedCommits): Unit = {
+  def disconnectAndBecomeSleeping(hc: FiatHostedCommits): Unit = {
     // Could have implemented a more involved partially-signed LCSS resolution
     // but for now we will just disconnect and resolve on reconnect if it gets too busy
     CommsTower.workers.get(hc.remoteInfo.nodeSpecificPair).foreach(_.disconnect)

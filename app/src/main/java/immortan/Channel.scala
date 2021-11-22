@@ -1,7 +1,6 @@
 package immortan
 
 import java.util.concurrent.Executors
-
 import akka.actor.{Actor, ActorRef, Props}
 import fr.acinq.bitcoin.ByteVector32
 import fr.acinq.eclair.MilliSatoshi
@@ -12,6 +11,7 @@ import fr.acinq.eclair.wire.LightningMessage
 import immortan.Channel.channelContext
 import immortan.crypto.Tools._
 import immortan.crypto.{CanBeRepliedTo, StateMachine}
+import standardsats.wallet.{FiatChannelHosted, FiatHostedCommits}
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -32,18 +32,21 @@ object Channel {
   def load(listeners: Set[ChannelListener], bag: ChannelBag): Map[ByteVector32, Channel] = bag.all.map {
     case data: HasNormalCommitments => data.channelId -> ChannelNormal.make(listeners, data, bag)
     case data: HostedCommits => data.channelId -> ChannelHosted.make(listeners, data, bag)
+    case data: FiatHostedCommits => data.channelId -> FiatChannelHosted.make(listeners, data, bag)
     case _ => throw new RuntimeException
   }.toMap
 
   def chanAndCommitsOpt(chan: Channel): Option[ChanAndCommits] = chan.data match {
     case data: HasNormalCommitments => ChanAndCommits(chan, data.commitments).asSome
     case data: HostedCommits => ChanAndCommits(chan, data).asSome
+    case data: FiatHostedCommits => ChanAndCommits(chan, data).asSome
     case _ => None
   }
 
   def isOperational(chan: Channel): Boolean = chan.data match {
     case data: DATA_NORMAL => data.localShutdown.isEmpty && data.remoteShutdown.isEmpty
     case hostedCommits: HostedCommits => hostedCommits.error.isEmpty
+    case hostedCommits: FiatHostedCommits => hostedCommits.error.isEmpty
     case _ => false
   }
 
