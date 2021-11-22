@@ -158,7 +158,7 @@ object Features {
 
   case object FiatHostedChannels extends Feature {
     val rfcName = "Fiat Hosted channels"
-    val mandatory = 32976
+    val mandatory = 49356
   }
 
   case object PrivateRouting extends Feature {
