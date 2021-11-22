@@ -16,6 +16,7 @@ import com.btcontract.wallet.BaseActivity.StringOps
 import com.btcontract.wallet.R.string._
 import com.btcontract.wallet.sqlite._
 import com.btcontract.wallet.utils.{AwaitService, DelayedNotification, LocalBackup}
+import com.softwaremill.quicklens._
 import fr.acinq.bitcoin.{Block, ByteVector32, Satoshi, SatoshiLong}
 import fr.acinq.eclair._
 import fr.acinq.eclair.blockchain.electrum.ElectrumClient.SSL
@@ -49,7 +50,7 @@ object WalletApp {
   var extDataBag: SQLiteDataExtended = _
   var app: WalletApp = _
 
-  var txDescriptions: Map[ByteVector32, TxDescription] = Map.empty
+  val txDescriptions = mutable.Map.empty[ByteVector32, TxDescription]
   var currentChainNode: Option[InetSocketAddress] = None
 
   final val dbFileNameMisc = "misc.db"
@@ -134,7 +135,7 @@ object WalletApp {
     // In case these are needed early
     LNParams.logBag = new SQLiteLog(miscInterface)
     LNParams.chainHash = Block.LivenetGenesisBlock.hash
-    LNParams.routerConf = RouterConf(initRouteMaxLength = 6)
+    LNParams.routerConf = RouterConf(12, LNParams.maxCltvExpiryDelta)
     LNParams.ourInit = LNParams.createInit
     LNParams.syncParams = new SyncParams
   }
@@ -189,7 +190,7 @@ object WalletApp {
       override def initConnect: Unit = if (ensureTor) app.checkTorProxy(restartApplication)(super.initConnect) else super.initConnect
     }
 
-    val params = WalletParameters(extDataBag, chainWalletBag, dustLimit = 546L.sat)
+    val params = WalletParameters(extDataBag, chainWalletBag, txDataBag, dustLimit = 546L.sat)
     val pool = LNParams.loggedActor(Props(classOf[ElectrumClientPool], LNParams.blockCount, LNParams.chainHash, LNParams.ec), "connection-pool")
     val sync = LNParams.loggedActor(Props(classOf[ElectrumChainSync], pool, params.headerDb, LNParams.chainHash), "chain-sync")
     val watcher = LNParams.loggedActor(Props(classOf[ElectrumWatcher], LNParams.blockCount, pool), "channel-watcher")
@@ -197,21 +198,22 @@ object WalletApp {
 
     val walletExt: WalletExt =
       (WalletExt(wallets = Nil, catcher, sync, pool, watcher, params) /: chainWalletBag.listWallets) {
-        case walletExt1 ~ CompleteChainWalletInfo(core: SigningWallet, persistentSigningData, lastBalance, label) =>
-          val signingWallet = walletExt1.makeSigningWalletParts(core, lastBalance, label)
-          signingWallet.walletRef ! persistentSigningData
-          walletExt1 + signingWallet
+        case ext ~ CompleteChainWalletInfo(core: SigningWallet, persistentSigningWalletData, lastBalance, label, false) =>
+          val signingWallet = ext.makeSigningWalletParts(core, lastBalance, label)
+          signingWallet.walletRef ! persistentSigningWalletData
+          ext.copy(wallets = signingWallet :: ext.wallets)
 
-        case walletExt1 ~ CompleteChainWalletInfo(core: WatchingWallet, persistentWatchingData, lastBalance, label) =>
-          val watchingWallet = walletExt1.makeWatchingWalletParts(core, lastBalance, label)
-          watchingWallet.walletRef ! persistentWatchingData
-          walletExt1 + watchingWallet
+        case ext ~ CompleteChainWalletInfo(core: WatchingWallet, persistentWatchingWalletData, lastBalance, label, false) =>
+          val watchingWallet = ext.makeWatchingWallet84Parts(core, lastBalance, label)
+          watchingWallet.walletRef ! persistentWatchingWalletData
+          ext.copy(wallets = watchingWallet :: ext.wallets)
       }
 
     LNParams.chainWallets = if (walletExt.wallets.isEmpty) {
-      val params = SigningWallet(EclairWallet.BIP84, isRemovable = false)
-      val label = app.getString(R.string.bitcoin_wallet)
-      walletExt.withNewSigning(params, label)
+      val defaultLabel = app.getString(R.string.bitcoin_wallet)
+      val core = SigningWallet(walletType = EclairWallet.BIP84, isRemovable = false)
+      val wallet = walletExt.makeSigningWalletParts(core, Satoshi(0L), defaultLabel)
+      walletExt.withFreshWallet(wallet)
     } else walletExt
 
     LNParams.feeRates.listeners += new FeeRatesListener {
@@ -231,7 +233,14 @@ object WalletApp {
     LNParams.chainWallets.catcher ! new WalletEventsListener {
       override def onChainTipKnown(event: CurrentBlockCount): Unit = LNParams.cm.initConnect
 
-      override def onWalletReady(event: WalletReady): Unit = LNParams.updateChainWallet(LNParams.chainWallets withBalanceUpdated event)
+      override def onWalletReady(event: WalletReady): Unit = LNParams.synchronized {
+        // Wallet is already persisted so our only job at this point is to update runtime
+        def sameXPub(wallet: ElectrumEclairWallet): Boolean = wallet.ewt.xPub == event.xPub
+        LNParams.chainWallets = LNParams.chainWallets.modify(_.wallets.eachWhere(sameXPub).info) using { info =>
+          // Coin control is always disabled on start, we update it later with animation to make it noticeable
+          info.copy(lastBalance = event.balance, isCoinControlOn = event.excludedOutPoints.nonEmpty)
+        }
+      }
 
       override def onChainMasterSelected(event: InetSocketAddress): Unit = currentChainNode = event.asSome
 
@@ -244,7 +253,7 @@ object WalletApp {
         }
 
         def doAddChainTx(received: Satoshi, sent: Satoshi, description: TxDescription, isIncoming: Long, totalBalance: MilliSatoshi): Unit = txDataBag.db txWrap {
-          txDataBag.addTx(event.tx, event.depth, received, sent, event.feeOpt, event.xPub, description, isIncoming, balanceSnap = totalBalance, LNParams.fiatRates.info.rates)
+          txDataBag.addTx(event.tx, event.depth, received, sent, event.feeOpt, event.xPub, description, isIncoming, totalBalance, LNParams.fiatRates.info.rates, event.stamp)
           txDataBag.addSearchableTransaction(description.queryText(event.tx.txid), event.tx.txid)
         }
 
@@ -299,18 +308,14 @@ object WalletApp {
   // Fiat conversion
 
   def currentRate(rates: Fiat2Btc, code: String): Try[Double] = Try(rates apply code)
-
-  def msatInFiat(rates: Fiat2Btc, code: String)(msat: MilliSatoshi): Try[Double] =
-    currentRate(rates, code).map(perBtc => msat.toLong * perBtc / BtcDenomination.factor)
+  val currentMsatInFiatHuman: MilliSatoshi => String = msat => msatInFiatHuman(LNParams.fiatRates.info.rates, fiatCode, msat, formatFiat)
+  def msatInFiat(rates: Fiat2Btc, code: String)(msat: MilliSatoshi): Try[Double] = currentRate(rates, code).map(perBtc => msat.toLong * perBtc / BtcDenomination.factor)
 
   def msatInFiatHuman(rates: Fiat2Btc, code: String, msat: MilliSatoshi, decimalFormat: DecimalFormat): String = {
     val fiatAmount = msatInFiat(rates, code)(msat).map(f = decimalFormat.format).getOrElse(default = "?")
     val formatted = LNParams.fiatRates.customFiatSymbols.get(code).map(symbol => s"$symbol$fiatAmount")
     formatted.getOrElse(s"$fiatAmount $code")
   }
-
-  val currentMsatInFiatHuman: MilliSatoshi => String = msat =>
-    msatInFiatHuman(LNParams.fiatRates.info.rates, fiatCode, msat, formatFiat)
 }
 
 object Vibrator {
@@ -382,7 +387,7 @@ class WalletApp extends Application { me =>
   }
 
   def when(thenDate: Date, simpleFormat: SimpleDateFormat, now: Long = System.currentTimeMillis): String = thenDate.getTime match {
-    case ago if now - ago > 12960000 || tooFewSpace || WalletApp.denom == BtcDenomination => simpleFormat.format(thenDate)
+    case tooLongAgo if now - tooLongAgo > 12960000 || tooFewSpace || WalletApp.denom == BtcDenomination => simpleFormat.format(thenDate)
     case ago => android.text.format.DateUtils.getRelativeTimeSpanString(ago, now, 0).toString
   }
 

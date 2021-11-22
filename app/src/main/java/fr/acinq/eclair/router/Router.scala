@@ -5,6 +5,8 @@ import fr.acinq.eclair._
 import fr.acinq.eclair.router.Graph.GraphStructure._
 import fr.acinq.eclair.router.Graph.RichWeight
 import fr.acinq.eclair.wire._
+import immortan.crypto.Tools._
+import immortan.utils.Statistics
 import scodec.bits.ByteVector
 
 
@@ -18,9 +20,9 @@ case class ChannelUpdateExt(update: ChannelUpdate, crc32: Long, score: Long, use
 }
 
 object Router {
-  case class ChannelDesc(shortChannelId: ShortChannelId, from: PublicKey, to: PublicKey)
+  case class ChannelDesc(shortChannelId: Long, from: PublicKey, to: PublicKey)
 
-  case class RouterConf(initRouteMaxLength: Int, routeMaxCltv: CltvExpiryDelta = CltvExpiryDelta(2016), maxChannelFailures: Int = 4, maxStrangeNodeFailures: Int = 6, maxRemoteAttempts: Int = 10)
+  case class RouterConf(initRouteMaxLength: Int, routeMaxCltv: CltvExpiryDelta, maxChannelFailures: Int = 4, maxStrangeNodeFailures: Int = 4, maxRemoteAttempts: Int = 6)
 
   case class PublicChannel(update1Opt: Option[ChannelUpdateExt], update2Opt: Option[ChannelUpdateExt], ann: ChannelAnnouncement) {
     def getChannelUpdateSameSideAs(cu: ChannelUpdate): Option[ChannelUpdateExt] = if (cu.position == ChannelUpdate.POSITION1NODE) update1Opt else update2Opt
@@ -34,11 +36,17 @@ object Router {
   }
 
   case class ChannelHop(edge: GraphEdge) extends Hop {
-    override def toString: String = s"node: ${nodeId.toString}, base: ${edge.updExt.update.feeBaseMsat}, ppm: ${edge.updExt.update.feeProportionalMillionths}, chanId: ${edge.desc.shortChannelId.toString}"
     override def fee(amount: MilliSatoshi): MilliSatoshi = nodeFee(edge.updExt.update.feeBaseMsat, edge.updExt.update.feeProportionalMillionths, amount)
     override val cltvExpiryDelta: CltvExpiryDelta = edge.updExt.update.cltvExpiryDelta
     override val nextNodeId: PublicKey = edge.desc.to
     override val nodeId: PublicKey = edge.desc.from
+
+    override def toString: String = {
+      val base = edge.updExt.update.feeBaseMsat
+      val ppm = edge.updExt.update.feeProportionalMillionths
+      val sid = ShortChannelId.asString(edge.desc.shortChannelId)
+      s"node: ${nodeId.toString}, base: $base, ppm: $ppm, sid: $sid"
+    }
   }
 
   case class NodeHop(nodeId: PublicKey, nextNodeId: PublicKey, cltvExpiryDelta: CltvExpiryDelta, fee: MilliSatoshi) extends Hop {
@@ -63,9 +71,9 @@ object Router {
 
     lazy val routedPerChannelHop: Seq[RoutedPerChannelHop] = routedPerHop.collect { case (amt, chanHop: ChannelHop) => amt -> chanHop }
 
-    def getEdgeForNode(nodeId: PublicKey): Option[GraphEdge] = routedPerChannelHop.collectFirst { case (_, chanHop: ChannelHop) if nodeId == chanHop.nodeId => chanHop.edge }
+    def getEdgeForNode(nodeId: PublicKey): Option[GraphEdge] = routedPerChannelHop.secondItems.collectFirst { case chanHop if nodeId == chanHop.nodeId => chanHop.edge }
 
-    def asString: String = routedPerHop.collect { case (_, hop) => hop.toString }.mkString(s"${weight.costs.head} -> ", " -> ", s" -> ${weight.costs.last}, route fee: $fee")
+    def asString: String = routedPerHop.secondItems.map(_.toString).mkString(s"${weight.costs.head}\n->\n", "\n->\n", s"\n->\n${weight.costs.last}\n---\nroute fee: $fee")
 
     require(hops.nonEmpty, "Route cannot be empty")
   }
@@ -76,10 +84,29 @@ object Router {
 
   case class RouteFound(route: Route, fullTag: FullPaymentTag, partId: ByteVector) extends RouteResponse
 
-  case class Data(channels: Map[ShortChannelId, PublicChannel], hostedChannels: Map[ShortChannelId, PublicChannel], graph: DirectedGraph)
+  case class Data(channels: Map[Long, PublicChannel], hostedChannels: Map[Long, PublicChannel], graph: DirectedGraph) {
+    val defAvgHopParams = AvgHopParams(CltvExpiryDelta(144), feeProportionalMillionths = 500L, feeBaseMsat = 1000L.msat, sampleSize = 1)
+
+    lazy val avgHopParams: AvgHopParams = if (channels.nonEmpty) {
+      val sample = channels.values.toVector.flatMap(pubChan => pubChan.update1Opt ++ pubChan.update2Opt)
+      val noFeeOutliers = Statistics.removeExtremeOutliers(sample)(_.update.feeProportionalMillionths)
+      getAvgHopParams(noFeeOutliers)
+    } else defAvgHopParams
+  }
 
   def getDesc(cu: ChannelUpdate, ann: ChannelAnnouncement): ChannelDesc = {
     if (Announcements isNode1 cu.channelFlags) ChannelDesc(cu.shortChannelId, ann.nodeId1, ann.nodeId2)
     else ChannelDesc(cu.shortChannelId, ann.nodeId2, ann.nodeId1)
+  }
+
+  def getAvgHopParams(sample: Seq[ChannelUpdateExt] = Nil): AvgHopParams = {
+    val cltvMean = Statistics.meanBy(sample)(_.update.cltvExpiryDelta.underlying).toInt
+    val cltvDeltaToFrequency = sample.groupBy(_.update.cltvExpiryDelta.underlying).mapValues(_.size)
+    val (cltvMode, _) = cltvDeltaToFrequency.maxBy(identity)(Statistics.InverseIntTupleComparator)
+
+    val proportional = Statistics.meanBy(sample)(_.update.feeProportionalMillionths).toLong
+    val base = MilliSatoshi(Statistics.meanBy(sample)(_.update.feeBaseMsat.underlying).toLong)
+    // For avergage hop we take max(mean, mode) to ensure we don't exlude too many routes by cltv
+    AvgHopParams(CltvExpiryDelta(cltvMean max cltvMode), proportional, base, sample.size)
   }
 }

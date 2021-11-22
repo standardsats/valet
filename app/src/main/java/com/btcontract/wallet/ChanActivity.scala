@@ -38,15 +38,14 @@ object ChanActivity {
     val preimages = hc.revealedFulfills.map(_.ourPreimage.toHex).mkString("\n")
     val hostedState = HostedState(hc.remoteInfo.nodeId, hc.remoteInfo.nodeSpecificPubKey, hc.lastCrossSignedState)
     val serializedHostedState = immortan.wire.ExtCodecs.hostedStateCodec.encode(value = hostedState).require.toHex
-    WalletApp.app.getString(ln_hosted_chan_state).format(getDetails(hc), serializedHostedState, preimages)
+    WalletApp.app.getString(ln_hosted_chan_state).format(getDetails(hc, "n/a"), serializedHostedState, preimages)
   }
 
-  def getDetails(cs: Commitments): String = {
-    val remoteId = cs.remoteInfo.nodeId.toString
-    val localId = cs.remoteInfo.nodeSpecificPubKey.toString
+  def getDetails(cs: Commitments, fundingTxid: String): String = {
     val shortId = cs.updateOpt.map(_.shortChannelId.toString).getOrElse("unknown")
     val stamp = WalletApp.app.when(new Date(cs.startedAt), WalletApp.app.dateFormat)
-    WalletApp.app.getString(ln_chan_details).format(remoteId, localId, shortId, stamp)
+    WalletApp.app.getString(ln_chan_details).format(cs.remoteInfo.nodeId.toString,
+      cs.remoteInfo.nodeSpecificPubKey.toString, shortId, fundingTxid, stamp)
   }
 }
 
@@ -94,8 +93,9 @@ class ChanActivity extends ChanErrorHandlerActivity with ChoiceReceiver with Has
     val channelCard: CardView = swipeWrap.findViewById(R.id.channelCard).asInstanceOf[CardView]
 
     val hcBranding: RelativeLayout = swipeWrap.findViewById(R.id.hcBranding).asInstanceOf[RelativeLayout]
-    val hcSupportInfo: TextView = swipeWrap.findViewById(R.id.hcSupportInfo).asInstanceOf[TextView]
+    val hcImageContainer: CardView = swipeWrap.findViewById(R.id.hcImageContainer).asInstanceOf[CardView]
     val hcImage: ImageView = swipeWrap.findViewById(R.id.hcImage).asInstanceOf[ImageView]
+    val hcInfo: ImageView = swipeWrap.findViewById(R.id.hcInfo).asInstanceOf[ImageButton]
 
     val baseBar: ProgressBar = swipeWrap.findViewById(R.id.baseBar).asInstanceOf[ProgressBar]
     val overBar: ProgressBar = swipeWrap.findViewById(R.id.overBar).asInstanceOf[ProgressBar]
@@ -151,7 +151,16 @@ class ChanActivity extends ChanErrorHandlerActivity with ChoiceReceiver with Has
         if (tempFeeMismatch) extraInfoText.setText(ln_info_fee_mismatch)
         visibleExcept(goneRes = -1)
       } else {
-        val closeInfoRes = chan.data match { case c: DATA_CLOSING => closedBy(c) case _ => ln_info_shutdown }
+        val closeInfoRes = chan.data match {
+          case _: DATA_WAIT_FOR_REMOTE_PUBLISH_FUTURE_COMMITMENT => ln_info_await_close
+          case close: DATA_CLOSING if close.remoteCommitPublished.nonEmpty => ln_info_close_remote
+          case close: DATA_CLOSING if close.nextRemoteCommitPublished.nonEmpty => ln_info_close_remote
+          case close: DATA_CLOSING if close.futureRemoteCommitPublished.nonEmpty => ln_info_close_remote
+          case close: DATA_CLOSING if close.mutualClosePublished.nonEmpty => ln_info_close_coop
+          case _: DATA_CLOSING => ln_info_close_local
+          case _ => ln_info_shutdown
+        }
+
         channelCard setOnClickListener bringChanOptions(normalChanActions.take(2), cs)
         visibleExcept(R.id.progressBars, R.id.canReceive, R.id.canSend)
         extraInfoText.setText(getString(closeInfoRes).html)
@@ -196,18 +205,20 @@ class ChanActivity extends ChanErrorHandlerActivity with ChoiceReceiver with Has
       }
 
       val brandOpt = brandingInfos.get(hc.remoteInfo.nodeId)
-      setVis(isVisible = hc.overrideProposal.isDefined, overrideProposal)
-      setVis(isVisible = brandOpt.isDefined, hcBranding)
+      // Hide image container at start, show it later if bitmap is fine
+      hcInfo setOnClickListener onButtonTap(me browse "https://lightning-wallet.com/posts/scaling-ln-with-hosted-channels/")
+      setVisMany(true -> hcBranding, false -> hcImageContainer, hc.overrideProposal.isDefined -> overrideProposal)
 
-      for (HostedChannelBranding(_, pngIcon, contactInfo) <- brandOpt) {
-        pngIcon.map(_.toArray).map(hcImageMemo.get).foreach(hcImage.setImageBitmap)
-        hcSupportInfo.setText(contactInfo)
-      }
+      for {
+        HostedChannelBranding(_, pngIcon, contactInfo) <- brandOpt
+        bitmapImage <- Try(pngIcon.get.toArray).map(hcImageMemo.get)
+        _ = hcImage setOnClickListener onButtonTap(me browse contactInfo)
+        _ = setVis(isVisible = true, hcImageContainer)
+      } hcImage.setImageBitmap(bitmapImage)
 
       removeItem setOnClickListener onButtonTap {
         if (hc.localSpec.htlcs.nonEmpty) snack(chanContainer, getString(ln_hosted_chan_remove_impossible).html, R.string.dialog_ok, _.dismiss)
         else mkCheckForm(alert => runAnd(alert.dismiss)(me removeHc hc), none, confirmationBuilder(hc, getString(confirm_ln_hosted_chan_remove).html), dialog_ok, dialog_cancel)
-        swipeWrap.close(true)
       }
 
       overrideProposal setOnClickListener onButtonTap {
@@ -242,19 +253,16 @@ class ChanActivity extends ChanErrorHandlerActivity with ChoiceReceiver with Has
   }
 
   override def onDestroy: Unit = {
-    try for (channel <- LNParams.cm.all.values) channel.listeners -= me catch none
+    try LNParams.cm.all.values.foreach(_.listeners -= me) catch none
     updateSubscription.foreach(_.unsubscribe)
     super.onDestroy
   }
 
   override def onChoiceMade(tag: AnyRef, pos: Int): Unit = (tag, pos) match {
-    case (commits: Commitments, 0) => share(ChanActivity getDetails commits)
-    case (hc: HostedCommits, 1) => share(ChanActivity getHcState hc)
-
-    case (cs: NormalCommits, 1) =>
-      val builder = confirmationBuilder(cs, getString(confirm_ln_normal_chan_close_wallet).html)
-      def proceed: Unit = for (chan <- me getChanByCommits cs) chan process CMD_CLOSE(None, force = false)
-      mkCheckForm(alert => runAnd(alert.dismiss)(proceed), none, builder, dialog_ok, dialog_cancel)
+    case (cs: NormalCommits, 0) => me share ChanActivity.getDetails(cs, cs.commitInput.outPoint.txid.toString)
+    case (nc: HostedCommits, 0) => me share ChanActivity.getDetails(nc, fundingTxid = "n/a")
+    case (hc: HostedCommits, 1) => me share ChanActivity.getHcState(hc)
+    case (cs: NormalCommits, 1) => closeNcToWallet(cs)
 
     case (hc: HostedCommits, 2) =>
       val builder = confirmationBuilder(hc, getString(confirm_ln_hosted_chan_drain).html)
@@ -268,6 +276,15 @@ class ChanActivity extends ChanErrorHandlerActivity with ChoiceReceiver with Has
   override def onException: PartialFunction[Malfunction, Unit] = {
     case (CMDException(reason, _: CMD_CLOSE), _, data: HasNormalCommitments) => chanError(data.channelId, reason, data.commitments.remoteInfo)
     case (CMDException(reason, _: CMD_HOSTED_STATE_OVERRIDE), _, hc: HostedCommits) => chanError(hc.channelId, reason, hc.remoteInfo)
+  }
+
+  def closeNcToWallet(cs: NormalCommits): Unit = {
+    bringChainWalletChooser(normalChanActions.tail.head.toString) { wallet =>
+      runFutureProcessOnUI(wallet.getReceiveAddresses, onFail) { addressResponse =>
+        val pubKeyScript = LNParams.addressToPubKeyScript(addressResponse.firstAccountAddress)
+        for (chan <- me getChanByCommits cs) chan process CMD_CLOSE(pubKeyScript.asSome, force = false)
+      }
+    }
   }
 
   def closeNcToAddress(cs: NormalCommits): Unit = {
@@ -311,9 +328,9 @@ class ChanActivity extends ChanErrorHandlerActivity with ChoiceReceiver with Has
   def receiveIntoChan(commits: Commitments): Unit = {
     lnReceiveGuard(getChanByCommits(commits).toList, chanContainer) {
       new OffChainReceiver(getChanByCommits(commits).toList, initMaxReceivable = Long.MaxValue.msat, initMinReceivable = 0L.msat) {
-        override def getManager: RateManager = new RateManager(body, getString(dialog_add_description).asSome, dialog_visibility_public, LNParams.fiatRates.info.rates, WalletApp.fiatCode)
+        override def getManager: RateManager = new RateManager(body, getString(dialog_add_description).asSome, dialog_visibility_sender, LNParams.fiatRates.info.rates, WalletApp.fiatCode)
         override def getDescription: PaymentDescription = PaymentDescription(split = None, label = None, semanticOrder = None, invoiceText = manager.resultExtraInput getOrElse new String)
-        override def processInvoice(prExt: PaymentRequestExt): Unit = runAnd(InputParser.value = prExt)(me goTo ClassNames.qrInvoiceActivityClass)
+        override def processInvoice(prExt: PaymentRequestExt): Unit = goToWithValue(ClassNames.qrInvoiceActivityClass, prExt)
         override def getTitleText: String = getString(dialog_receive_ln)
       }
     }
@@ -355,7 +372,7 @@ class ChanActivity extends ChanErrorHandlerActivity with ChoiceReceiver with Has
       addFlowChip(footer.flow, getString(chan_open_scan), R.drawable.border_blue, _ => scanNodeQr)
       if (LNParams.isMainnet) addFlowChip(footer.flow, getString(chan_open_lnbig), R.drawable.border_blue, _ => me browse "https://lnbig.com/#/open-channel")
       if (LNParams.isMainnet) addFlowChip(footer.flow, getString(chan_open_bitrefill), R.drawable.border_blue, _ => me browse "https://www.bitrefill.com/buy/lightning-channel")
-      if (LNParams.isMainnet && LNParams.cm.allHostedCommits.isEmpty && LNParams.currentBlockDay > 0) addFlowChip(footer.flow, getString(rpa_request_hc), R.drawable.border_yellow, _ => requestHostedChannel)
+      if (LNParams.isMainnet && LNParams.cm.allHostedCommits.isEmpty) addFlowChip(footer.flow, getString(rpa_request_hc), R.drawable.border_yellow, _ => requestHostedChannel)
       chanList.addFooterView(footer.view)
       chanList.setAdapter(chanAdapter)
       chanList.setDividerHeight(0)
@@ -384,14 +401,6 @@ class ChanActivity extends ChanErrorHandlerActivity with ChoiceReceiver with Has
   private def sumOrNothing(amt: MilliSatoshi, mainColor: String): String = {
     if (0L.msat != amt) WalletApp.denom.parsedWithSign(amt, mainColor, cardZero)
     else getString(chan_nothing)
-  }
-
-  private def closedBy(cd: DATA_CLOSING): Int = {
-    if (cd.remoteCommitPublished.nonEmpty) ln_info_close_remote
-    else if (cd.nextRemoteCommitPublished.nonEmpty) ln_info_close_remote
-    else if (cd.futureRemoteCommitPublished.nonEmpty) ln_info_close_remote
-    else if (cd.mutualClosePublished.nonEmpty) ln_info_close_coop
-    else ln_info_close_local
   }
 
   private def peerInfo(info: RemoteNodeInfo): String = s"<strong>${info.nodeId.toString.take(16).humanFour}</strong><br>${info.address.toString}"

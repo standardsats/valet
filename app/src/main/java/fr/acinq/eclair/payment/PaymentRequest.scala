@@ -19,7 +19,8 @@ package fr.acinq.eclair.payment
 import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey}
 import fr.acinq.bitcoin.{Base58, Base58Check, Bech32, Block, ByteVector32, ByteVector64, Crypto}
 import fr.acinq.eclair.payment.PaymentRequest._
-import fr.acinq.eclair.{CltvExpiryDelta, FeatureSupport, Features, MilliSatoshi, MilliSatoshiLong, ShortChannelId}
+import fr.acinq.eclair.wire.ExtraHop
+import fr.acinq.eclair.{CltvExpiryDelta, FeatureSupport, Features, MilliSatoshi, MilliSatoshiLong}
 import scodec.bits.{BitVector, ByteOrdering, ByteVector}
 import scodec.codecs.{list, ubyte}
 import scodec.{Codec, Err}
@@ -125,7 +126,7 @@ object PaymentRequest {
         Some(PaymentSecret(paymentSecret)),
         fallbackAddress.map(FallbackAddress.apply),
         Some(Expiry(OUR_EXPIRY_SECONDS)),
-        Some(MinFinalCltvExpiry(minFinalCltvExpiryDelta.toInt)),
+        Some(MinFinalCltvExpiry(minFinalCltvExpiryDelta.underlying)),
         features).flatten
       defaultTags ++ extraHops.map(RoutingInfo)
     }
@@ -267,17 +268,6 @@ object PaymentRequest {
   }
 
   /**
-   * Extra hop contained in RoutingInfoTag
-   *
-   * @param nodeId                    start of the channel
-   * @param shortChannelId            channel id
-   * @param feeBase                   node fixed fee
-   * @param feeProportionalMillionths node proportional fee
-   * @param cltvExpiryDelta           node cltv expiry delta
-   */
-  case class ExtraHop(nodeId: PublicKey, shortChannelId: ShortChannelId, feeBase: MilliSatoshi, feeProportionalMillionths: Long, cltvExpiryDelta: CltvExpiryDelta)
-
-  /**
    * Routing Info
    *
    * @param path one or more entries containing extra routing information for a private route
@@ -344,7 +334,7 @@ object PaymentRequest {
 
     val extraHopCodec: Codec[ExtraHop] = (
       ("nodeId" | publicKey) ::
-        ("shortChannelId" | shortchannelid) ::
+        ("shortChannelId" | int64) ::
         ("fee_base_msat" | millisatoshi32) ::
         ("fee_proportional_millionth" | uint32) ::
         ("cltv_expiry_delta" | cltvExpiryDelta)

@@ -180,6 +180,10 @@ object ChannelCodecs {
       (zeropaddedstring(32) withContext "alias")
   }.as[RemoteNodeInfo]
 
+  val channelLabelCodec = (text withContext "label").as[ChannelLabel]
+
+  val extParamsCodec = discriminated[ExtParams].by(uint16).typecase(1, channelLabelCodec)
+
   val commitmentsCodec = {
     (byte withContext "channelFlags") ::
       (bytes32 withContext "channelId") ::
@@ -198,7 +202,7 @@ object ChannelCodecs {
       (uint64overflow withContext "localNextHtlcId") ::
       (uint64overflow withContext "remoteNextHtlcId") ::
       (inputInfoCodec withContext "commitInput") ::
-      (listOfN(uint16, varsizebinarydata) withContext "extParams") ::
+      (listOfN(uint16, extParamsCodec) withContext "extParams") ::
       (int64 withContext "startedAt")
   }.as[NormalCommits]
 
@@ -250,13 +254,13 @@ object ChannelCodecs {
 
   val DATA_WAIT_FOR_FUNDING_LOCKED_Codec = {
     (commitmentsCodec withContext "commitments") ::
-      (shortchannelid withContext "shortChannelId") ::
+      (int64 withContext "shortChannelId") ::
       (lengthDelimited(fundingLockedCodec) withContext "lastSent")
   }.as[DATA_WAIT_FOR_FUNDING_LOCKED]
 
   val DATA_NORMAL_Codec = {
     (commitmentsCodec withContext "commitments") ::
-      (shortchannelid withContext "shortChannelId") ::
+      (int64 withContext "shortChannelId") ::
       (bool8 withContext "feeUpdateRequired") ::
       (listOfN(uint16, varsizebinarydata) withContext "extParams") ::
       (optional(bool8, lengthDelimited(shutdownCodec)) withContext "localShutdown") ::
@@ -300,7 +304,7 @@ object ChannelCodecs {
       (optional(bool8, lengthDelimited(failCodec)) withContext "remoteError") ::
       (optional(bool8, lengthDelimited(resizeChannelCodec)) withContext "resizeProposal") ::
       (optional(bool8, lengthDelimited(stateOverrideCodec)) withContext "overrideProposal") ::
-      (listOfN(uint16, varsizebinarydata) withContext "extParams") ::
+      (listOfN(uint16, extParamsCodec) withContext "extParams") ::
       (int64 withContext "startedAt")
   }.as[HostedCommits]
 

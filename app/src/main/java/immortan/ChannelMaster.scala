@@ -1,7 +1,5 @@
 package immortan
 
-import java.util.concurrent.atomic.AtomicLong
-
 import com.google.common.cache.LoadingCache
 import fr.acinq.bitcoin.ByteVector32
 import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey}
@@ -22,6 +20,7 @@ import immortan.fsm._
 import immortan.utils.{PaymentRequestExt, Rx}
 import rx.lang.scala.Subject
 
+import java.util.concurrent.atomic.AtomicLong
 import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.util.Try
@@ -55,7 +54,7 @@ object ChannelMaster {
 
   def dangerousHCRevealed(allRevealed: Map[ByteVector32, RevealedLocalFulfills], tip: Long, hash: ByteVector32): Iterable[LocalFulfill] = {
     // Of all incoming payments inside of HCs for which we have revealed a preimage, find those which are dangerously close to expiration, but not expired yet, but not hopelessly close
-    allRevealed.getOrElse(hash, Iterable.empty).filter(tip >= _.theirAdd.cltvExpiry.toLong - LNParams.hcFulfillSafetyBlocks).filter(tip <= _.theirAdd.cltvExpiry.toLong - 3)
+    allRevealed.getOrElse(hash, Iterable.empty).filter(tip >= _.theirAdd.cltvExpiry.underlying - LNParams.hcFulfillSafetyBlocks).filter(tip <= _.theirAdd.cltvExpiry.underlying - 3)
   }
 }
 
@@ -65,41 +64,44 @@ case class InFlightPayments(out: Map[FullPaymentTag, OutgoingAdds], in: Map[Full
 }
 
 class ChannelMaster(val payBag: PaymentBag, val chanBag: ChannelBag, val dataBag: DataBag, val pf: PathFinder) extends ChannelListener with ConnectionListener with CanBeShutDown { me =>
-  val getPaymentInfoMemo: LoadingCache[ByteVector32, PaymentInfoTry] = memoize(payBag.getPaymentInfo)
   val initResolveMemo: LoadingCache[UpdateAddHtlcExt, IncomingResolution] = memoize(initResolve)
   val getPreimageMemo: LoadingCache[ByteVector32, PreimageTry] = memoize(payBag.getPreimage)
   val opm: OutgoingPaymentMaster = new OutgoingPaymentMaster(me)
 
-  // This is defined as mutable set so wallet implementation can append listeners of its own at runtime here
-  val localPaymentListeners: mutable.Set[OutgoingPaymentListener] = mutable.Set apply new OutgoingPaymentListener {
-    override def wholePaymentSucceeded(data: OutgoingPaymentSenderData): Unit = opm process RemoveSenderFSM(data.cmd.fullTag)
+  val localPaymentListeners: mutable.Set[OutgoingPaymentListener] = {
+    val defListener: OutgoingPaymentListener = new OutgoingPaymentListener {
+      override def wholePaymentSucceeded(data: OutgoingPaymentSenderData): Unit =
+        opm process RemoveSenderFSM(data.cmd.fullTag)
 
-    override def wholePaymentFailed(data: OutgoingPaymentSenderData): Unit = chanBag.db txWrap {
-      // This method gets called after NO payment parts are left in system, irregardless of restarts
-      dataBag.putReport(data.cmd.fullTag.paymentHash, data.failuresAsString)
-      payBag.updAbortedOutgoing(data.cmd.fullTag.paymentHash)
-      opm process RemoveSenderFSM(data.cmd.fullTag)
-    }
-
-    override def gotFirstPreimage(data: OutgoingPaymentSenderData, fulfill: RemoteFulfill): Unit = chanBag.db txWrap {
-      // Note that this method MAY get called multiple times for multipart payments if fulfills happen between restarts
-      getPaymentInfoMemo.get(fulfill.ourAdd.paymentHash).filter(_.status != PaymentStatus.SUCCEEDED).foreach { paymentInfo =>
-        // Persist payment metadata if this is ACTUALLY the first preimage (otherwise payment would be marked as successful)
-        payBag.addSearchablePayment(paymentInfo.description.queryText, fulfill.ourAdd.paymentHash)
-        payBag.updOkOutgoing(fulfill, data.usedFee)
-
-        if (data.inFlightParts.nonEmpty) {
-          // Sender FSM won't have in-flight parts after restart
-          dataBag.putReport(fulfill.ourAdd.paymentHash, data.usedRoutesAsString)
-          // We only increment scores for normal channels, never for HCs
-          data.successfulUpdates.foreach(pf.normalBag.incrementScore)
-        }
+      override def wholePaymentFailed(data: OutgoingPaymentSenderData): Unit = chanBag.db txWrap {
+        // This method gets called after NO payment parts are left in system, irregardless of restarts
+        dataBag.putReport(data.cmd.fullTag.paymentHash, data.failuresAsString)
+        payBag.updAbortedOutgoing(data.cmd.fullTag.paymentHash)
+        opm process RemoveSenderFSM(data.cmd.fullTag)
       }
 
-      payBag.setPreimage(fulfill.ourAdd.paymentHash, fulfill.theirPreimage)
-      getPaymentInfoMemo.invalidate(fulfill.ourAdd.paymentHash)
-      getPreimageMemo.invalidate(fulfill.ourAdd.paymentHash)
+      override def gotFirstPreimage(data: OutgoingPaymentSenderData, fulfill: RemoteFulfill): Unit = chanBag.db txWrap {
+        // Note that this method MAY get called multiple times for multipart payments if fulfills happen between restarts
+        payBag.getPaymentInfo(fulfill.ourAdd.paymentHash).filter(_.status != PaymentStatus.SUCCEEDED).foreach { paymentInfo =>
+          // Persist payment metadata if this is ACTUALLY the first preimage (otherwise payment would be marked as successful)
+          payBag.addSearchablePayment(paymentInfo.description.queryText, fulfill.ourAdd.paymentHash)
+          payBag.updOkOutgoing(fulfill, data.usedFee)
+
+          if (data.inFlightParts.nonEmpty) {
+            // Sender FSM won't have in-flight parts after restart
+            dataBag.putReport(fulfill.ourAdd.paymentHash, data.usedRoutesAsString)
+            // We only increment scores for normal channels, never for HCs
+            data.successfulUpdates.foreach(pf.normalBag.incrementScore)
+          }
+        }
+
+        payBag.setPreimage(fulfill.ourAdd.paymentHash, fulfill.theirPreimage)
+        getPreimageMemo.invalidate(fulfill.ourAdd.paymentHash)
+      }
     }
+
+    // Mutable set so can be extended
+    mutable.Set(defListener)
   }
 
   var all = Map.empty[ByteVector32, Channel]
@@ -121,18 +123,16 @@ class ChannelMaster(val payBag: PaymentBag, val chanBag: ChannelBag, val dataBag
       // Attempt to decrypt an onion with our peer-specific nodeId, this would be a routed payment
       // If fails with BadOnion: get all waiting incoming secrets and try to find a matching one
 
-      case Left(_: BadOnion) =>
-        // Add random secret to find at least one BadOnion result and fail this HTLC properly
-        val ephemeralKeys = (payBag.listPendingSecrets + randomBytes32).map(LNParams.secret.keys.fakeInvoiceKey)
+      case Left(routed: BadOnion) =>
+        val ephemeralKeys = payBag.listPendingSecrets.map(LNParams.secret.keys.fakeInvoiceKey).toList
         val decryptionResults = for (ephemeralKey <- ephemeralKeys) yield IncomingPacket.decrypt(ext.theirAdd, ephemeralKey)
-        val resultsAndKeys = decryptionResults.zip(ephemeralKeys)
+        val goodResultFirst = decryptionResults.zip(ephemeralKeys) sortBy { case res ~ _ if res.isRight => 0 case _ => 1 }
 
-        resultsAndKeys.find(_._1.isRight).getOrElse(resultsAndKeys.head) match {
-          case Left(fail: BadOnion) ~ _ => CMD_FAIL_MALFORMED_HTLC(fail.onionHash, fail.code, ext.theirAdd)
-          case Left(onionFail) ~ secret => CMD_FAIL_HTLC(Right(onionFail), secret, ext.theirAdd)
-          case Right(packet) ~ secret => defineResolution(secret, packet)
-          case _ => throw new RuntimeException
-        }
+        goodResultFirst.headOption.map {
+          case (Right(packet), secret) => defineResolution(secret, packet)
+          case (Left(fail: BadOnion), _) => CMD_FAIL_MALFORMED_HTLC(fail.onionHash, fail.code, ext.theirAdd)
+          case (Left(onionFail), secret) => CMD_FAIL_HTLC(Right(onionFail), secret, ext.theirAdd)
+        } getOrElse CMD_FAIL_MALFORMED_HTLC(routed.onionHash, routed.code, ext.theirAdd)
 
       case Left(onionFail) => CMD_FAIL_HTLC(Right(onionFail), ext.remoteInfo.nodeSpecificPrivKey, ext.theirAdd)
       case Right(packet) => defineResolution(ext.remoteInfo.nodeSpecificPrivKey, packet)
@@ -143,12 +143,6 @@ class ChannelMaster(val payBag: PaymentBag, val chanBag: ChannelBag, val dataBag
     // payment itself may be fulfilled with preimage revealed or failed
     inProcessors -= data.fullTag
     inFinalized.onNext(data)
-  }
-
-  def updateDescriptionAndCache(description: PaymentDescription, paymentHash: ByteVector32): Unit = {
-    // This makes sure payment info cache is always updated every time a description is changed
-    payBag.updDescription(description, paymentHash)
-    getPaymentInfoMemo.invalidate(paymentHash)
   }
 
   // CONNECTION LISTENER
@@ -229,8 +223,6 @@ class ChannelMaster(val payBag: PaymentBag, val chanBag: ChannelBag, val dataBag
 
   def sortedReceivable(chans: Iterable[Channel] = Nil): Seq[ChanAndCommits] = operationalCncs(chans).filter(_.commits.updateOpt.isDefined).sortBy(_.commits.availableForReceive)
 
-  def sortedSendable(chans: Iterable[Channel] = Nil): Seq[ChanAndCommits] = operationalCncs(chans).sortBy(_.commits.availableForSend)
-
   def maxReceivable(sorted: Seq[ChanAndCommits] = Nil): Option[CommitsAndMax] = {
     // Example: we have (5, 50, 60, 100) chans -> (50, 60, 100), receivable = 50*3 = 150, #channels = 3
     // Example: we have (25, 50, 60, 100) chans -> (25, 50, 60, 100), receivable = 50*3 = 150 (because 50*3 > 25*4), but #channels = 4
@@ -242,26 +234,20 @@ class ChannelMaster(val payBag: PaymentBag, val chanBag: ChannelBag, val dataBag
   def maxSendable(chans: Iterable[Channel] = Nil): MilliSatoshi = {
     val inPrincipleUsableChans = chans.filter(Channel.isOperational)
     val sendableNoFee = opm.getSendable(inPrincipleUsableChans, maxFee = 0L.msat).values.sum
-    val theoreticMaxFee = LNParams.maxOffChainFeeAboveRatio.max(sendableNoFee * LNParams.maxOffChainFeeRatio)
-    // Subtract max theoretical fee from EACH channel since ANY channel MAY use ALL of fee reserve
-    opm.getSendable(inPrincipleUsableChans, maxFee = theoreticMaxFee).values.sum
+    val fee = LNParams.maxOffChainFeeAboveRatio.max(sendableNoFee * LNParams.maxOffChainFeeRatio)
+    0L.msat.max(sendableNoFee - fee)
   }
 
-  def makeSendCmd(prExt: PaymentRequestExt, toSend: MilliSatoshi, allowedChans: Seq[Channel], typicalChainTxFee: MilliSatoshi, capLNFeeToChain: Boolean): SendMultiPart = {
+  def makeSendCmd(prExt: PaymentRequestExt, toSend: MilliSatoshi, allowedChans: Seq[Channel], typicalChainFee: MilliSatoshi, capLNFeeToChain: Boolean): SendMultiPart = {
     val fullTag = FullPaymentTag(paymentHash = prExt.pr.paymentHash, paymentSecret = prExt.pr.paymentSecret.get, tag = PaymentTagTlv.LOCALLY_SENT)
     val extraEdges = RouteCalculation.makeExtraEdges(prExt.pr.routingInfo, target = prExt.pr.nodeId)
+    val maxFee = toSend * LNParams.maxOffChainFeeRatio
 
-    val feeReserve = toSend * LNParams.maxOffChainFeeRatio match {
-      case percent if percent < LNParams.maxOffChainFeeAboveRatio => LNParams.maxOffChainFeeAboveRatio
-      case percent if percent > typicalChainTxFee && capLNFeeToChain => typicalChainTxFee
-      case percent => percent
-    }
-
-    val split = SplitInfo(totalSum = 0L.msat, toSend)
     // Supply relative cltv expiry in case if we initiate a payment when chain tip is not yet known
     val chainExpiry = Right(prExt.pr.minFinalCltvExpiryDelta getOrElse LNParams.minInvoiceExpiryDelta)
     // An assumption is that toSend is at most maxSendable so max theoretically possible off-chain fee is already counted in, so we can send amount + fee
-    SendMultiPart(fullTag, chainExpiry, split, LNParams.routerConf, targetNodeId = prExt.pr.nodeId, feeReserve, allowedChans, fullTag.paymentSecret, extraEdges)
+    val feeReserve = if (maxFee < LNParams.maxOffChainFeeAboveRatio) LNParams.maxOffChainFeeAboveRatio else if (maxFee > typicalChainFee && capLNFeeToChain) typicalChainFee else maxFee
+    SendMultiPart(fullTag, chainExpiry, SplitInfo(totalSum = 0L.msat, toSend), LNParams.routerConf, targetNodeId = prExt.pr.nodeId, feeReserve, allowedChans, fullTag.paymentSecret, extraEdges)
   }
 
   def makePrExt(toReceive: MilliSatoshi, description: PaymentDescription, allowedChans: Seq[ChanAndCommits], hash: ByteVector32, secret: ByteVector32): PaymentRequestExt = {
@@ -270,28 +256,29 @@ class ChannelMaster(val payBag: PaymentBag, val chanBag: ChannelBag, val dataBag
     PaymentRequestExt.from(pr)
   }
 
-  def localSend(cmd: SendMultiPart): Unit = {
-    opm process CreateSenderFSM(localPaymentListeners, cmd.fullTag)
-    opm process ClearFailures
-    opm process cmd
-  }
-
   def checkIfSendable(paymentHash: ByteVector32): Option[Int] = {
     val isActive = opm.data.payments.values.exists(fsm => fsm.fullTag.tag == PaymentTagTlv.LOCALLY_SENT && fsm.fullTag.paymentHash == paymentHash)
     if (isActive) Some(PaymentInfo.NOT_SENDABLE_IN_FLIGHT) else if (getPreimageMemo.get(paymentHash).isSuccess) Some(PaymentInfo.NOT_SENDABLE_SUCCESS) else None
   }
 
+  def localSend(cmd: SendMultiPart): Unit = {
+    val create = CreateSenderFSM(localPaymentListeners, cmd.fullTag)
+    List(create, ClearFailures, cmd).foreach(opm.process)
+  }
+
   // These are executed in Channel context
 
   override def onException: PartialFunction[Malfunction, Unit] = {
+    case (error: ExpiredHtlcInNormalChannel, chan: ChannelNormal, _: HasNormalCommitments) =>
+      LNParams.logBag.put("channel-force-close-expired-htlc", error.stackTraceAsString)
+      chan doProcess CMD_CLOSE(scriptPubKey = None, force = true)
+
     case (error: ChannelTransitionFail, chan: ChannelNormal, _: HasNormalCommitments) =>
-      // Execute immediately in same thread to not let channel get updated
-      LNParams.logBag.put("channel-force-close", error.stackTraceAsString)
+      LNParams.logBag.put("channel-force-close-error", error.stackTraceAsString)
       chan doProcess CMD_CLOSE(scriptPubKey = None, force = true)
 
     case (error: ChannelTransitionFail, chan: ChannelHosted, hc: HostedCommits) =>
-      // Execute immediately in same thread to not let channel get updated
-      LNParams.logBag.put("channel-suspend", error.stackTraceAsString)
+      LNParams.logBag.put("hosted-channel-suspend", error.stackTraceAsString)
       chan.localSuspend(hc, ErrorCodes.ERR_HOSTED_MANUAL_SUSPEND)
   }
 

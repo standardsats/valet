@@ -11,6 +11,7 @@ import androidx.core.app.NotificationManagerCompat
 import com.btcontract.wallet.BaseActivity.StringOps
 import com.btcontract.wallet.R.string._
 import com.ornach.nobobutton.NoboButton
+import fr.acinq.bitcoin.Satoshi
 import fr.acinq.eclair.blockchain.EclairWallet._
 import fr.acinq.eclair.blockchain.electrum.db.SigningWallet
 import immortan.LNParams
@@ -31,6 +32,7 @@ object ClassNames {
   val qrSplitActivityClass: Class[QRSplitActivity] = classOf[QRSplitActivity]
   val qrChainActivityClass: Class[QRChainActivity] = classOf[QRChainActivity]
   val qrInvoiceActivityClass: Class[QRInvoiceActivity] = classOf[QRInvoiceActivity]
+  val coinControlActivityClass: Class[CoinControlActivity] = classOf[CoinControlActivity]
 
   val settingsActivityClass: Class[SettingsActivity] = classOf[SettingsActivity]
   val remotePeerActivityClass: Class[RemotePeerActivity] = classOf[RemotePeerActivity]
@@ -132,8 +134,8 @@ class MainActivity extends NfcReaderActivity with BaseActivity { me =>
         val core = SigningWallet(walletType = BIP32, isRemovable = true)
         decrypt(restoreLegacyWallet, extraInput.getText.toString) map { seed =>
           SetupActivity.fromMnemonics(seed.getMnemonicCode.asScala.toList, host = me)
-          val walletExt1 = LNParams.chainWallets.withNewSigning(core, core.walletType)
-          LNParams.updateChainWallet(walletExt = walletExt1)
+          val wallet = LNParams.chainWallets.makeSigningWalletParts(core, Satoshi(0L), core.walletType)
+          LNParams.chainWallets = LNParams.chainWallets.withFreshWallet(wallet)
           me exitTo ClassNames.hubActivityClass
           legacyWalletFile.delete
         } getOrElse makeAttempt

@@ -1,25 +1,27 @@
 package com.btcontract.wallet
 
-import android.widget._
-import immortan.crypto.Tools._
-import com.btcontract.wallet.Colors._
-import com.btcontract.wallet.R.string._
-import fr.acinq.eclair.blockchain.EclairWallet._
-
+import android.content.Intent
 import android.os.{Build, Bundle}
 import android.view.{View, ViewGroup}
-import immortan.{ChannelMaster, LNParams}
-import fr.acinq.eclair.wire.{Domain, NodeAddress}
-import immortan.utils.{BtcDenomination, SatDenomination}
-import com.btcontract.wallet.BuildConfig.{VERSION_CODE, VERSION_NAME}
-import com.btcontract.wallet.utils.{LocalBackup, OnListItemClickListener}
-import fr.acinq.eclair.blockchain.electrum.db.SigningWallet
-import com.btcontract.wallet.sheets.BaseChoiceBottomSheet
-import fr.acinq.eclair.wire.CommonCodecs.nodeaddress
-import com.google.android.material.snackbar.Snackbar
+import android.widget._
 import com.btcontract.wallet.BaseActivity.StringOps
+import com.btcontract.wallet.BuildConfig.{VERSION_CODE, VERSION_NAME}
+import com.btcontract.wallet.Colors._
+import com.btcontract.wallet.R.string._
+import com.btcontract.wallet.sheets.{BaseChoiceBottomSheet, PairingData}
+import com.btcontract.wallet.utils.{LocalBackup, OnListItemClickListener}
+import com.google.android.material.snackbar.Snackbar
+import fr.acinq.bitcoin.Satoshi
 import fr.acinq.eclair.MilliSatoshi
-import android.content.Intent
+import fr.acinq.eclair.blockchain.EclairWallet
+import fr.acinq.eclair.blockchain.EclairWallet._
+import fr.acinq.eclair.blockchain.electrum.db.{SigningWallet, WatchingWallet}
+import fr.acinq.eclair.wire.CommonCodecs.nodeaddress
+import fr.acinq.eclair.wire.{Domain, NodeAddress}
+import immortan.crypto.Tools._
+import immortan.utils.{BtcDenomination, SatDenomination}
+import immortan.{ChannelMaster, LNParams}
+
 import scala.util.Success
 
 
@@ -51,6 +53,7 @@ class SettingsActivity extends BaseActivity with HasTypicalChainFee with ChoiceR
       ChannelMaster.next(ChannelMaster.stateUpdateStream)
       setFiat.updateView
 
+
     case CHOICE_BTC_DENOMINATON_TAG =>
       WalletApp.app.prefs.edit.putString(WalletApp.BTC_DENOM, units(pos).sign).commit
       ChannelMaster.next(ChannelMaster.stateUpdateStream)
@@ -80,14 +83,9 @@ class SettingsActivity extends BaseActivity with HasTypicalChainFee with ChoiceR
   }
 
   lazy private[this] val chainWallets: SettingsHolder = new SettingsHolder {
+    setVisMany(false -> settingsCheck, false -> settingsInfo)
     settingsTitle.setText(settings_chain_wallets)
-    setVis(isVisible = false, settingsCheck)
-
-    override def updateView: Unit = {
-      val usedWalletTags = LNParams.chainWallets.wallets.map(_.info.core.walletType)
-      val text = usedWalletTags.mkString(s" <font color=$cardZero>/</font> ")
-      settingsInfo.setText(text.html)
-    }
+    override def updateView: Unit = none
 
     private val wallets = Map(
       BIP32 -> ("BRD, legacy wallet", "m/0'/0/n"),
@@ -116,12 +114,14 @@ class SettingsActivity extends BaseActivity with HasTypicalChainFee with ChoiceR
       val listener = new OnListItemClickListener {
         def onItemClicked(itemPosition: Int): Unit = {
           val core = SigningWallet(possibleKeys(itemPosition), isRemovable = true)
-          if (list isItemChecked itemPosition) LNParams.chainWallets.withNewSigning(core, core.walletType).asSome.foreach(LNParams.updateChainWallet)
-          else LNParams.chainWallets.findByTag(core.walletType).map(LNParams.chainWallets.withoutWallet).foreach(LNParams.updateChainWallet)
-          // Call this after chain wallets have been updated to redraw them on hub activity
-          HubActivity.chainWalletStream.onNext(LNParams.chainWallets)
-          ChannelMaster.next(ChannelMaster.statusUpdateStream)
-          updateView
+
+          if (list isItemChecked itemPosition) {
+            val wallet = LNParams.chainWallets.makeSigningWalletParts(core, Satoshi(0L), label = core.walletType)
+            HubActivity.instance.walletCards.resetChainCards(LNParams.chainWallets withFreshWallet wallet)
+          } else {
+            val affectedWallet = LNParams.chainWallets.wallets.find(wallet => wallet.isSigning && wallet.info.core.walletType == core.walletType)
+            affectedWallet.map(LNParams.chainWallets.withoutWallet).foreach(HubActivity.instance.walletCards.resetChainCards)
+          }
         }
       }
 
@@ -129,6 +129,43 @@ class SettingsActivity extends BaseActivity with HasTypicalChainFee with ChoiceR
       list.setChoiceMode(AbsListView.CHOICE_MODE_MULTIPLE)
       new BaseChoiceBottomSheet(list).show(getSupportFragmentManager, "unused-wallet-type-tag")
       for (wallet <- LNParams.chainWallets.wallets) list.setItemChecked(possibleKeys.indexOf(wallet.info.core.walletType), true)
+    }
+  }
+
+  lazy private[this] val addHardware: SettingsHolder = new SettingsHolder {
+    setVisMany(false -> settingsCheck, false -> settingsInfo)
+    view setOnClickListener onButtonTap(callUrScanner)
+    settingsTitle.setText(settings_hardware_add)
+    override def updateView: Unit = none
+
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
+      val message = getString(error_old_api_level).format(Build.VERSION.SDK_INT)
+      setVis(isVisible = true, settingsInfo)
+      settingsInfo.setText(message)
+      settingsTitle.setAlpha(0.5F)
+      view.setEnabled(false)
+    }
+
+    def callUrScanner: Unit = {
+      def onKey(data: PairingData): Unit = {
+        val (container, extraInputLayout, extraInput) = singleInputPopup
+        val builder = titleBodyAsViewBuilder(getString(settings_hardware_label).asDefView, container)
+        mkCheckForm(alert => runAnd(alert.dismiss)(proceed), none, builder, dialog_ok, dialog_cancel)
+        extraInputLayout.setHint(dialog_set_label)
+        showKeys(extraInput)
+
+        def proceed: Unit = runAnd(finish) {
+          if (LNParams.chainWallets.findByPubKey(data.bip84XPub.publicKey).isEmpty) {
+            val core = WatchingWallet(EclairWallet.BIP84, data.masterFingerprint, data.bip84XPub, isRemovable = true)
+            val label = extraInput.getText.toString.trim.asSome.filter(_.nonEmpty).getOrElse(EclairWallet.BIP84)
+            val wallet = LNParams.chainWallets.makeWatchingWallet84Parts(core, lastBalance = Satoshi(0L), label)
+            HubActivity.instance.walletCards.resetChainCards(LNParams.chainWallets withFreshWallet wallet)
+          }
+        }
+      }
+
+      val sheet = new sheets.URBottomSheet(me, onKey)
+      callScanner(sheet)
     }
   }
 
@@ -199,7 +236,7 @@ class SettingsActivity extends BaseActivity with HasTypicalChainFee with ChoiceR
     override def updateView: Unit = {
       val short = WalletApp.denom.sign.toUpperCase
       val isSatDenom = WalletApp.denom == SatDenomination
-      val text = if (isSatDenom) s"Satoshi ($short)" else s"Bitcoin (BTC, $short)"
+      val text = if (isSatDenom) s"Satoshi ($short)" else s"Bitcoin ($short)"
       settingsInfo.setText(text)
     }
   }
@@ -283,8 +320,6 @@ class SettingsActivity extends BaseActivity with HasTypicalChainFee with ChoiceR
       addFlowChip(links.flow, getString(sources), R.drawable.border_green, _ => me browse "https://github.com/btcontract/wallet")
       addFlowChip(links.flow, getString(rate), R.drawable.border_green, _ => me bringRateDialog null)
 
-      if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) addFlowChip(links.flow, getString(settings_old_api_warn), R.drawable.border_yellow).setMaxLines(10)
-
       for (count <- LNParams.logBag.count if count > 0) {
         def exportLog: Unit = me share LNParams.logBag.recent.map(_.asString).mkString("\n\n")
         val errorCount = s"${me getString error_log} <font color=$cardZero>$count</font>"
@@ -294,6 +329,7 @@ class SettingsActivity extends BaseActivity with HasTypicalChainFee with ChoiceR
       settingsContainer.addView(settingsPageitle.view)
       settingsContainer.addView(storeLocalBackup.view)
       settingsContainer.addView(chainWallets.view)
+      settingsContainer.addView(addHardware.view)
       settingsContainer.addView(electrum.view)
       settingsContainer.addView(setFiat.view)
       settingsContainer.addView(setBtc.view)

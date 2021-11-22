@@ -45,12 +45,12 @@ case class LocalFailure(status: String, amount: MilliSatoshi) extends PaymentFai
 }
 
 case class UnreadableRemoteFailure(route: Route) extends PaymentFailure {
-  override def asString: String = s"- Remote failure at unknown channel: ${route.asString}"
+  override def asString: String = s"- Remote failure at unknown channel.\n${route.asString}"
 }
 
 case class RemoteFailure(packet: Sphinx.DecryptedFailurePacket, route: Route) extends PaymentFailure {
-  def originChannelId: String = route.getEdgeForNode(packet.originNode).map(_.updExt.update.shortChannelId.toString).getOrElse("unknown channel")
-  override def asString: String = s"- ${packet.failureMessage.message} at $originChannelId: ${route.asString}"
+  def originShortChanId: Long = route.getEdgeForNode(packet.originNode).map(_.updExt.update.shortChannelId).getOrElse(-1L)
+  override def asString: String = s"- ${packet.failureMessage.message} at ${ShortChannelId asString originShortChanId}.\n${route.asString}"
 }
 
 // Master commands and data
@@ -116,7 +116,7 @@ class OutgoingPaymentMaster(val cm: ChannelMaster) extends StateMachine[Outgoing
       become(data.withFailuresReduced(System.currentTimeMillis), state)
 
     case (send: SendMultiPart, EXPECTING_PAYMENTS | WAITING_FOR_ROUTE) =>
-      for (edge <- send.assistedEdges) cm.pf process edge
+      for (graphEdge <- send.assistedEdges) cm.pf process graphEdge
       data.payments(send.fullTag) doProcess send
       me process CMDAskForRoute
 
@@ -147,7 +147,7 @@ class OutgoingPaymentMaster(val cm: ChannelMaster) extends StateMachine[Outgoing
       cm.pf process PathFinder.FindRoute(me, req1)
       become(data, WAITING_FOR_ROUTE)
 
-    case (PathFinder.NotifyRejected, WAITING_FOR_ROUTE) =>
+    case (PathFinder.NotifyNotReady, WAITING_FOR_ROUTE) =>
       // Pathfinder is not yet ready, switch local state back
       // pathfinder is expected to notify us once it gets ready
       become(data, EXPECTING_PAYMENTS)
@@ -258,18 +258,7 @@ case class OutgoingPaymentSenderData(cmd: SendMultiPart, parts: Map[ByteVector, 
   def withLocalFailure(reason: String, amount: MilliSatoshi): OutgoingPaymentSenderData = copy(failures = LocalFailure(reason, amount) +: failures)
   def withoutPartId(failedPartId: ByteVector): OutgoingPaymentSenderData = copy(parts = parts - failedPartId)
   def usedRoutesAsString: String = inFlightParts.map(_.route.asString).mkString("\n\n")
-
-  def failuresAsString: String = {
-    val byAmount: Map[MilliSatoshi, Failures] = failures.groupBy {
-      case fail: UnreadableRemoteFailure => fail.route.weight.costs.head
-      case fail: RemoteFailure => fail.route.weight.costs.head
-      case fail: LocalFailure => fail.amount
-    }
-
-    def translateFails(failureList: Failures): String = failureList.map(_.asString).mkString("\n\n")
-    val bySortedAmount = byAmount.mapValues(translateFails).toSeq.sortBy { case (amount, _) => -amount }
-    bySortedAmount.map { case (amount, fails) => s"» $amount:\n\n$fails" }.mkString("\n\n")
-  }
+  def failuresAsString: String = failures.reverse.map(_.asString).mkString("\n\n")
 
   lazy val inFlightParts: Iterable[InFlightInfo] = parts.values.flatMap { case wait: WaitForRouteOrInFlight => wait.flight case _ => None }
   lazy val successfulUpdates: Iterable[ChannelUpdateExt] = inFlightParts.flatMap(_.route.routedPerChannelHop).toMap.values.map(_.edge.updExt)
@@ -340,7 +329,7 @@ class OutgoingPaymentSender(val fullTag: FullPaymentTag, val listeners: Iterable
     case (found: RouteFound, PENDING) =>
       data.parts.values.collectFirst {
         case wait: WaitForRouteOrInFlight if wait.flight.isEmpty && wait.partId == found.partId =>
-          val chainExpiry = data.cmd.chainExpiry match { case Right(delta) => delta.toCltvExpiry(LNParams.blockCount.get + 1) case Left(absolute) => absolute }
+          val chainExpiry = data.cmd.chainExpiry.fold(fb = _.toCltvExpiry(LNParams.blockCount.get + 1L), fa = identity)
           val finalPayload = Onion.createMultiPartPayload(wait.amount, data.cmd.split.totalSum, chainExpiry, data.cmd.outerPaymentSecret, data.cmd.onionTlvs, data.cmd.userCustomTlvs)
           val (firstAmount, firstExpiry, onion) = OutgoingPacket.buildPacket(Sphinx.PaymentPacket)(wait.onionKey, fullTag.paymentHash, found.route.hops, finalPayload)
           val cmdAdd = CMD_ADD_HTLC(fullTag, firstAmount, firstExpiry, PacketAndSecrets(onion.packet, onion.sharedSecrets), finalPayload)

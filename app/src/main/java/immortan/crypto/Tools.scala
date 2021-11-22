@@ -1,26 +1,29 @@
 package immortan.crypto
 
-import java.io.ByteArrayInputStream
-import java.nio.ByteOrder
-import java.util.concurrent.TimeUnit
-
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache}
+import com.sparrowwallet.hummingbird.UR
 import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey}
+import fr.acinq.bitcoin.Psbt.KeyPathWithMaster
 import fr.acinq.bitcoin._
+import fr.acinq.eclair._
+import fr.acinq.eclair.blockchain.electrum.ElectrumWallet.GenerateTxResponse
 import fr.acinq.eclair.blockchain.fee.FeeratePerKw
 import fr.acinq.eclair.crypto.ChaCha20Poly1305
-import fr.acinq.eclair.payment.PaymentRequest.ExtraHop
 import fr.acinq.eclair.router.Graph.GraphStructure.GraphEdge
 import fr.acinq.eclair.router.RouteCalculation
 import fr.acinq.eclair.router.Router.ChannelDesc
 import fr.acinq.eclair.transactions.CommitmentSpec
-import fr.acinq.eclair._
+import fr.acinq.eclair.wire.ExtraHop
 import immortan.crypto.Noise.KeyPair
 import immortan.crypto.Tools.runAnd
 import immortan.utils.{FeeRatesInfo, ThrottledWork}
 import rx.lang.scala.Observable
 import scodec.bits.ByteVector
 
+import java.io.ByteArrayInputStream
+import java.nio.charset.StandardCharsets
+import java.nio.{ByteBuffer, ByteOrder}
+import java.util.concurrent.TimeUnit
 import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.language.implicitConversions
@@ -79,10 +82,10 @@ object Tools {
     Crypto.sha256(nodesCombined)
   }
 
-  def hostedShortChanId(pubkey1: ByteVector, pubkey2: ByteVector): ShortChannelId = {
+  def hostedShortChanId(pubkey1: ByteVector, pubkey2: ByteVector): Long = {
     val stream = new ByteArrayInputStream(hostedNodesCombined(pubkey1, pubkey2).toArray)
     def getChunk: Long = Protocol.uint64(stream, ByteOrder.BIG_ENDIAN)
-    ShortChannelId(List.fill(8)(getChunk).sum)
+    List.fill(8)(getChunk).sum
   }
 
   def mkFakeLocalEdge(from: PublicKey, toPeer: PublicKey): GraphEdge = {
@@ -90,7 +93,7 @@ object Tools {
     // Parameters do not matter except that it must point to real peer
 
     val zeroCltvDelta = CltvExpiryDelta(0)
-    val randomShortChannelId = ShortChannelId(secureRandom.nextLong)
+    val randomShortChannelId = secureRandom.nextLong
     val fakeDesc = ChannelDesc(randomShortChannelId, from, to = toPeer)
     val fakeHop = ExtraHop(from, randomShortChannelId, MilliSatoshi(0L), 0L, zeroCltvDelta)
     GraphEdge(updExt = RouteCalculation.toFakeUpdate(fakeHop), desc = fakeDesc)
@@ -114,6 +117,47 @@ object Tools {
 
   def chaChaDecrypt(key: ByteVector32, data: ByteVector): Try[ByteVector] = Try {
     ChaCha20Poly1305.decrypt(key, nonce = data drop 16 take 12, ciphertext = data drop 28, ByteVector.empty, mac = data take 16)
+  }
+
+  def prepareBip84Psbt(response: GenerateTxResponse, masterFingerprint: Long): Psbt = {
+    // We ONLY support BIP84 watching wallets so all inputs have witnesses
+    val psbt1 = Psbt(response.tx)
+
+    // Provide info about inputs
+    val psbt2 = response.tx.txIn.foldLeft(psbt1) { case (psbt, txIn) =>
+      val parentTransaction = response.data.transactions(txIn.outPoint.txid)
+      val utxoPubKey = response.data.publicScriptMap(parentTransaction.txOut(txIn.outPoint.index.toInt).publicKeyScript)
+      val derivationPath = Map(KeyPathWithMaster(masterFingerprint, utxoPubKey.path) -> utxoPubKey.publicKey).map(_.swap)
+      psbt.updateWitnessInputTx(parentTransaction, txIn.outPoint.index.toInt, derivationPaths = derivationPath).get
+    }
+
+    // Provide info about out change output
+    response.tx.txOut.zipWithIndex.foldLeft(psbt2) { case (psbt, txOut ~ index) =>
+      response.data.publicScriptChangeMap.get(txOut.publicKeyScript) map { changeKey =>
+        val changeKeyPathWithMaster = KeyPathWithMaster(masterFingerprint, changeKey.path)
+        val derivationPath = Map(changeKeyPathWithMaster -> changeKey.publicKey).map(_.swap)
+        psbt.updateWitnessOutput(index, derivationPaths = derivationPath).get
+      } getOrElse psbt
+    }
+  }
+
+  def extractBip84Tx(psbt: Psbt): Try[Transaction] = {
+    // We ONLY support BIP84 watching wallets so all inputs have witnesses
+    psbt.inputs.zipWithIndex.foldLeft(psbt) { case (psbt1, input ~ index) =>
+      val (pubKey: PublicKey, signature: ByteVector) = input.partialSigs.head
+      val witness = Script.witnessPay2wpkh(pubKey, signature)
+      psbt1.finalizeWitnessInput(index, witness).get
+    }.extract
+  }
+
+  def obtainPsbt(ur: UR): Try[Psbt] = {
+    val urBytes = ur.decodeFromRegistry.asInstanceOf[Bytes]
+    val charDecoder = StandardCharsets.UTF_8.newDecoder
+    val buffer = ByteBuffer.wrap(urBytes)
+
+    Try {
+      ByteVector.fromValidHex(charDecoder.decode(buffer).toString)
+    } flatMap Psbt.read orElse Psbt.read(urBytes)
   }
 
   object ~ {

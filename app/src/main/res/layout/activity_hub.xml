@@ -39,19 +39,19 @@
         <com.ornach.nobobutton.NoboButton
             app:nb_text="@string/dialog_send"
             android:onClick="bringSendOptions"
-            android:layout_width="120dp"
+            android:layout_width="110dp"
             android:layout_margin="10dp"
             style="@style/GrayButton"/>
 
         <com.ornach.nobobutton.NoboButton
-            app:nb_drawableResource="@drawable/outline_qr_code_scanner_24"
+            app:nb_drawableResource="@drawable/outline_qr_code_scanner_32_24"
             android:onClick="bringScanner"
             style="@style/GrayButton"/>
 
         <com.ornach.nobobutton.NoboButton
             app:nb_text="@string/dialog_receive"
             android:onClick="bringReceiveOptions"
-            android:layout_width="120dp"
+            android:layout_width="110dp"
             android:layout_margin="10dp"
             style="@style/GrayButton"/>
 
