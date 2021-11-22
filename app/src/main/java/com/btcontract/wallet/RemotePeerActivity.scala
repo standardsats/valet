@@ -23,6 +23,8 @@ import immortan.fsm.{HCOpenHandler, NCFundeeOpenHandler, NCFunderOpenHandler}
 import immortan.utils._
 import org.apmem.tools.layouts.FlowLayout
 import rx.lang.scala.Observable
+import standardsats.wallet.FiatChannelHosted
+import standardsats.wallet.fsm.FiatHCOpenHandler
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -308,11 +310,11 @@ class RemotePeerActivity extends ChanErrorHandlerActivity with ExternalDataCheck
       alert.dismiss
 
       // We only need local params to extract defaultFinalScriptPubKey
-//      val params = LNParams.makeChannelParams(isFunder = false, LNParams.minChanDustLimit)
-//      new HCOpenHandler(hasInfo.remoteInfo, secret, params.defaultFinalScriptPubKey, LNParams.cm) {
-//        def onEstablished(cs: Commitments, channel: ChannelHosted): Unit = implant(cs, channel)
-//        def onFailure(reason: Throwable): Unit = revertAndInform(reason)
-//      }
+      val params = LNParams.makeChannelParams(isFunder = false, LNParams.minChanDustLimit)
+      new FiatHCOpenHandler(hasInfo.remoteInfo, secret, params.defaultFinalScriptPubKey, LNParams.cm) {
+        def onEstablished(cs: Commitments, channel: FiatChannelHosted): Unit = implant(cs, channel)
+        def onFailure(reason: Throwable): Unit = revertAndInform(reason)
+      }
     }
   }
 
