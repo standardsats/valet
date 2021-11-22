@@ -41,7 +41,7 @@ public class LocalBackupSpec {
 
         try {
             // Correctly decrypt a backup file and copy it to database file location
-            ByteVector cipherbytes = ByteVector.view(Files.toByteArray(LocalBackup.getBackupFileUnsafe(chainHash, seed)));
+            ByteVector cipherbytes = ByteVector.view(Files.toByteArray(LocalBackup.getBackupFileUnsafe(WalletApp.app().getBaseContext(), chainHash, seed)));
             ByteVector plainbytes = LocalBackup.decryptBackup(cipherbytes, seed).get();
             Assert.assertArrayEquals(plainbytes.toArray(), fileContents.toArray());
             LocalBackup.copyPlainDataToDbLocation(WalletApp.app(), dbFileName, plainbytes);
@@ -53,7 +53,7 @@ public class LocalBackupSpec {
     // Called from here because this class has write permissions
 
     public void writeGraphSnapshot(ByteVector snapshot) {
-        File graphFile = LocalBackup.getGraphFileUnsafe(LNParams.chainHash());
+        File graphFile = LocalBackup.getGraphFileUnsafe(WalletApp.app().getBaseContext(), LNParams.chainHash());
 
         try {
             Files.write(snapshot.toArray(), graphFile);

@@ -18,6 +18,7 @@
     <string name="lightning_wallet">Молния</string>
     <string name="total_balance">Общий баланс</string>
     <string name="hosted_channel">HOSTED CHANNEL\nCustodial solution</string>
+    <string name="hosted_fiat_channel">HOSTED FIAT CHANNEL\nCustodial solution</string>
     <string name="typing_hints">Биткойн адрес, инвойс, емейл&#8230;</string>
     <string name="copied_to_clipboard">Скопировано в буфер</string>
     <string name="add_address">Больше свежих адресов</string>
@@ -233,8 +234,10 @@
     <string name="rpa_disconnected">Удаленный узел отключился</string>
     <string name="rpa_no_feature_support">Невозможно открыть канал с этим узлом потмоу что он не поддерживает важные особенности протокола</string>
     <string name="rpa_hc_warn"><![CDATA[<br><b>Внимание!</b><br><br>Ваши средства в hosted-канале будут храниться на стороне хоста: убедитесь, что вы доверяете этому ему!]]></string>
+    <string name="rpa_fiat_hc_warn"><![CDATA[<br><b>Внимание!</b><br><br>Ваши средства в hosted-канале будут храниться на стороне хоста: убедитесь, что вы доверяете этому ему! <br><br>Ваш баланс будет привязан к USD, поэтому баланс в сатошах будет плавающим.]]></string>
     <string name="rpa_request_channel">Поделитесь своим node ID с удаленным узлом и оставьте открытой эту страницу до получения входящего канала</string>
     <string name="rpa_request_hc">Запросить hosted-канал</string>
+    <string name="rpa_request_fiat_hc">Запросить hosted-канал в фиате</string>
     <string name="rpa_share_node_id">Поделиться Node ID</string>
     <string name="rpa_open_nc">Открыть новый канал</string>
 

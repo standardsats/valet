@@ -18,6 +18,7 @@
     <string name="lightning_wallet">Lightning</string>
     <string name="total_balance">Saldo total</string>
     <string name="hosted_channel">HOSTED CHANNEL\nCustodial solution</string>
+    <string name="hosted_fiat_channel">HOSTED FIAT CHANNEL\nCustodial solution</string>
     <string name="typing_hints">Dirección de Bitcoin, factura, correo&#8230;</string>
     <string name="copied_to_clipboard">Copiado al portapapeles</string>
     <string name="add_address">Más direcciones no usadas</string>
@@ -233,8 +234,10 @@
     <string name="rpa_disconnected">Par remoto desconectado</string>
     <string name="rpa_no_feature_support">No es posible abrir canales con este nodo ya que algunas características importantes no están soportadas por el par remoto.</string>
     <string name="rpa_hc_warn"><![CDATA[<br><b>Atención!</b><br><br>El saldo de tu canal hospedado será guardado del lado del anfitrión, asegúrate de que confías en este par.]]></string>
+    <string name="rpa_fiat_hc_warn"><![CDATA[<br><b>Attention!</b><br><br>El saldo de tu canal hospedado será guardado del lado del anfitrión, asegúrate de que confías en este par.. <br><br>YSu saldo estará ajustado al precio en USD, por lo que el saldo de satoshi estará flotando]]></string>
     <string name="rpa_request_channel">Comparte el ID de tu nodo con el par remoto y mantén esta página abierta para obtener un canal entrante.</string>
     <string name="rpa_request_hc">Solicitar canal hospedado</string>
+    <string name="rpa_request_fiat_hc">Solicitar canal hospedado em fiat</string>
     <string name="rpa_share_node_id">Compartir ID del nodo</string>
     <string name="rpa_open_nc">Financiar nuevo canal</string>
 

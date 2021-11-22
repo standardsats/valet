@@ -64,6 +64,7 @@ class RemotePeerActivity extends ChanErrorHandlerActivity with ExternalDataCheck
     StaticRemoteKey -> findViewById(R.id.StaticRemoteKey).asInstanceOf[TextView],
     PrivateRouting -> findViewById(R.id.PrivateRouting).asInstanceOf[TextView],
     HostedChannels -> findViewById(R.id.HostedChannels).asInstanceOf[TextView],
+    FiatHostedChannels -> findViewById(R.id.FiatHostedChannels).asInstanceOf[TextView],
     ChainSwap -> findViewById(R.id.ChainSwap).asInstanceOf[TextView],
     Wumbo -> findViewById(R.id.Wumbo).asInstanceOf[TextView]
   )
@@ -275,6 +276,7 @@ class RemotePeerActivity extends ChanErrorHandlerActivity with ExternalDataCheck
   def sharePeerSpecificNodeId(view: View): Unit = share(hasInfo.remoteInfo.nodeSpecificPubKey.toString)
 
   def requestHostedChannel(view: View): Unit = askHostedChannel(randomBytes32)
+  def requestFiatHostedChannel(view: View): Unit = askFiatHostedChannel(randomBytes32)
 
   def askHostedChannel(secret: ByteVector32): Unit = {
     val builder = new AlertDialog.Builder(me).setTitle(rpa_request_hc).setMessage(getString(rpa_hc_warn).html)
@@ -292,6 +294,25 @@ class RemotePeerActivity extends ChanErrorHandlerActivity with ExternalDataCheck
         def onEstablished(cs: Commitments, channel: ChannelHosted): Unit = implant(cs, channel)
         def onFailure(reason: Throwable): Unit = revertAndInform(reason)
       }
+    }
+  }
+
+  def askFiatHostedChannel(secret: ByteVector32): Unit = {
+    val builder = new AlertDialog.Builder(me).setTitle(rpa_request_fiat_hc).setMessage(getString(rpa_fiat_hc_warn).html)
+    mkCheckForm(doAskHostedChannel, none, builder, dialog_ok, dialog_cancel)
+
+    def doAskHostedChannel(alert: AlertDialog): Unit = {
+      // Switch view first since HC may throw immediately
+      setVis(isVisible = false, viewYesFeatureSupport)
+      stopAcceptingIncomingOffers
+      alert.dismiss
+
+      // We only need local params to extract defaultFinalScriptPubKey
+//      val params = LNParams.makeChannelParams(isFunder = false, LNParams.minChanDustLimit)
+//      new HCOpenHandler(hasInfo.remoteInfo, secret, params.defaultFinalScriptPubKey, LNParams.cm) {
+//        def onEstablished(cs: Commitments, channel: ChannelHosted): Unit = implant(cs, channel)
+//        def onFailure(reason: Throwable): Unit = revertAndInform(reason)
+//      }
     }
   }
 

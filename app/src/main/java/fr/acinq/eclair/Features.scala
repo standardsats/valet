@@ -156,6 +156,11 @@ object Features {
     val mandatory = 32974
   }
 
+  case object FiatHostedChannels extends Feature {
+    val rfcName = "Fiat Hosted channels"
+    val mandatory = 32976
+  }
+
   case object PrivateRouting extends Feature {
     val rfcName = "Private routing"
     val mandatory = 33174
@@ -170,7 +175,7 @@ object Features {
     Set(ChannelRangeQueriesExtended, OptionDataLossProtect, BasicMultiPartPayment,
       ChannelRangeQueries, VariableLengthOnion, InitialRoutingSync, PrivateRouting,
       ShutdownAnySegwit, TrampolinePayment, StaticRemoteKey, HostedChannels,
-      ResizeableHostedChannels, PaymentSecret, ChainSwap, Wumbo)
+      ResizeableHostedChannels, FiatHostedChannels, PaymentSecret, ChainSwap, Wumbo)
 
   // Returns true if both feature sets are compatible
   def areCompatible(ours: Features, theirs: Features): Boolean =
