@@ -56,6 +56,7 @@ class RemotePeerActivity extends ChanErrorHandlerActivity with ExternalDataCheck
   private[this] lazy val viewNoFeatureSupport = findViewById(R.id.viewNoFeatureSupport).asInstanceOf[TextView]
   private[this] lazy val viewYesFeatureSupport = findViewById(R.id.viewYesFeatureSupport).asInstanceOf[LinearLayout]
   private[this] lazy val optionHostedChannel = findViewById(R.id.optionHostedChannel).asInstanceOf[NoboButton]
+  private[this] lazy val optionFiatHostedChannel = findViewById(R.id.optionFiatHostedChannel).asInstanceOf[NoboButton]
 
   private[this] lazy val criticalFeatures = Set(BasicMultiPartPayment, OptionDataLossProtect, StaticRemoteKey)
 
@@ -121,6 +122,7 @@ class RemotePeerActivity extends ChanErrorHandlerActivity with ExternalDataCheck
 
       setVis(isVisible = !criticalSupportAvailable, viewNoFeatureSupport)
       setVis(isVisible = theirInitSupports(HostedChannels), optionHostedChannel)
+      setVis(isVisible = theirInitSupports(FiatHostedChannels), optionFiatHostedChannel)
       setVis(isVisible = true, featuresList)
     }.run
   }

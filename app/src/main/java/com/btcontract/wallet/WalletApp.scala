@@ -134,7 +134,7 @@ object WalletApp {
 
     // In case these are needed early
     LNParams.logBag = new SQLiteLog(miscInterface)
-    LNParams.chainHash = Block.LivenetGenesisBlock.hash
+    LNParams.chainHash = Block.TestnetGenesisBlock.hash // Block.LivenetGenesisBlock.hash
     LNParams.routerConf = RouterConf(12, LNParams.maxCltvExpiryDelta)
     LNParams.ourInit = LNParams.createInit
     LNParams.syncParams = new SyncParams
