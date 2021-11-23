@@ -67,6 +67,7 @@ abstract class PathFinder(val normalBag: NetworkBag, val hostedBag: NetworkBag) 
   def updateLastNormalResyncStamp(stamp: Long): Unit
 
   def getPHCExtraNodes: Set[RemoteNodeInfo]
+  def getPFHCExtraNodes: Set[RemoteNodeInfo]
   def getExtraNodes: Set[RemoteNodeInfo]
 
   def doProcess(change: Any): Unit = (change, state) match {
@@ -139,6 +140,7 @@ abstract class PathFinder(val normalBag: NetworkBag, val hostedBag: NetworkBag) 
       // Normal resync has happened recently, but PHC resync is outdated (PHC failed last time due to running out of attempts)
       // in this case we skip normal sync and start directly with PHC sync to save time and increase PHC sync success chances
       attemptPHCSync
+      attemptPFHCSync
 
     case (phcPure: CompleteHostedRoutingData, OPERATIONAL) =>
       // First, completely replace PHC data with obtained one
@@ -176,6 +178,7 @@ abstract class PathFinder(val normalBag: NetworkBag, val hostedBag: NetworkBag) 
       // Notify that normal graph sync is complete
       listeners.foreach(_ process sync)
       attemptPHCSync
+      attemptPFHCSync
 
     // We always accept and store disabled channels:
     // - to reduce subsequent sync traffic if channel remains disabled
@@ -259,6 +262,13 @@ abstract class PathFinder(val normalBag: NetworkBag, val hostedBag: NetworkBag) 
     if (LNParams.syncParams.phcSyncNodes.nonEmpty) {
       val master = new PHCSyncMaster(data) { def onSyncComplete(pure: CompleteHostedRoutingData): Unit = me process pure }
       master process SyncMasterPHCData(LNParams.syncParams.phcSyncNodes, getPHCExtraNodes, activeSyncs = Set.empty)
+    } else updateLastTotalResyncStamp(System.currentTimeMillis)
+  }
+
+  def attemptPFHCSync: Unit = {
+    if (LNParams.syncParams.pfhcSyncNodes.nonEmpty) {
+      val master = new PFHCSyncMaster(data) { def onSyncComplete(pure: CompleteHostedRoutingData): Unit = me process pure }
+      master process SyncMasterPFHCData(LNParams.syncParams.phcSyncNodes, getPFHCExtraNodes, activeSyncs = Set.empty)
     } else updateLastTotalResyncStamp(System.currentTimeMillis)
   }
 

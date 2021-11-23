@@ -1,7 +1,6 @@
 package com.btcontract.wallet
 
 import java.util.{Date, TimerTask}
-
 import android.graphics.{Bitmap, BitmapFactory}
 import android.os.Bundle
 import android.text.Spanned
@@ -26,8 +25,9 @@ import immortan.ChannelListener.Malfunction
 import immortan._
 import immortan.crypto.Tools._
 import immortan.utils.{BitcoinUri, InputParser, PaymentRequestExt, Rx}
-import immortan.wire.HostedState
+import immortan.wire.{FiatHostedState, HostedState}
 import rx.lang.scala.Subscription
+import standardsats.wallet.FiatHostedCommits
 
 import scala.concurrent.duration._
 import scala.util.Try
@@ -38,6 +38,13 @@ object ChanActivity {
     val preimages = hc.revealedFulfills.map(_.ourPreimage.toHex).mkString("\n")
     val hostedState = HostedState(hc.remoteInfo.nodeId, hc.remoteInfo.nodeSpecificPubKey, hc.lastCrossSignedState)
     val serializedHostedState = immortan.wire.ExtCodecs.hostedStateCodec.encode(value = hostedState).require.toHex
+    WalletApp.app.getString(ln_hosted_chan_state).format(getDetails(hc, "n/a"), serializedHostedState, preimages)
+  }
+
+  def getFiatHcState(hc: FiatHostedCommits): String = {
+    val preimages = hc.revealedFulfills.map(_.ourPreimage.toHex).mkString("\n")
+    val hostedState = FiatHostedState(hc.remoteInfo.nodeId, hc.remoteInfo.nodeSpecificPubKey, hc.lastCrossSignedState)
+    val serializedHostedState = immortan.wire.ExtCodecs.fiatHostedStateCodec.encode(value = hostedState).require.toHex
     WalletApp.app.getString(ln_hosted_chan_state).format(getDetails(hc, "n/a"), serializedHostedState, preimages)
   }
 

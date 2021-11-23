@@ -1007,7 +1007,7 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
   override def onException: PartialFunction[Malfunction, Unit] = {
     case (CMDException(_, _: CMD_CLOSE), _, _: HasNormalCommitments) => // Swallow this specific error here, it will be displayed on StatActivity
     case (CMDException(_, _: CMD_HOSTED_STATE_OVERRIDE), _, _: HostedCommits) => // Swallow this specific error here, it will be displayed on StatActivity
-    case (CMDException(_, _: CMD_HOSTED_STATE_OVERRIDE), _, _: FiatHostedCommits) => // Swallow this specific error here, it will be displayed on StatActivity
+    case (CMDException(_, _: CMD_FIAT_HOSTED_STATE_OVERRIDE), _, _: FiatHostedCommits) => // Swallow this specific error here, it will be displayed on StatActivity
     case (error: ChannelTransitionFail, _, data: HasNormalCommitments) => chanError(data.channelId, getString(error_channel_closed).format(error.stackTraceAsString), data.commitments.remoteInfo)
     case (error: ChannelTransitionFail, _, hc: HostedCommits) if hc.error.isEmpty => chanError(hc.channelId, getString(error_channel_suspended).format(error.stackTraceAsString), hc.remoteInfo)
     case (error: ChannelTransitionFail, _, hc: FiatHostedCommits) if hc.error.isEmpty => chanError(hc.channelId, getString(error_channel_suspended).format(error.stackTraceAsString), hc.remoteInfo)

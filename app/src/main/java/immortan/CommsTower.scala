@@ -79,6 +79,7 @@ object CommsTower {
             case message: UnknownMessage =>
               LightningMessageCodecs.decode(message) match {
                 case msg: HostedChannelMessage => for (lst <- ourListeners) lst.onHostedMessage(me, msg)
+                case msg: FiatHostedChannelMessage => for (lst <- ourListeners) lst.onFiatHostedMessage(me, msg)
                 case msg: SwapOut => for (lst <- ourListeners) lst.onSwapOutMessage(me, msg)
                 case msg: SwapIn => for (lst <- ourListeners) lst.onSwapInMessage(me, msg)
                 case msg => for (lst <- ourListeners) lst.onMessage(me, msg)
@@ -150,6 +151,7 @@ trait ConnectionListener {
   def onOperational(worker: CommsTower.Worker, theirInit: Init): Unit = none
   def onMessage(worker: CommsTower.Worker, msg: LightningMessage): Unit = none
   def onHostedMessage(worker: CommsTower.Worker, msg: HostedChannelMessage): Unit = none
+  def onFiatHostedMessage(worker: CommsTower.Worker, msg: FiatHostedChannelMessage): Unit = none
   def onSwapOutMessage(worker: CommsTower.Worker, msg: SwapOut): Unit = none
   def onSwapInMessage(worker: CommsTower.Worker, msg: SwapIn): Unit = none
   def onDisconnect(worker: CommsTower.Worker): Unit = none

@@ -14,6 +14,7 @@ import immortan.{HostedCommits, RemoteNodeInfo}
 import scodec.bits.ByteVector
 import scodec.codecs._
 import scodec.{Attempt, Codec}
+import standardsats.wallet.FiatHostedCommits
 
 
 object ChannelCodecs {
@@ -308,6 +309,22 @@ object ChannelCodecs {
       (int64 withContext "startedAt")
   }.as[HostedCommits]
 
+  val fiatHostedCommitsCodec = {
+    (remoteNodeInfoCodec withContext "remoteInfo") ::
+      (commitmentSpecCodec withContext "localSpec") ::
+      (lengthDelimited(fiatLastCrossSignedStateCodec) withContext "lastCrossSignedState") ::
+      (listOfN(uint16, updateMessageCodec) withContext "nextLocalUpdates") ::
+      (listOfN(uint16, updateMessageCodec) withContext "nextRemoteUpdates") ::
+      (optional(bool8, lengthDelimited(channelUpdateCodec)) withContext "updateOpt") ::
+      (setCodec(uint64overflow) withContext "postErrorOutgoingResolvedIds") ::
+      (optional(bool8, lengthDelimited(failCodec)) withContext "localError") ::
+      (optional(bool8, lengthDelimited(failCodec)) withContext "remoteError") ::
+      (optional(bool8, lengthDelimited(fiatResizeChannelCodec)) withContext "resizeProposal") ::
+      (optional(bool8, lengthDelimited(fiatStateOverrideCodec)) withContext "overrideProposal") ::
+      (listOfN(uint16, extParamsCodec) withContext "extParams") ::
+      (int64 withContext "startedAt")
+  }.as[FiatHostedCommits]
+
   val persistentDataCodec =
     discriminated[PersistentChannelData].by(uint16)
       .typecase(1, DATA_WAIT_FOR_FUNDING_CONFIRMED_Codec)
@@ -317,4 +334,5 @@ object ChannelCodecs {
       .typecase(5, DATA_CLOSING_Codec)
       .typecase(6, DATA_WAIT_FOR_REMOTE_PUBLISH_FUTURE_COMMITMENT_Codec)
       .typecase(7, hostedCommitsCodec)
+      .typecase(8, fiatHostedCommitsCodec)
 }

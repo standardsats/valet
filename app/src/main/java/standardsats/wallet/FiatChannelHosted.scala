@@ -14,7 +14,7 @@ import immortan.{Channel, ChannelBag, ChannelListener, CommsTower, ErrorExt, LNP
 import immortan.Channel._
 import immortan.ErrorCodes._
 import immortan.crypto.Tools._
-import immortan.fsm.PreimageCheck
+import standardsats.wallet.fsm.PreimageCheck
 import scodec.bits.ByteVector
 
 object FiatChannelHosted {
@@ -25,7 +25,7 @@ object FiatChannelHosted {
     doProcess(hostedData)
   }
 
-  def restoreCommits(localLCSS: LastCrossSignedState, remoteInfo: RemoteNodeInfo): FiatHostedCommits = {
+  def restoreCommits(localLCSS: FiatLastCrossSignedState, remoteInfo: RemoteNodeInfo): FiatHostedCommits = {
     val inFlightHtlcs = localLCSS.incomingHtlcs.map(IncomingHtlc) ++ localLCSS.outgoingHtlcs.map(OutgoingHtlc)
     FiatHostedCommits(remoteInfo.safeAlias, CommitmentSpec(feeratePerKw = FeeratePerKw(0L.sat), localLCSS.localBalanceMsat, localLCSS.remoteBalanceMsat, inFlightHtlcs.toSet),
       localLCSS, nextLocalUpdates = Nil, nextRemoteUpdates = Nil, updateOpt = None, postErrorOutgoingResolvedIds = Set.empty, localError = None, remoteError = None)
@@ -37,17 +37,17 @@ abstract class FiatChannelHosted extends Channel { me =>
 
   def doProcess(change: Any): Unit = Tuple3(data, change, state) match {
     case (wait: WaitRemoteFiatHostedReply, CMD_SOCKET_ONLINE, WAIT_FOR_INIT) =>
-      me SEND InvokeHostedChannel(LNParams.chainHash, wait.refundScriptPubKey, wait.secret)
+      me SEND InvokeFiatHostedChannel(LNParams.chainHash, wait.refundScriptPubKey, wait.secret)
       BECOME(wait, WAIT_FOR_ACCEPT)
 
 
-    case (WaitRemoteFiatHostedReply(remoteInfo, refundScriptPubKey, _), init: InitHostedChannel, WAIT_FOR_ACCEPT) =>
+    case (WaitRemoteFiatHostedReply(remoteInfo, refundScriptPubKey, _), init: InitFiatHostedChannel, WAIT_FOR_ACCEPT) =>
       if (init.initialClientBalanceMsat > init.channelCapacityMsat) throw new RuntimeException(s"Their init balance for us=${init.initialClientBalanceMsat}, is larger than capacity")
       if (UInt64(100000000L) > init.maxHtlcValueInFlightMsat) throw new RuntimeException(s"Their max value in-flight=${init.maxHtlcValueInFlightMsat}, is too low")
       if (init.htlcMinimumMsat > 546000L.msat) throw new RuntimeException(s"Their minimal payment size=${init.htlcMinimumMsat}, is too high")
       if (init.maxAcceptedHtlcs < 1) throw new RuntimeException("They can accept too few in-flight payments")
 
-      val lcss = LastCrossSignedState(isHost = false, refundScriptPubKey, init, LNParams.currentBlockDay, init.initialClientBalanceMsat,
+      val lcss = FiatLastCrossSignedState(isHost = false, refundScriptPubKey, init, LNParams.currentBlockDay, init.initialClientBalanceMsat,
         init.channelCapacityMsat - init.initialClientBalanceMsat, localUpdates = 0L, remoteUpdates = 0L, incomingHtlcs = Nil, outgoingHtlcs = Nil,
         localSigOfRemote = ByteVector64.Zeroes, remoteSigOfLocal = ByteVector64.Zeroes).withLocalSigOfRemote(remoteInfo.nodeSpecificPrivKey)
 
@@ -56,7 +56,7 @@ abstract class FiatChannelHosted extends Channel { me =>
       SEND(localHalfSignedHC.lastCrossSignedState.stateUpdate)
 
 
-    case (WaitRemoteFiatHostedStateUpdate(_, localHalfSignedHC), remoteSU: StateUpdate, WAIT_FOR_ACCEPT) =>
+    case (WaitRemoteFiatHostedStateUpdate(_, localHalfSignedHC), remoteSU: FiatStateUpdate, WAIT_FOR_ACCEPT) =>
       val localCompleteLCSS = localHalfSignedHC.lastCrossSignedState.copy(remoteSigOfLocal = remoteSU.localSigOfRemoteLCSS)
       val isRightRemoteUpdateNumber = localHalfSignedHC.lastCrossSignedState.remoteUpdates == remoteSU.localUpdates
       val isRightLocalUpdateNumber = localHalfSignedHC.lastCrossSignedState.localUpdates == remoteSU.remoteUpdates
@@ -71,7 +71,7 @@ abstract class FiatChannelHosted extends Channel { me =>
       StoreBecomeSend(localHalfSignedHC.copy(lastCrossSignedState = localCompleteLCSS), OPEN, askBrandingInfo)
 
 
-    case (wait: WaitRemoteFiatHostedReply, remoteLCSS: LastCrossSignedState, WAIT_FOR_ACCEPT) =>
+    case (wait: WaitRemoteFiatHostedReply, remoteLCSS: FiatLastCrossSignedState, WAIT_FOR_ACCEPT) =>
       val isLocalSigOk = remoteLCSS.verifyRemoteSig(wait.remoteInfo.nodeSpecificPubKey)
       val isRemoteSigOk = remoteLCSS.reverse.verifyRemoteSig(wait.remoteInfo.nodeId)
       val hc = FiatChannelHosted.restoreCommits(remoteLCSS.reverse, wait.remoteInfo)
@@ -153,7 +153,7 @@ abstract class FiatChannelHosted extends Channel { me =>
 
 
     // First attempt a normal state update, then a resized state update if original signature check fails and we have a pending resize proposal
-    case (hc: FiatHostedCommits, remoteSU: StateUpdate, OPEN) if (remoteSU.localSigOfRemoteLCSS != hc.lastCrossSignedState.remoteSigOfLocal) && hc.error.isEmpty =>
+    case (hc: FiatHostedCommits, remoteSU: FiatStateUpdate, OPEN) if (remoteSU.localSigOfRemoteLCSS != hc.lastCrossSignedState.remoteSigOfLocal) && hc.error.isEmpty =>
       attemptStateUpdate(remoteSU, hc)
 
 
@@ -196,15 +196,15 @@ abstract class FiatChannelHosted extends Channel { me =>
 
     case (hc: FiatHostedCommits, CMD_SOCKET_ONLINE, SLEEPING) =>
       val origRefundPubKey = hc.lastCrossSignedState.refundScriptPubKey
-      val invokeMsg = InvokeHostedChannel(LNParams.chainHash, origRefundPubKey, ByteVector.empty)
+      val invokeMsg = InvokeFiatHostedChannel(LNParams.chainHash, origRefundPubKey, ByteVector.empty)
       SEND(hc.error getOrElse invokeMsg)
 
 
     case (hc: FiatHostedCommits, CMD_SOCKET_OFFLINE, OPEN) => BECOME(hc, SLEEPING)
 
-    case (hc: FiatHostedCommits, _: InitHostedChannel, SLEEPING) => SEND(hc.lastCrossSignedState)
+    case (hc: FiatHostedCommits, _: InitFiatHostedChannel, SLEEPING) => SEND(hc.lastCrossSignedState)
 
-    case (hc: FiatHostedCommits, remoteLCSS: LastCrossSignedState, SLEEPING) if hc.error.isEmpty => attemptInitResync(hc, remoteLCSS)
+    case (hc: FiatHostedCommits, remoteLCSS: FiatLastCrossSignedState, SLEEPING) if hc.error.isEmpty => attemptInitResync(hc, remoteLCSS)
 
     case (hc: FiatHostedCommits, remoteInfo: RemoteNodeInfo, SLEEPING) if hc.remoteInfo.nodeId == remoteInfo.nodeId => StoreBecomeSend(hc.copy(remoteInfo = remoteInfo.safeAlias), SLEEPING)
 
@@ -216,23 +216,23 @@ abstract class FiatChannelHosted extends Channel { me =>
 
     case (hc: FiatHostedCommits, cmd: HC_CMD_RESIZE, OPEN | SLEEPING) if hc.resizeProposal.isEmpty && hc.error.isEmpty =>
       val capacitySat = hc.lastCrossSignedState.initHostedChannel.channelCapacityMsat.truncateToSatoshi
-      val resize = ResizeChannel(capacitySat + cmd.delta).sign(hc.remoteInfo.nodeSpecificPrivKey)
+      val resize = FiatResizeChannel(capacitySat + cmd.delta).sign(hc.remoteInfo.nodeSpecificPrivKey)
       StoreBecomeSend(hc.copy(resizeProposal = resize.asSome), state, resize)
       process(CMD_SIGN)
 
 
-    case (hc: FiatHostedCommits, resize: ResizeChannel, OPEN | SLEEPING) if hc.resizeProposal.isEmpty && hc.error.isEmpty =>
+    case (hc: FiatHostedCommits, resize: FiatResizeChannel, OPEN | SLEEPING) if hc.resizeProposal.isEmpty && hc.error.isEmpty =>
       // Can happen if we have sent a resize earlier, but then lost channel data and restored from their
       val isLocalSigOk: Boolean = resize.verifyClientSig(hc.remoteInfo.nodeSpecificPubKey)
       if (isLocalSigOk) StoreBecomeSend(hc.copy(resizeProposal = resize.asSome), state)
       else localSuspend(hc, ERR_HOSTED_INVALID_RESIZE)
 
 
-    case (hc: FiatHostedCommits, remoteSO: StateOverride, OPEN | SLEEPING) if hc.error.isDefined && !hc.overrideProposal.contains(remoteSO) =>
+    case (hc: FiatHostedCommits, remoteSO: FiatStateOverride, OPEN | SLEEPING) if hc.error.isDefined && !hc.overrideProposal.contains(remoteSO) =>
       StoreBecomeSend(hc.copy(overrideProposal = remoteSO.asSome), state)
 
 
-    case (hc: FiatHostedCommits, cmd @ CMD_HOSTED_STATE_OVERRIDE(remoteSO), OPEN | SLEEPING) if hc.error.isDefined =>
+    case (hc: FiatHostedCommits, cmd @ CMD_FIAT_HOSTED_STATE_OVERRIDE(remoteSO), OPEN | SLEEPING) if hc.error.isDefined =>
       val overriddenLocalBalance = hc.lastCrossSignedState.initHostedChannel.channelCapacityMsat - remoteSO.localBalanceMsat
       val completeLocalLCSS = hc.lastCrossSignedState.copy(incomingHtlcs = Nil, outgoingHtlcs = Nil, localBalanceMsat = overriddenLocalBalance,
         remoteBalanceMsat = remoteSO.localBalanceMsat, localUpdates = remoteSO.remoteUpdates, remoteUpdates = remoteSO.localUpdates, blockDay = remoteSO.blockDay,
@@ -275,7 +275,7 @@ abstract class FiatChannelHosted extends Channel { me =>
     if (hc.localError.isEmpty) StoreBecomeSend(hc.copy(localError = localError.asSome), state, localError)
   }
 
-  def attemptInitResync(hc: FiatHostedCommits, remoteLCSS: LastCrossSignedState): Unit = {
+  def attemptInitResync(hc: FiatHostedCommits, remoteLCSS: FiatLastCrossSignedState): Unit = {
     val hc1 = hc.resizeProposal.filter(_ isRemoteResized remoteLCSS).map(hc.withResize).getOrElse(hc) // They may have a resized LCSS
     val weAreEven = hc.lastCrossSignedState.remoteUpdates == remoteLCSS.localUpdates && hc.lastCrossSignedState.localUpdates == remoteLCSS.remoteUpdates
     val weAreAhead = hc.lastCrossSignedState.remoteUpdates > remoteLCSS.localUpdates || hc.lastCrossSignedState.localUpdates > remoteLCSS.remoteUpdates
@@ -317,7 +317,7 @@ abstract class FiatChannelHosted extends Channel { me =>
     }
   }
 
-  def attemptStateUpdate(remoteSU: StateUpdate, hc: FiatHostedCommits): Unit = {
+  def attemptStateUpdate(remoteSU: FiatStateUpdate, hc: FiatHostedCommits): Unit = {
     val lcss1 = hc.nextLocalUnsignedLCSS(remoteSU.blockDay).copy(remoteSigOfLocal = remoteSU.localSigOfRemoteLCSS).withLocalSigOfRemote(hc.remoteInfo.nodeSpecificPrivKey)
     val hc1 = hc.copy(lastCrossSignedState = lcss1, localSpec = hc.nextLocalSpec, nextLocalUpdates = Nil, nextRemoteUpdates = Nil)
     val isRemoteSigOk = lcss1.verifyRemoteSig(hc.remoteInfo.nodeId)

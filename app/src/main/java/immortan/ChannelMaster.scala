@@ -163,6 +163,11 @@ class ChannelMaster(val payBag: PaymentBag, val chanBag: ChannelBag, val dataBag
     case _ => hostedFromNode(worker.info.nodeId).foreach(_ process message)
   }
 
+  override def onFiatHostedMessage(worker: CommsTower.Worker, message: FiatHostedChannelMessage): Unit = message match {
+    case msg: FiatHostedChannelBranding => dataBag.putFiatBranding(worker.info.nodeId, msg)
+    case _ => fiatHostedFromNode(worker.info.nodeId).foreach(_ process message)
+  }
+
   override def onDisconnect(worker: CommsTower.Worker): Unit = {
     allFromNode(worker.info.nodeId).foreach(_.chan process CMD_SOCKET_OFFLINE)
     Rx.ioQueue.delay(5.seconds).foreach(_ => initConnect)

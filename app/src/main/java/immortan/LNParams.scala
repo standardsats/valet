@@ -202,12 +202,15 @@ class SyncParams {
   val lightning: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"03baa70886d9200af0ffbd3f9e18d96008331c858456b16e3a9b41e735c6208fef"), NodeAddress.unresolved(9735, host = 45, 20, 67, 1), "LIGHTNING")
   val acinq: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"03864ef025fde8fb587d989186ce6a4a186895ee44a926bfc370e2c366597a3f8f"), NodeAddress.unresolved(9735, host = 34, 239, 230, 56), "ACINQ")
   val syncNodes: Set[RemoteNodeInfo] = Set(satm, motherbase, bCashIsTrash, ergveinNet, conductor, silentBob, lightning, acinq)
-  val phcSyncNodes: Set[RemoteNodeInfo] = Set(satm, motherbase, lntxbot1)
+  val phcSyncNodes: Set[RemoteNodeInfo] = Set(satm, motherbase, lntxbot1, ergveinNet)
+  val pfhcSyncNodes: Set[RemoteNodeInfo] = Set(satm, motherbase, lntxbot1, ergveinNet)
 
   val maxPHCCapacity: MilliSatoshi = MilliSatoshi(100000000000000L) // PHC can not be larger than 1000 BTC
   val minPHCCapacity: MilliSatoshi = MilliSatoshi(1000000000L) // PHC can not be smaller than 0.01 BTC
   val minNormalChansForPHC = 5 // How many normal chans a node must have to be eligible for PHCs
   val maxPHCPerNode = 3 // How many PHCs a node can have in total
+  val minNormalChansForPFHC = 0 // How many normal chans a node must have to be eligible for PHCs TODO: RAISE IT
+  val maxPFHCPerNode = 3 // How many PHCs a node can have in total
 
   val minCapacity: MilliSatoshi = MilliSatoshi(900000000L) // 900k sat
   val maxNodesToSyncFrom = 2 // How many disjoint peers to use for majority sync
@@ -316,6 +319,9 @@ trait DataBag {
 
   def putBranding(nodeId: PublicKey, branding: HostedChannelBranding)
   def tryGetBranding(nodeId: PublicKey): Try[HostedChannelBranding]
+
+  def putFiatBranding(nodeId: PublicKey, branding: FiatHostedChannelBranding)
+  def tryGetFiatBranding(nodeId: PublicKey): Try[FiatHostedChannelBranding]
 
   def putSwapInState(nodeId: PublicKey, state: SwapInState)
   def tryGetSwapInState(nodeId: PublicKey): Try[SwapInStateExt]

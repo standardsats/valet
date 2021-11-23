@@ -1,12 +1,11 @@
 package immortan.sqlite
 
 import java.lang.{Integer => JInt}
-
 import fr.acinq.bitcoin.Crypto.PublicKey
 import fr.acinq.bitcoin.{BlockHeader, ByteVector32}
 import fr.acinq.eclair.blockchain.electrum.db.HeaderDb
-import fr.acinq.eclair.wire.LightningMessageCodecs.{hostedChannelBrandingCodec, swapInStateCodec, trampolineOnCodec}
-import fr.acinq.eclair.wire.{HostedChannelBranding, SwapInState, TrampolineOn}
+import fr.acinq.eclair.wire.LightningMessageCodecs.{fiatHostedChannelBrandingCodec, hostedChannelBrandingCodec, swapInStateCodec, trampolineOnCodec}
+import fr.acinq.eclair.wire.{FiatHostedChannelBranding, HostedChannelBranding, SwapInState, TrampolineOn}
 import immortan.crypto.Tools.Bytes
 import immortan.sqlite.SQLiteData._
 import immortan.utils.ImplicitJsonFormats._
@@ -79,6 +78,18 @@ class SQLiteData(val db: DBInterface) extends HeaderDb with DataBag {
   def tryGetBranding(nodeId: PublicKey): Try[HostedChannelBranding] =
     tryGet(LABEL_BRANDING_PREFIX + nodeId.toString) map { rawHostedChannelBranding =>
       hostedChannelBrandingCodec.decode(rawHostedChannelBranding.toBitVector).require.value
+    }
+
+  // FiatHostedChannelBranding
+
+  def putFiatBranding(nodeId: PublicKey, branding: FiatHostedChannelBranding): Unit = {
+    val hostedChannelBranding = fiatHostedChannelBrandingCodec.encode(branding).require.toByteArray
+    put(LABEL_BRANDING_PREFIX + nodeId.toString, hostedChannelBranding)
+  }
+
+  def tryGetFiatBranding(nodeId: PublicKey): Try[FiatHostedChannelBranding] =
+    tryGet(LABEL_BRANDING_PREFIX + nodeId.toString) map { rawHostedChannelBranding =>
+      fiatHostedChannelBrandingCodec.decode(rawHostedChannelBranding.toBitVector).require.value
     }
 
   // SwapInState

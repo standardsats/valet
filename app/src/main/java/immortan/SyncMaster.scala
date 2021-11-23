@@ -26,6 +26,7 @@ object SyncMaster {
   final val SHORT_ID_SYNC = 2
   final val GOSSIP_SYNC = 3
   final val PHC_SYNC = 4
+  final val PFHC_SYNC = 5
 
   final val CMDAddSync = "cmd-add-sync"
   final val CMDGetGossip = "cmd-get-gossip"
@@ -89,6 +90,38 @@ case class SyncWorkerPHCData(phcMaster: PHCSyncMaster,
       expectedPositions.getOrElse(cu.shortChannelId, Set.empty).contains(cu.position) // Remote node must not send the same update twice
 }
 
+case class SyncWorkerPFHCData(pfhcMaster: PFHCSyncMaster,
+                             updates: Set[ChannelUpdate],
+                             expectedPositions: Map[Long, PositionSet] = Map.empty,
+                             nodeIdToShortIds: Map[PublicKey, ShortChanIdSet] = Map.empty,
+                             announces: Map[Long, ChannelAnnouncement] = Map.empty) extends SyncWorkerData {
+
+  def withNewAnnounce(ann: ChannelAnnouncement): SyncWorkerPFHCData = {
+    val expectedPositions1 = expectedPositions.updated(ann.shortChannelId, ChannelUpdate.fullSet)
+    val nodeId1ToShortIds = nodeIdToShortIds.getOrElse(ann.nodeId1, Set.empty) + ann.shortChannelId
+    val nodeId2ToShortIds = nodeIdToShortIds.getOrElse(ann.nodeId2, Set.empty) + ann.shortChannelId
+    val nodeIdToShortIds1 = nodeIdToShortIds.updated(ann.nodeId1, nodeId1ToShortIds).updated(ann.nodeId2, nodeId2ToShortIds)
+    copy(expectedPositions = expectedPositions1, announces = announces.updated(ann.shortChannelId, ann), nodeIdToShortIds = nodeIdToShortIds1)
+  }
+
+  def withNewUpdate(cu: ChannelUpdate): SyncWorkerPFHCData = {
+    val oneLessPosition = expectedPositions.getOrElse(cu.shortChannelId, Set.empty) - cu.position
+    copy(expectedPositions = expectedPositions.updated(cu.shortChannelId, oneLessPosition), updates = updates + cu)
+  }
+
+  def isAcceptable(ann: ChannelAnnouncement): Boolean = {
+    val notTooMuchNode1PHCs = nodeIdToShortIds.getOrElse(ann.nodeId1, Set.empty).size < LNParams.syncParams.maxPHCPerNode
+    val notTooMuchNode2PHCs = nodeIdToShortIds.getOrElse(ann.nodeId2, Set.empty).size < LNParams.syncParams.maxPHCPerNode
+    val isCorrect = Tools.hostedShortChanId(ann.nodeId1.value, ann.nodeId2.value) == ann.shortChannelId
+    ann.isPHC && isCorrect && notTooMuchNode1PHCs && notTooMuchNode2PHCs
+  }
+
+  def isUpdateAcceptable(cu: ChannelUpdate): Boolean =
+    cu.htlcMaximumMsat.exists(cap => cap >= LNParams.syncParams.minPHCCapacity && cap <= LNParams.syncParams.maxPHCCapacity && cap > cu.htlcMinimumMsat) && // Capacity is fine
+      announces.get(cu.shortChannelId).map(_ getNodeIdSameSideAs cu).exists(Announcements checkSig cu) && // We have received a related announce, signature is valid
+      expectedPositions.getOrElse(cu.shortChannelId, Set.empty).contains(cu.position) // Remote node must not send the same update twice
+}
+
 case class SyncWorker(master: CanBeRepliedTo, keyPair: KeyPair, remoteInfo: RemoteNodeInfo, ourInit: Init) extends StateMachine[SyncWorkerData] { me =>
   implicit val context: ExecutionContextExecutor = ExecutionContext fromExecutor Executors.newSingleThreadExecutor
 
@@ -101,6 +134,7 @@ case class SyncWorker(master: CanBeRepliedTo, keyPair: KeyPair, remoteInfo: Remo
   val listener: ConnectionListener = new ConnectionListener {
     override def onOperational(worker: CommsTower.Worker, init: Init): Unit = if (me supportsExtQueries init) process(worker) else worker.disconnect
     override def onHostedMessage(worker: CommsTower.Worker, remoteMessage: HostedChannelMessage): Unit = process(remoteMessage)
+    override def onFiatHostedMessage(worker: CommsTower.Worker, remoteMessage: FiatHostedChannelMessage): Unit = process(remoteMessage)
     override def onMessage(worker: CommsTower.Worker, remoteMessage: LightningMessage): Unit = process(remoteMessage)
 
     override def onDisconnect(worker: CommsTower.Worker): Unit = {
@@ -116,6 +150,7 @@ case class SyncWorker(master: CanBeRepliedTo, keyPair: KeyPair, remoteInfo: Remo
 
   def doProcess(change: Any): Unit = (change, data, state) match {
     case (data1: SyncWorkerPHCData, null, WAITING) => become(data1, PHC_SYNC)
+    case (data1: SyncWorkerPFHCData, null, WAITING) => become(data1, PFHC_SYNC)
     case (data1: SyncWorkerShortIdsData, null, WAITING) => become(data1, SHORT_ID_SYNC)
     case (data1: SyncWorkerGossipData, _, WAITING | SHORT_ID_SYNC) => become(data1, GOSSIP_SYNC)
 
@@ -164,6 +199,17 @@ case class SyncWorker(master: CanBeRepliedTo, keyPair: KeyPair, remoteInfo: Remo
     case (update: ChannelUpdate, d1: SyncWorkerPHCData, PHC_SYNC) if d1.isUpdateAcceptable(update) => become(d1.withNewUpdate(update.lite), PHC_SYNC)
 
     case (_: ReplyPublicHostedChannelsEnd, completeSyncData: SyncWorkerPHCData, PHC_SYNC) =>
+      // Peer has informed us that there is no more PHC gossip left, inform master and shut down
+      master process completeSyncData
+      me process CMDShutdown
+
+    // PFHC_SYNC
+
+    case (worker: CommsTower.Worker, _: SyncWorkerPFHCData, PFHC_SYNC) => worker.handler process QueryPublicFiatHostedChannels(LNParams.chainHash)
+    case (ann: ChannelAnnouncement, d1: SyncWorkerPFHCData, PFHC_SYNC) if d1.isAcceptable(ann) && d1.pfhcMaster.isAcceptable(ann) => become(d1.withNewAnnounce(ann.lite), PFHC_SYNC)
+    case (update: ChannelUpdate, d1: SyncWorkerPFHCData, PFHC_SYNC) if d1.isUpdateAcceptable(update) => become(d1.withNewUpdate(update.lite), PFHC_SYNC)
+
+    case (_: ReplyPublicHostedChannelsEnd, completeSyncData: SyncWorkerPHCData, PFHC_SYNC) =>
       // Peer has informed us that there is no more PHC gossip left, inform master and shut down
       master process completeSyncData
       me process CMDShutdown
@@ -389,6 +435,52 @@ abstract class PHCSyncMaster(routerData: Data) extends StateMachine[SyncMasterDa
       become(null, SHUT_DOWN)
 
     case (d1: SyncWorkerPHCData, _, PHC_SYNC) =>
+      // Worker has informed us that PHC sync is complete, shut everything down
+      me onSyncComplete CompleteHostedRoutingData(d1.announces.values.toSet, d1.updates)
+      become(null, SHUT_DOWN)
+
+    case _ =>
+  }
+}
+
+case class SyncMasterPFHCData(baseInfos: Set[RemoteNodeInfo], extInfos: Set[RemoteNodeInfo], activeSyncs: Set[SyncWorker], attemptsLeft: Int = 12) extends SyncMasterData
+
+abstract class PFHCSyncMaster(routerData: Data) extends StateMachine[SyncMasterData] with CanBeRepliedTo { me =>
+  implicit val context: ExecutionContextExecutor = ExecutionContext fromExecutor Executors.newSingleThreadExecutor
+  def process(changeMessage: Any): Unit = scala.concurrent.Future(me doProcess changeMessage)
+  become(null, PFHC_SYNC)
+
+  // These checks require graph
+  def isAcceptable(ann: ChannelAnnouncement): Boolean = {
+    val node1HasEnoughIncomingChans = routerData.graph.vertices.getOrElse(ann.nodeId1, Nil).size >= LNParams.syncParams.minNormalChansForPFHC
+    val node2HasEnoughIncomingChans = routerData.graph.vertices.getOrElse(ann.nodeId2, Nil).size >= LNParams.syncParams.minNormalChansForPFHC
+    node1HasEnoughIncomingChans && node2HasEnoughIncomingChans
+  }
+
+  def onSyncComplete(pure: CompleteHostedRoutingData): Unit
+
+  def doProcess(change: Any): Unit = (change, data, state) match {
+    case (setupData: SyncMasterPFHCData, null, PFHC_SYNC) if setupData.baseInfos.nonEmpty =>
+      become(freshData = setupData, PFHC_SYNC)
+      me process CMDAddSync
+
+    case (CMDAddSync, data1: SyncMasterPFHCData, PFHC_SYNC) if data1.activeSyncs.isEmpty =>
+      // We are asked to create a new worker AND we don't have a worker yet: create one
+      // for now PHC sync happens with a single remote peer
+
+      val newSyncWorker = data1.getNewSync(me)
+      become(data1.copy(activeSyncs = data1.activeSyncs + newSyncWorker), PFHC_SYNC)
+      newSyncWorker process SyncWorkerPFHCData(me, updates = Set.empty)
+
+    case (sd: SyncDisconnected, data1: SyncMasterPFHCData, PFHC_SYNC) if data1.attemptsLeft > 0 =>
+      become(data1.copy(attemptsLeft = data1.attemptsLeft - 1).withoutSync(sd), PFHC_SYNC)
+      Rx.ioQueue.delay(5.seconds).foreach(_ => me process CMDAddSync)
+
+    case (_: SyncWorker, _, PFHC_SYNC) =>
+      // No more reconnection attempts left
+      become(null, SHUT_DOWN)
+
+    case (d1: SyncWorkerPFHCData, _, PFHC_SYNC) =>
       // Worker has informed us that PHC sync is complete, shut everything down
       me onSyncComplete CompleteHostedRoutingData(d1.announces.values.toSet, d1.updates)
       become(null, SHUT_DOWN)

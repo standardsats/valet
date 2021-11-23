@@ -26,7 +26,7 @@ abstract class FiatHCOpenHandler(info: RemoteNodeInfo, peerSpecificSecret: ByteV
   private val makeChanListener = new ConnectionListener with ChannelListener { me =>
     override def onDisconnect(worker: CommsTower.Worker): Unit = CommsTower.rmListenerNative(info, me)
     override def onOperational(worker: CommsTower.Worker, theirInit: Init): Unit = freshChannel process CMD_SOCKET_ONLINE
-    override def onHostedMessage(worker: CommsTower.Worker, message: HostedChannelMessage): Unit = freshChannel process message
+    override def onFiatHostedMessage(worker: CommsTower.Worker, message: FiatHostedChannelMessage): Unit = freshChannel process message
 
     override def onMessage(worker: CommsTower.Worker, message: LightningMessage): Unit = message match {
       case msg: HasChannelId if msg.channelId == channelId => freshChannel process msg

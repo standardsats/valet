@@ -15,9 +15,9 @@ case class WaitRemoteFiatHostedReply(remoteInfo: RemoteNodeInfo, refundScriptPub
 
 case class WaitRemoteFiatHostedStateUpdate(remoteInfo: RemoteNodeInfo, hc: FiatHostedCommits) extends ChannelData
 
-case class FiatHostedCommits(remoteInfo: RemoteNodeInfo, localSpec: CommitmentSpec, lastCrossSignedState: LastCrossSignedState,
+case class FiatHostedCommits(remoteInfo: RemoteNodeInfo, localSpec: CommitmentSpec, lastCrossSignedState: FiatLastCrossSignedState,
                          nextLocalUpdates: List[UpdateMessage], nextRemoteUpdates: List[UpdateMessage], updateOpt: Option[ChannelUpdate], postErrorOutgoingResolvedIds: Set[Long],
-                         localError: Option[Fail], remoteError: Option[Fail], resizeProposal: Option[ResizeChannel] = None, overrideProposal: Option[StateOverride] = None,
+                         localError: Option[Fail], remoteError: Option[Fail], resizeProposal: Option[FiatResizeChannel] = None, overrideProposal: Option[FiatStateOverride] = None,
                          extParams: List[ExtParams] = Nil, startedAt: Long = System.currentTimeMillis) extends PersistentChannelData with Commitments { me =>
 
   lazy val error: Option[Fail] = localError.orElse(remoteError)
@@ -49,8 +49,8 @@ case class FiatHostedCommits(remoteInfo: RemoteNodeInfo, localSpec: CommitmentSp
 
   override def ourBalance: MilliSatoshi = availableForSend
 
-  def nextLocalUnsignedLCSS(blockDay: Long): LastCrossSignedState =
-    LastCrossSignedState(lastCrossSignedState.isHost, lastCrossSignedState.refundScriptPubKey, lastCrossSignedState.initHostedChannel,
+  def nextLocalUnsignedLCSS(blockDay: Long): FiatLastCrossSignedState =
+    FiatLastCrossSignedState(lastCrossSignedState.isHost, lastCrossSignedState.refundScriptPubKey, lastCrossSignedState.initHostedChannel,
       blockDay = blockDay, localBalanceMsat = nextLocalSpec.toLocal, remoteBalanceMsat = nextLocalSpec.toRemote, nextTotalLocal, nextTotalRemote,
       nextLocalSpec.incomingAdds.toList.sortBy(_.id), nextLocalSpec.outgoingAdds.toList.sortBy(_.id), localSigOfRemote = ByteVector64.Zeroes,
       remoteSigOfLocal = ByteVector64.Zeroes)
@@ -89,7 +89,7 @@ case class FiatHostedCommits(remoteInfo: RemoteNodeInfo, localSpec: CommitmentSp
     case None => throw ChannelTransitionFail(channelId, fulfill)
   }
 
-  def withResize(resize: ResizeChannel): FiatHostedCommits =
+  def withResize(resize: FiatResizeChannel): FiatHostedCommits =
     me.modify(_.lastCrossSignedState.initHostedChannel.maxHtlcValueInFlightMsat).setTo(resize.newCapacityMsatU64)
       .modify(_.lastCrossSignedState.initHostedChannel.channelCapacityMsat).setTo(resize.newCapacity.toMilliSatoshi)
       .modify(_.localSpec.toRemote).using(_ + resize.newCapacity - lastCrossSignedState.initHostedChannel.channelCapacityMsat)

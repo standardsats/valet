@@ -90,6 +90,7 @@ object CMD_CLOSE {
 
 case class CMD_CLOSE(scriptPubKey: Option[ByteVector], force: Boolean) extends Command
 case class CMD_HOSTED_STATE_OVERRIDE(so: StateOverride) extends Command
+case class CMD_FIAT_HOSTED_STATE_OVERRIDE(so: FiatStateOverride) extends Command
 case class HC_CMD_RESIZE(delta: Satoshi) extends Command
 case object CMD_SOCKET_OFFLINE extends Command
 case object CMD_SOCKET_ONLINE extends Command

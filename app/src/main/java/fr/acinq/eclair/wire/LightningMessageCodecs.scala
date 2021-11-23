@@ -383,6 +383,124 @@ object LightningMessageCodecs {
 
   final val HC_ERROR_TAG = 63497
 
+  // Fiat hosted channels
+  val invokeFiatHostedChannelCodec = {
+    (bytes32 withContext "chainHash") ::
+      (varsizebinarydata withContext "refundScriptPubKey") ::
+      (varsizebinarydata withContext "secret")
+  }.as[InvokeFiatHostedChannel]
+
+  lazy val initFiatHostedChannelCodec = {
+    (uint64 withContext "maxHtlcValueInFlightMsat") ::
+      (millisatoshi withContext "htlcMinimumMsat") ::
+      (uint16 withContext "maxAcceptedHtlcs") ::
+      (millisatoshi withContext "channelCapacityMsat") ::
+      (millisatoshi withContext "initialClientBalanceMsat") ::
+      (listOfN(uint16, uint16) withContext "features")
+  }.as[InitFiatHostedChannel]
+
+  lazy val fiatHostedChannelBrandingCodec = {
+    (rgb withContext "rgbColor") ::
+      (optional(bool8, varsizebinarydata) withContext "pngIcon") ::
+      (variableSizeBytes(uint16, utf8) withContext "contactInfo")
+  }.as[FiatHostedChannelBranding]
+
+  lazy val fiatLastCrossSignedStateCodec = {
+    (bool8 withContext "isHost") ::
+      (varsizebinarydata withContext "refundScriptPubKey") ::
+      (lengthDelimited(initFiatHostedChannelCodec) withContext "initHostedChannel") ::
+      (uint32 withContext "blockDay") ::
+      (millisatoshi withContext "localBalanceMsat") ::
+      (millisatoshi withContext "remoteBalanceMsat") ::
+      (uint32 withContext "localUpdates") ::
+      (uint32 withContext "remoteUpdates") ::
+      (listOfN(uint16, lengthDelimited(LightningMessageCodecs.updateAddHtlcCodec)) withContext "incomingHtlcs") ::
+      (listOfN(uint16, lengthDelimited(LightningMessageCodecs.updateAddHtlcCodec)) withContext "outgoingHtlcs") ::
+      (bytes64 withContext "remoteSigOfLocal") ::
+      (bytes64 withContext "localSigOfRemote")
+  }.as[FiatLastCrossSignedState]
+
+  val fiatStateUpdateCodec = {
+    (uint32 withContext "blockDay") ::
+      (uint32 withContext "localUpdates") ::
+      (uint32 withContext "remoteUpdates") ::
+      (bytes64 withContext "localSigOfRemoteLCSS")
+  }.as[FiatStateUpdate]
+
+  val fiatStateOverrideCodec = {
+    (uint32 withContext "blockDay") ::
+      (millisatoshi withContext "localBalanceMsat") ::
+      (uint32 withContext "localUpdates") ::
+      (uint32 withContext "remoteUpdates") ::
+      (bytes64 withContext "localSigOfRemoteLCSS")
+  }.as[FiatStateOverride]
+
+  lazy val fiatAnnouncementSignatureCodec = {
+    (bytes64 withContext "nodeSignature") ::
+      (bool8 withContext "wantsReply")
+  }.as[FiatAnnouncementSignature]
+
+  val fiatResizeChannelCodec = {
+    (satoshi withContext "newCapacity") ::
+      (bytes64 withContext "clientSig")
+  }.as[FiatResizeChannel]
+
+  val fiatAskBrandingInfoCodec = (bytes32 withContext "chainHash").as[FiatAskBrandingInfo]
+
+  val queryPublicFiatHostedChannelsCodec = (bytes32 withContext "chainHash").as[QueryPublicFiatHostedChannels]
+
+  val replyPublicFiatHostedChannelsEndCodec = (bytes32 withContext "chainHash").as[ReplyPublicFiatHostedChannelsEnd]
+
+  lazy val fiatQueryPreimagesCodec = (listOfN(uint16, bytes32) withContext "hashes").as[FiatQueryPreimages]
+
+  lazy val fiatReplyPreimagesCodec = (listOfN(uint16, bytes32) withContext "preimages").as[FiatReplyPreimages]
+
+  final val FHC_INVOKE_HOSTED_CHANNEL_TAG = 75535
+
+  final val FHC_INIT_HOSTED_CHANNEL_TAG = 75533
+
+  final val FHC_LAST_CROSS_SIGNED_STATE_TAG = 75531
+
+  final val FHC_STATE_UPDATE_TAG = 75529
+
+  final val FHC_STATE_OVERRIDE_TAG = 75527
+
+  final val FHC_HOSTED_CHANNEL_BRANDING_TAG = 75525
+
+  final val FHC_ANNOUNCEMENT_SIGNATURE_TAG = 75523
+
+  final val FHC_RESIZE_CHANNEL_TAG = 75521
+
+  final val FHC_QUERY_PUBLIC_HOSTED_CHANNELS_TAG = 75519
+
+  final val FHC_REPLY_PUBLIC_HOSTED_CHANNELS_END_TAG = 75517
+
+  final val FHC_QUERY_PREIMAGES_TAG = 75515
+
+  final val FHC_REPLY_PREIMAGES_TAG = 75513
+
+  final val FHC_ASK_BRANDING_INFO = 75511
+
+
+  final val PFHC_ANNOUNCE_GOSSIP_TAG = 74513
+
+  final val PFHC_ANNOUNCE_SYNC_TAG = 74511
+
+  final val PFHC_UPDATE_GOSSIP_TAG = 74509
+
+  final val PFHC_UPDATE_SYNC_TAG = 74507
+
+
+  final val FHC_UPDATE_ADD_HTLC_TAG = 73505
+
+  final val FHC_UPDATE_FULFILL_HTLC_TAG = 73503
+
+  final val FHC_UPDATE_FAIL_HTLC_TAG = 73501
+
+  final val FHC_UPDATE_FAIL_MALFORMED_HTLC_TAG = 73499
+
+  final val FHC_ERROR_TAG = 73497
+
   // SWAP-IN
 
   val swapInResponseCodec = {
@@ -557,6 +675,31 @@ object LightningMessageCodecs {
       case HC_UPDATE_ADD_HTLC_TAG => updateAddHtlcCodec
       case HC_ERROR_TAG => failCodec
 
+      case FHC_HOSTED_CHANNEL_BRANDING_TAG => fiatHostedChannelBrandingCodec
+      case FHC_LAST_CROSS_SIGNED_STATE_TAG => fiatLastCrossSignedStateCodec
+      case FHC_INVOKE_HOSTED_CHANNEL_TAG => invokeFiatHostedChannelCodec
+      case FHC_INIT_HOSTED_CHANNEL_TAG => initFiatHostedChannelCodec
+      case FHC_STATE_OVERRIDE_TAG => fiatStateOverrideCodec
+      case FHC_RESIZE_CHANNEL_TAG => fiatResizeChannelCodec
+      case FHC_STATE_UPDATE_TAG => fiatStateUpdateCodec
+
+      case FHC_QUERY_PUBLIC_HOSTED_CHANNELS_TAG => queryPublicFiatHostedChannelsCodec
+      case FHC_REPLY_PUBLIC_HOSTED_CHANNELS_END_TAG => replyPublicFiatHostedChannelsEndCodec
+      case FHC_QUERY_PREIMAGES_TAG => fiatQueryPreimagesCodec
+      case FHC_REPLY_PREIMAGES_TAG => fiatReplyPreimagesCodec
+      case FHC_ASK_BRANDING_INFO => fiatAskBrandingInfoCodec
+
+      case PFHC_ANNOUNCE_GOSSIP_TAG => channelAnnouncementCodec
+      case PFHC_ANNOUNCE_SYNC_TAG => channelAnnouncementCodec
+      case PFHC_UPDATE_GOSSIP_TAG => channelUpdateCodec
+      case PFHC_UPDATE_SYNC_TAG => channelUpdateCodec
+
+      case FHC_UPDATE_FAIL_MALFORMED_HTLC_TAG => updateFailMalformedHtlcCodec
+      case FHC_UPDATE_FULFILL_HTLC_TAG => updateFulfillHtlcCodec
+      case FHC_UPDATE_FAIL_HTLC_TAG => updateFailHtlcCodec
+      case FHC_UPDATE_ADD_HTLC_TAG => updateAddHtlcCodec
+      case FHC_ERROR_TAG => failCodec
+
       case SWAP_IN_REQUEST_MESSAGE_TAG => provide(SwapInRequest)
       case SWAP_IN_PAYMENT_REQUEST_MESSAGE_TAG => swapInPaymentRequestCodec
       case SWAP_IN_PAYMENT_DENIED_MESSAGE_TAG => swapInPaymentDeniedCodec
@@ -593,6 +736,20 @@ object LightningMessageCodecs {
     case msg: QueryPreimages => UnknownMessage(HC_QUERY_PREIMAGES_TAG, queryPreimagesCodec.encode(msg).require.toByteVector)
     case msg: ReplyPreimages => UnknownMessage(HC_REPLY_PREIMAGES_TAG, replyPreimagesCodec.encode(msg).require.toByteVector)
     case msg: AskBrandingInfo => UnknownMessage(HC_ASK_BRANDING_INFO, askBrandingInfoCodec.encode(msg).require.toByteVector)
+
+    case msg: FiatHostedChannelBranding => UnknownMessage(FHC_HOSTED_CHANNEL_BRANDING_TAG, fiatHostedChannelBrandingCodec.encode(msg).require.toByteVector)
+    case msg: FiatLastCrossSignedState => UnknownMessage(FHC_LAST_CROSS_SIGNED_STATE_TAG, fiatLastCrossSignedStateCodec.encode(msg).require.toByteVector)
+    case msg: InvokeFiatHostedChannel => UnknownMessage(FHC_INVOKE_HOSTED_CHANNEL_TAG, invokeFiatHostedChannelCodec.encode(msg).require.toByteVector)
+    case msg: InitFiatHostedChannel => UnknownMessage(FHC_INIT_HOSTED_CHANNEL_TAG, initFiatHostedChannelCodec.encode(msg).require.toByteVector)
+    case msg: FiatStateOverride => UnknownMessage(FHC_STATE_OVERRIDE_TAG, fiatStateOverrideCodec.encode(msg).require.toByteVector)
+    case msg: FiatResizeChannel => UnknownMessage(FHC_RESIZE_CHANNEL_TAG, fiatResizeChannelCodec.encode(msg).require.toByteVector)
+    case msg: FiatStateUpdate => UnknownMessage(FHC_STATE_UPDATE_TAG, fiatStateUpdateCodec.encode(msg).require.toByteVector)
+
+    case msg: QueryPublicFiatHostedChannels => UnknownMessage(FHC_QUERY_PUBLIC_HOSTED_CHANNELS_TAG, queryPublicFiatHostedChannelsCodec.encode(msg).require.toByteVector)
+    case msg: ReplyPublicFiatHostedChannelsEnd => UnknownMessage(FHC_REPLY_PUBLIC_HOSTED_CHANNELS_END_TAG, replyPublicFiatHostedChannelsEndCodec.encode(msg).require.toByteVector)
+    case msg: FiatQueryPreimages => UnknownMessage(FHC_QUERY_PREIMAGES_TAG, fiatQueryPreimagesCodec.encode(msg).require.toByteVector)
+    case msg: FiatReplyPreimages => UnknownMessage(FHC_REPLY_PREIMAGES_TAG, fiatReplyPreimagesCodec.encode(msg).require.toByteVector)
+    case msg: FiatAskBrandingInfo => UnknownMessage(FHC_ASK_BRANDING_INFO, fiatAskBrandingInfoCodec.encode(msg).require.toByteVector)
 
     case SwapInRequest => UnknownMessage(SWAP_IN_REQUEST_MESSAGE_TAG, provide(SwapInRequest).encode(SwapInRequest).require.toByteVector)
     case msg: SwapInPaymentRequest => UnknownMessage(SWAP_IN_PAYMENT_REQUEST_MESSAGE_TAG, swapInPaymentRequestCodec.encode(msg).require.toByteVector)
