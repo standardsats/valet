@@ -51,6 +51,7 @@
                         style="@style/BoundedView"
                         android:layout_centerVertical="true"
                         android:layout_alignParentStart="true"
+                        android:id="@+id/hcBrandingText"
                         android:text="@string/hosted_channel"/>
 
                     <LinearLayout
@@ -130,8 +131,53 @@
 
                 <!-- Capacity, can send/receive, other info -->
 
+                <RelativeLayout
+                    android:id="@+id/fiatRate"
+                    style="@style/FillingView"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="10dp">
+
+                    <TextView
+                        style="@style/BoundedView"
+                        android:layout_alignParentStart="true"
+                        android:layout_centerVertical="true"
+                        android:text="@string/chan_fiat_rate" />
+
+                    <TextView
+                        android:id="@+id/fiatRateText"
+                        style="@style/BoundedView"
+                        android:layout_alignParentEnd="true"
+                        android:layout_centerVertical="true" />
+                </RelativeLayout>
+
+                <RelativeLayout
+                    android:id="@+id/fiatValue"
+                    style="@style/FillingView"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="10dp">
+
+                    <TextView
+                        style="@style/BoundedView"
+                        android:layout_alignParentStart="true"
+                        android:layout_centerVertical="true"
+                        android:text="@string/chan_fiat_value" />
+
+                    <TextView
+                        android:id="@+id/fiatValueText"
+                        style="@style/BoundedView"
+                        android:layout_alignParentEnd="true"
+                        android:layout_centerVertical="true" />
+                </RelativeLayout>
+
                 <RelativeLayout style="@style/FillingView" android:layout_marginBottom="10dp" android:id="@+id/totalCapacity">
-                    <TextView style="@style/BoundedView" android:layout_centerVertical="true" android:layout_alignParentStart="true" android:text="@string/chan_capacity"/>
+
+                    <TextView
+                        style="@style/BoundedView"
+                        android:layout_alignParentStart="true"
+                        android:layout_centerVertical="true"
+                        android:text="@string/chan_capacity" />
                     <TextView style="@style/BoundedView" android:layout_centerVertical="true" android:layout_alignParentEnd="true" android:id="@+id/totalCapacityText"/>
                 </RelativeLayout>
 

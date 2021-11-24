@@ -24,11 +24,12 @@ import fr.acinq.eclair.wire.{FiatHostedChannelBranding, HostedChannelBranding}
 import immortan.ChannelListener.Malfunction
 import immortan._
 import immortan.crypto.Tools._
-import immortan.utils.{BitcoinUri, InputParser, PaymentRequestExt, Rx}
+import immortan.utils.{BitcoinUri, Denomination, InputParser, PaymentRequestExt, Rx}
 import immortan.wire.{FiatHostedState, HostedState}
 import rx.lang.scala.Subscription
 import standardsats.wallet.{FiatChannelHosted, FiatHostedCommits}
 
+import java.text.DecimalFormat
 import scala.concurrent.duration._
 import scala.util.Try
 
@@ -106,6 +107,7 @@ class ChanActivity extends ChanErrorHandlerActivity with ChoiceReceiver with Has
     val hcImageContainer: CardView = swipeWrap.findViewById(R.id.hcImageContainer).asInstanceOf[CardView]
     val hcImage: ImageView = swipeWrap.findViewById(R.id.hcImage).asInstanceOf[ImageView]
     val hcInfo: ImageView = swipeWrap.findViewById(R.id.hcInfo).asInstanceOf[ImageButton]
+    val hcBrandingText: TextView = swipeWrap.findViewById(R.id.hcBrandingText).asInstanceOf[TextView]
 
     val baseBar: ProgressBar = swipeWrap.findViewById(R.id.baseBar).asInstanceOf[ProgressBar]
     val overBar: ProgressBar = swipeWrap.findViewById(R.id.overBar).asInstanceOf[ProgressBar]
@@ -120,8 +122,13 @@ class ChanActivity extends ChanErrorHandlerActivity with ChoiceReceiver with Has
     val overrideProposal: TextView = swipeWrap.findViewById(R.id.overrideProposal).asInstanceOf[TextView]
     val extraInfoText: TextView = swipeWrap.findViewById(R.id.extraInfoText).asInstanceOf[TextView]
 
+    val rateText: TextView = swipeWrap.findViewById(R.id.fiatRateText).asInstanceOf[TextView]
+    val fiatText: TextView = swipeWrap.findViewById(R.id.fiatValueText).asInstanceOf[TextView]
+
     val wrappers: Seq[View] =
       swipeWrap.findViewById(R.id.progressBars).asInstanceOf[View] ::
+        swipeWrap.findViewById(R.id.fiatRate).asInstanceOf[View] ::
+        swipeWrap.findViewById(R.id.fiatValue).asInstanceOf[View] ::
         swipeWrap.findViewById(R.id.totalCapacity).asInstanceOf[View] ::
         swipeWrap.findViewById(R.id.refundableAmount).asInstanceOf[View] ::
         swipeWrap.findViewById(R.id.paymentsInFlight).asInstanceOf[View] ::
@@ -185,6 +192,8 @@ class ChanActivity extends ChanErrorHandlerActivity with ChoiceReceiver with Has
 
       setVis(isVisible = false, overrideProposal)
       setVis(isVisible = false, hcBranding)
+      setVis(isVisible = false, rateText)
+      setVis(isVisible = false, fiatText)
 
       ChannelIndicatorLine.setView(chanState, chan)
       peerAddress.setText(peerInfo(cs.remoteInfo).html)
@@ -314,6 +323,12 @@ class ChanActivity extends ChanErrorHandlerActivity with ChoiceReceiver with Has
       canReceiveText.setText(sumOrNothing(hc.availableForReceive, cardOut).html)
       canSendText.setText(sumOrNothing(hc.availableForSend, cardIn).html)
       paymentsInFlightText.setText(sumOrNothing(inFlight, cardIn).html)
+
+      setVis(isVisible = true, rateText)
+      setVis(isVisible = true, fiatText)
+      rateText.setText(fiatOrNothing(56304, cardIn).html)
+      fiatText.setText(fiatOrNothing(0, cardIn).html)
+      hcBrandingText.setText(hosted_fiat_channel)
 
       // Order messages by degree of importance since user can only see a single one
       setVis(isVisible = hc.error.isDefined || hc.updateOpt.isEmpty, extraInfoText)
@@ -486,6 +501,17 @@ class ChanActivity extends ChanErrorHandlerActivity with ChoiceReceiver with Has
 
   private def sumOrNothing(amt: MilliSatoshi, mainColor: String): String = {
     if (0L.msat != amt) WalletApp.denom.parsedWithSign(amt, mainColor, cardZero)
+    else getString(chan_nothing)
+  }
+
+  private def fiatOrNothing(amt: Int, mainColor: String): String = {
+    if (0L != amt) {
+      val fmt: DecimalFormat = new DecimalFormat("###,###,###")
+      fmt.setDecimalFormatSymbols(Denomination.symbols)
+      val sign = "USD/BTC"
+
+      s"<font color=$mainColor>" + fmt.format(amt) + "</font>" + "\u00A0" + sign
+    }
     else getString(chan_nothing)
   }
 

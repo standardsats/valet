@@ -18,7 +18,7 @@
     <string name="lightning_wallet">Lightning</string>
     <string name="total_balance">Saldo total</string>
     <string name="hosted_channel">HOSTED CHANNEL\nCustodial solution</string>
-    <string name="hosted_fiat_channel">HOSTED FIAT CHANNEL\nCustodial solution</string>
+    <string name="hosted_fiat_channel">FIAT CHANNEL\nCustodial solution</string>
     <string name="typing_hints">Endereço Bitcoin, invoice, email&#8230;</string>
     <string name="copied_to_clipboard">Copiado para clipboard</string>
     <string name="add_address">Mais endereços novos</string>
@@ -378,6 +378,9 @@
     <string name="chan_can_receive">Pode receber</string>
     <string name="chan_in_flight">Valor encaminhado</string>
     <string name="chan_refundable">Reembolsável</string>
+
+    <string name="chan_fiat_rate">Taxa</string>
+    <string name="chan_fiat_value">Balança Fiat</string>
 
     <string name="chan_nothing"><![CDATA[<i>nada</i>]]></string>
 
