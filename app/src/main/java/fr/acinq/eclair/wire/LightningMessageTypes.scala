@@ -353,7 +353,7 @@ case class FiatLastCrossSignedState(isHost: Boolean, refundScriptPubKey: ByteVec
       hostFlag.toByte)
   }
 
-  def stateUpdate: StateUpdate = StateUpdate(blockDay, localUpdates, remoteUpdates, localSigOfRemote)
+  def stateUpdate: FiatStateUpdate = FiatStateUpdate(blockDay, localUpdates, remoteUpdates, localSigOfRemote)
 
   def verifyRemoteSig(pubKey: PublicKey): Boolean = Crypto.verifySignature(hostedSigHash, remoteSigOfLocal, pubKey)
 

@@ -69,6 +69,7 @@ abstract class TransportHandler(keyPair: KeyPair, remotePubKey: ByteVector) exte
 
     // Normal operation phase: messages can be sent and received here
     case (cd: CyphertextData, msg: LightningMessage, WAITING_CYPHERTEXT) =>
+      println(s"Sending message ${LightningMessageCodecs prepare msg}")
       val encoded = LightningMessageCodecs.lightningMessageCodecWithFallback.encode(LightningMessageCodecs prepare msg)
       val (encoder1, ciphertext) = encryptMsg(cd.enc, encoded.require.toByteVector)
       handleEncryptedOutgoingData(ciphertext)

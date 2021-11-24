@@ -76,7 +76,7 @@ object CommsTower {
             case message: Init => handleTheirRemoteInitMessage(ourListeners)(remoteInit = message)
             case message: Ping => handler process Pong(ByteVector fromValidHex "00" * message.pongLength)
 
-            case message: UnknownMessage =>
+            case message: UnknownMessage => println(s"Unknown $message");
               LightningMessageCodecs.decode(message) match {
                 case msg: HostedChannelMessage => for (lst <- ourListeners) lst.onHostedMessage(me, msg)
                 case msg: FiatHostedChannelMessage => for (lst <- ourListeners) lst.onFiatHostedMessage(me, msg)
@@ -85,7 +85,7 @@ object CommsTower {
                 case msg => for (lst <- ourListeners) lst.onMessage(me, msg)
               }
 
-            case message => for (lst <- ourListeners) lst.onMessage(me, message)
+            case message => println(s"Standard $message"); for (lst <- ourListeners) lst.onMessage(me, message)
           }
         }
 
