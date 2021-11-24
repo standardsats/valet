@@ -20,14 +20,14 @@ import com.softwaremill.quicklens._
 import fr.acinq.bitcoin._
 import fr.acinq.eclair._
 import fr.acinq.eclair.channel._
-import fr.acinq.eclair.wire.HostedChannelBranding
+import fr.acinq.eclair.wire.{FiatHostedChannelBranding, HostedChannelBranding}
 import immortan.ChannelListener.Malfunction
 import immortan._
 import immortan.crypto.Tools._
 import immortan.utils.{BitcoinUri, InputParser, PaymentRequestExt, Rx}
 import immortan.wire.{FiatHostedState, HostedState}
 import rx.lang.scala.Subscription
-import standardsats.wallet.FiatHostedCommits
+import standardsats.wallet.{FiatChannelHosted, FiatHostedCommits}
 
 import scala.concurrent.duration._
 import scala.util.Try
@@ -61,6 +61,7 @@ class ChanActivity extends ChanErrorHandlerActivity with ChoiceReceiver with Has
   private[this] lazy val chanList = findViewById(R.id.chanList).asInstanceOf[ListView]
 
   private[this] lazy val brandingInfos = WalletApp.txDataBag.db.txWrap(getBrandingInfos.toMap)
+  private[this] lazy val fiatBrandingInfos = WalletApp.txDataBag.db.txWrap(getFiatBrandingInfos.toMap)
   private[this] lazy val normalChanActions = getResources.getStringArray(R.array.ln_normal_chan_actions).map(_.html)
   private[this] lazy val hostedChanActions = getResources.getStringArray(R.array.ln_hosted_chan_actions).map(_.html)
   private[this] var updateSubscription = Option.empty[Subscription]
@@ -82,6 +83,8 @@ class ChanActivity extends ChanErrorHandlerActivity with ChoiceReceiver with Has
       val cardView = (getItem(position), card.getTag) match {
         case (ChanAndCommits(chan: ChannelHosted, hc: HostedCommits), view: HostedViewHolder) => view.fill(chan, hc)
         case (ChanAndCommits(chan: ChannelHosted, hc: HostedCommits), _) => new HostedViewHolder(card).fill(chan, hc)
+        case (ChanAndCommits(chan: FiatChannelHosted, hc: FiatHostedCommits), view: FiatHostedViewHolder) => view.fill(chan, hc)
+        case (ChanAndCommits(chan: FiatChannelHosted, hc: FiatHostedCommits), _) => new FiatHostedViewHolder(card).fill(chan, hc)
         case (ChanAndCommits(chan: ChannelNormal, commits: NormalCommits), view: NormalViewHolder) => view.fill(chan, commits)
         case (ChanAndCommits(chan: ChannelNormal, commits: NormalCommits), _) => new NormalViewHolder(card).fill(chan, commits)
         case _ => throw new RuntimeException
@@ -259,6 +262,67 @@ class ChanActivity extends ChanErrorHandlerActivity with ChoiceReceiver with Has
     }
   }
 
+  class FiatHostedViewHolder(view: View) extends ChanCardViewHolder(view) {
+    def fill(chan: FiatChannelHosted, hc: FiatHostedCommits): FiatHostedViewHolder = {
+      val capacity = hc.lastCrossSignedState.initHostedChannel.channelCapacityMsat
+      val inFlight = hc.nextLocalSpec.htlcs.foldLeft(0L.msat)(_ + _.add.amountMsat)
+      val barCanReceive = (hc.availableForReceive.toLong / capacity.truncateToSatoshi.toLong).toInt
+      val barCanSend = (hc.availableForSend.toLong / capacity.truncateToSatoshi.toLong).toInt
+
+      val errorText = (hc.localError, hc.remoteError) match {
+        case Some(error) ~ _ => s"LOCAL: ${ErrorExt extractDescription error}"
+        case _ ~ Some(error) => s"REMOTE: ${ErrorExt extractDescription error}"
+        case _ => new String
+      }
+
+      val brandOpt = fiatBrandingInfos.get(hc.remoteInfo.nodeId)
+      // Hide image container at start, show it later if bitmap is fine
+      hcInfo setOnClickListener onButtonTap(me browse "https://lightning-wallet.com/posts/scaling-ln-with-hosted-channels/")
+      setVisMany(true -> hcBranding, false -> hcImageContainer, hc.overrideProposal.isDefined -> overrideProposal)
+
+      for {
+        FiatHostedChannelBranding(_, pngIcon, contactInfo) <- brandOpt
+        bitmapImage <- Try(pngIcon.get.toArray).map(hcImageMemo.get)
+        _ = hcImage setOnClickListener onButtonTap(me browse contactInfo)
+        _ = setVis(isVisible = true, hcImageContainer)
+      } hcImage.setImageBitmap(bitmapImage)
+
+      removeItem setOnClickListener onButtonTap {
+        if (hc.localSpec.htlcs.nonEmpty) snack(chanContainer, getString(ln_hosted_chan_remove_impossible).html, R.string.dialog_ok, _.dismiss)
+        else mkCheckForm(alert => runAnd(alert.dismiss)(me removeFhc hc), none, confirmationBuilder(hc, getString(confirm_ln_hosted_chan_remove).html), dialog_ok, dialog_cancel)
+      }
+
+      overrideProposal setOnClickListener onButtonTap {
+        val newBalance = hc.lastCrossSignedState.initHostedChannel.channelCapacityMsat - hc.overrideProposal.get.localBalanceMsat
+        val current = WalletApp.denom.parsedWithSign(hc.availableForSend, cardIn, cardZero)
+        val overridden = WalletApp.denom.parsedWithSign(newBalance, cardIn, cardZero)
+
+        def proceed: Unit = chan process CMD_FIAT_HOSTED_STATE_OVERRIDE(hc.overrideProposal.get)
+        val builder = confirmationBuilder(hc, getString(ln_hc_override_warn).format(current, overridden).html)
+        mkCheckForm(alert => runAnd(alert.dismiss)(proceed), none, builder, dialog_ok, dialog_cancel)
+      }
+
+      channelCard setOnClickListener bringChanOptions(hostedChanActions, hc)
+
+      visibleExcept(R.id.refundableAmount)
+      ChannelIndicatorLine.setView(chanState, chan)
+      peerAddress.setText(peerInfo(hc.remoteInfo).html)
+      baseBar.setSecondaryProgress(barCanSend + barCanReceive)
+      baseBar.setProgress(barCanSend)
+
+      totalCapacityText.setText(sumOrNothing(capacity, cardIn).html)
+      canReceiveText.setText(sumOrNothing(hc.availableForReceive, cardOut).html)
+      canSendText.setText(sumOrNothing(hc.availableForSend, cardIn).html)
+      paymentsInFlightText.setText(sumOrNothing(inFlight, cardIn).html)
+
+      // Order messages by degree of importance since user can only see a single one
+      setVis(isVisible = hc.error.isDefined || hc.updateOpt.isEmpty, extraInfoText)
+      extraInfoText.setText(ln_info_no_update)
+      extraInfoText.setText(errorText)
+      this
+    }
+  }
+
   override def onDestroy: Unit = {
     try LNParams.cm.all.values.foreach(_.listeners -= me) catch none
     updateSubscription.foreach(_.unsubscribe)
@@ -353,6 +417,16 @@ class ChanActivity extends ChanErrorHandlerActivity with ChoiceReceiver with Has
     updateChanData.run
   }
 
+  def removeFhc(hc: FiatHostedCommits): Unit = {
+    LNParams.cm.chanBag.delete(hc.channelId)
+    LNParams.cm.all -= hc.channelId
+
+    // Update hub activity balance and chan list here
+    ChannelMaster.next(ChannelMaster.stateUpdateStream)
+    CommsTower.disconnectNative(hc.remoteInfo)
+    updateChanData.run
+  }
+
   def scanNodeQr: Unit = {
     def resolveNodeQr: Unit = InputParser.checkAndMaybeErase {
       case _: RemoteNodeInfo => me exitTo ClassNames.remotePeerActivityClass
@@ -403,6 +477,11 @@ class ChanActivity extends ChanErrorHandlerActivity with ChoiceReceiver with Has
   private def getBrandingInfos = for {
     ChanAndCommits(_: ChannelHosted, commits) <- csToDisplay
     brand <- WalletApp.extDataBag.tryGetBranding(commits.remoteInfo.nodeId).toOption
+  } yield commits.remoteInfo.nodeId -> brand
+
+  private def getFiatBrandingInfos = for {
+    ChanAndCommits(_: FiatChannelHosted, commits) <- csToDisplay
+    brand <- WalletApp.extDataBag.tryGetFiatBranding(commits.remoteInfo.nodeId).toOption
   } yield commits.remoteInfo.nodeId -> brand
 
   private def sumOrNothing(amt: MilliSatoshi, mainColor: String): String = {

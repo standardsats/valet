@@ -61,7 +61,7 @@ abstract class FiatChannelHosted extends Channel { me =>
       val isRightRemoteUpdateNumber = localHalfSignedHC.lastCrossSignedState.remoteUpdates == remoteSU.localUpdates
       val isRightLocalUpdateNumber = localHalfSignedHC.lastCrossSignedState.localUpdates == remoteSU.remoteUpdates
       val isRemoteSigOk = localCompleteLCSS.verifyRemoteSig(localHalfSignedHC.remoteInfo.nodeId)
-      val askBrandingInfo = AskBrandingInfo(localHalfSignedHC.channelId)
+      val askBrandingInfo = FiatAskBrandingInfo(localHalfSignedHC.channelId)
       val isBlockDayWrong = isOutOfSync(remoteSU.blockDay)
 
       if (isBlockDayWrong) throw new RuntimeException("Their blockday is wrong")
@@ -75,7 +75,7 @@ abstract class FiatChannelHosted extends Channel { me =>
       val isLocalSigOk = remoteLCSS.verifyRemoteSig(wait.remoteInfo.nodeSpecificPubKey)
       val isRemoteSigOk = remoteLCSS.reverse.verifyRemoteSig(wait.remoteInfo.nodeId)
       val hc = FiatChannelHosted.restoreCommits(remoteLCSS.reverse, wait.remoteInfo)
-      val askBrandingInfo = AskBrandingInfo(hc.channelId)
+      val askBrandingInfo = FiatAskBrandingInfo(hc.channelId)
 
       if (!isRemoteSigOk) localSuspend(hc, ERR_HOSTED_WRONG_REMOTE_SIG)
       else if (!isLocalSigOk) localSuspend(hc, ERR_HOSTED_WRONG_LOCAL_SIG)
