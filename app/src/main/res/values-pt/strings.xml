@@ -109,6 +109,7 @@
     <string name="dialog_send_ln"><![CDATA[Enviar pagamento <b>Lightning</b>%1$s]]></string>
     <string name="dialog_split_ln"><![CDATA[Pagamento <b>Lightning</b> dividido%1$s]]></string>
     <string name="dialog_split_ln_tip">Deixe outra pessoa ler um invoice dividido,\nEntão toquem em PAGAR, aprox ao mesmo tempo</string>
+    <string name="dialog_ln_expected_fee"><![CDATA[<b>expected fee</b> %1$s]]></string>
     <string name="dialog_ln_requested"><![CDATA[<b>solicitado</b>&#160;%1$s]]></string>
     <string name="dialog_ln_left"><![CDATA[<b>falta pagar</b>&#160;%1$s]]></string>
 
@@ -146,7 +147,7 @@
     <string name="error_ln_receive_reserve"><![CDATA[Ainda não é possível solicitar pagamentos Relâmpago porque antes você precisa gastar ao menos<b>%1$s</b> para liberar espaço para receber.]]></string>
 
     <string name="error_ln_send_small"><![CDATA[Não é possível enviar este pagamento Relâmpago porque o valor solicitado de <b>%1$s</b> é muito baixo, o valor mínimo é <b>%2$s</b>.]]></string>
-    <string name="error_ln_send_reserve"><![CDATA[Não é possível enviar pagamentos Lightning ainda porque antes você precisa receber ao menos <b>%1$s</b> para abrir espaço para enviar.]]></string>
+    <string name="error_ln_send_reserve"><![CDATA[Can\'t send Lightning payments yet because your payment channel is empty and you need to receive something into it first.]]></string>
     <string name="error_ln_send_no_secret"><![CDATA[Não é possível enviar este pagamento Lightning porque o invoice não contém um segredo]]></string>
     <string name="error_ln_send_network"><![CDATA[Não é possível enviar este pagamento Lightning porque ele é de uma rede desconhecida]]></string>
     <string name="error_ln_send_split"><![CDATA[Não é possível continuar pois os parâmetros de partição deste invoice dividido estão errados.]]></string>
@@ -209,7 +210,7 @@
     <string name="popup_txid"><![CDATA[<b>txid</b>&#160;%1$s]]></string>
 
     <string name="popup_prior_chain_balance"><![CDATA[<b>saldo&#160;anterior</b>&#160;%1$s]]></string>
-    <string name="popup_ln_fee"><![CDATA[<b>taxa</b>&#160;%1$s,&#160;<b>econom</b>&#160;%2$s]]></string>
+    <string name="popup_ln_fee"><![CDATA[<b>taxa</b>&#160;%1$s&#160;(%2$s)]]></string>
     <string name="popup_fiat"><![CDATA[<b>fiat&#160;value</b>&#160;%1$s&#160;(%2$s)]]></string>
     <string name="popup_chain_fee"><![CDATA[<b>taxa&#160;chain</b>&#160;%1$s]]></string>
     <string name="popup_hash"><![CDATA[<b>hash</b>&#160;%1$s]]></string>

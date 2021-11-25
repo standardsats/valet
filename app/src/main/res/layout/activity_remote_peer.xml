@@ -36,43 +36,17 @@
             android:visibility="gone"
             f:layout_newLine="true">
 
-            <TextView
-                android:id="@+id/ChannelRangeQueriesExtended"
-                style="@style/ChipTextGrayMargin" />
 
-            <TextView
-                android:id="@+id/OptionDataLossProtect"
-                style="@style/ChipTextGrayMargin" />
+            <TextView style="@style/ChipTextGrayMargin" android:id="@+id/ChannelRangeQueriesExtended"/>
+            <TextView style="@style/ChipTextGrayMargin" android:id="@+id/OptionDataLossProtect"/>
+            <TextView style="@style/ChipTextGrayMargin" android:id="@+id/BasicMultiPartPayment"/>
+            <TextView style="@style/ChipTextGrayMargin" android:id="@+id/StaticRemoteKey"/>
+            <TextView style="@style/ChipTextGrayMargin" android:id="@+id/PrivateRouting"/>
+            <TextView style="@style/ChipTextGrayMargin" android:id="@+id/HostedChannels"/>
+            <TextView style="@style/ChipTextGrayMargin" android:id="@+id/FiatHostedChannels"/>
+            <TextView style="@style/ChipTextGrayMargin" android:id="@+id/ChainSwap"/>
+            <TextView style="@style/ChipTextGrayMargin" android:id="@+id/Wumbo"/>
 
-            <TextView
-                android:id="@+id/BasicMultiPartPayment"
-                style="@style/ChipTextGrayMargin" />
-
-            <TextView
-                android:id="@+id/PrivateRouting"
-                style="@style/ChipTextGrayMargin" />
-
-            <TextView
-                android:id="@+id/StaticRemoteKey"
-                style="@style/ChipTextGrayMargin" />
-
-            <TextView
-                android:id="@+id/HostedChannels"
-                style="@style/ChipTextGrayMargin" />
-
-            <TextView
-                android:id="@+id/FiatHostedChannels"
-                style="@style/ChipTextGrayMargin"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content" />
-
-            <TextView
-                android:id="@+id/ChainSwap"
-                style="@style/ChipTextGrayMargin" />
-
-            <TextView
-                android:id="@+id/Wumbo"
-                style="@style/ChipTextGrayMargin" />
         </org.apmem.tools.layouts.FlowLayout>
 
         <TextView

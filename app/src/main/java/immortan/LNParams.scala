@@ -1,5 +1,7 @@
 package immortan
 
+import java.util.concurrent.atomic.AtomicLong
+
 import akka.actor.{ActorRef, ActorSystem, PoisonPill, Props}
 import akka.util.Timeout
 import com.softwaremill.quicklens._
@@ -22,7 +24,6 @@ import immortan.sqlite._
 import immortan.utils._
 import scodec.bits.{ByteVector, HexStringSyntax}
 
-import java.util.concurrent.atomic.AtomicLong
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContextExecutor}
 import scala.util.Try
@@ -35,7 +36,7 @@ object LNParams {
   val cltvRejectThreshold: Int = hcFulfillSafetyBlocks + 36 // Reject incoming payment right away if CLTV expiry is closer than this to current chain tip when HTLC arrives
   val incomingFinalCltvExpiry: CltvExpiryDelta = CltvExpiryDelta(hcFulfillSafetyBlocks + 72) // Ask payer to set final CLTV expiry to current chain tip + this many blocks
 
-  val failedChanRecoveryMsec: Double = 300000D // Failed-at-amount channels are fully recovered and their original capacity can be tried again after this much time
+  val failedChanRecoveryMsec: Double = 600000D // Failed-at-amount channels are fully recovered and their original capacity can be tried again after this much time
 
   val maxCltvExpiryDelta: CltvExpiryDelta = CltvExpiryDelta(2016) // A relative expiry of the whole route can not exceed this much blocks
   val maxToLocalDelay: CltvExpiryDelta = CltvExpiryDelta(2016) // We ask peer to delay their payment for this long in case of force-close
@@ -48,7 +49,7 @@ object LNParams {
   val maxHoldSecs: Long = 600L
 
   val maxOffChainFeeRatio: Double = 0.01 // We are OK with paying up to this % of LN fee relative to payment amount
-  val maxOffChainFeeAboveRatio: MilliSatoshi = MilliSatoshi(20000L) // For small amounts we always accept fee up to this
+  val maxOffChainFeeAboveRatio: MilliSatoshi = MilliSatoshi(10000L) // For small amounts we always accept fee up to this
 
   val shouldSendUpdateFeerateDiff = 5.0
   val shouldRejectPaymentFeerateDiff = 20.0
@@ -102,9 +103,9 @@ object LNParams {
       (BasicMultiPartPayment, FeatureSupport.Optional),
       (OptionDataLossProtect, FeatureSupport.Optional),
       (VariableLengthOnion, FeatureSupport.Optional),
-      (PrivateRouting, FeatureSupport.Optional),
       (ShutdownAnySegwit, FeatureSupport.Optional),
       (StaticRemoteKey, FeatureSupport.Optional),
+      (PrivateRouting, FeatureSupport.Optional),
       (HostedChannels, FeatureSupport.Optional),
       (FiatHostedChannels, FeatureSupport.Optional),
       (PaymentSecret, FeatureSupport.Optional),
@@ -212,7 +213,7 @@ class SyncParams {
   val minNormalChansForPFHC = 0 // How many normal chans a node must have to be eligible for PHCs TODO: RAISE IT
   val maxPFHCPerNode = 3 // How many PHCs a node can have in total
 
-  val minCapacity: MilliSatoshi = MilliSatoshi(900000000L) // 900k sat
+  val minCapacity: MilliSatoshi = MilliSatoshi(750000000L) // 750k sat
   val maxNodesToSyncFrom = 2 // How many disjoint peers to use for majority sync
   val acceptThreshold = 1 // ShortIds and updates are accepted if confirmed by more than this peers
   val messagesToAsk = 400 // Ask for this many messages from peer before they say this chunk is done

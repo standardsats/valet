@@ -31,11 +31,14 @@ import fr.acinq.eclair.blockchain.electrum.ElectrumWallet.{GenerateTxResponse, R
 import fr.acinq.eclair.blockchain.electrum.{ElectrumEclairWallet, ElectrumWallet}
 import fr.acinq.eclair.blockchain.fee.FeeratePerByte
 import fr.acinq.eclair.channel._
+import fr.acinq.eclair.router.Router
 import fr.acinq.eclair.transactions.{LocalFulfill, RemoteFulfill, Scripts}
 import fr.acinq.eclair.wire.{FullPaymentTag, PaymentTagTlv, UnknownNextPeer}
 import immortan.ChannelListener.Malfunction
 import immortan.ChannelMaster.{OutgoingAdds, RevealedLocalFulfills}
+import immortan.PathFinder.{ExpectedRouteFees, GetExpectedRouteFees}
 import immortan._
+import immortan.crypto.CanBeRepliedTo
 import immortan.crypto.Tools._
 import immortan.fsm._
 import immortan.sqlite.SQLiteData
@@ -49,9 +52,9 @@ import spray.json._
 import standardsats.wallet.FiatHostedCommits
 
 import scala.collection.JavaConverters._
-import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 import scala.util.{Success, Try}
 
 
@@ -120,7 +123,7 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
 
   // PAYMENT LIST
 
-  def reloadTxInfos: Unit = txInfos.setItems(WalletApp.txDataBag.listRecentTxs(20) map WalletApp.txDataBag.toTxInfo)
+  def reloadTxInfos: Unit = txInfos.setItems(WalletApp.txDataBag.listRecentTxs(200) map WalletApp.txDataBag.toTxInfo)
   def reloadPaymentInfos: Unit = paymentInfos.setItems(LNParams.cm.payBag.listRecentPayments(20) map LNParams.cm.payBag.toPaymentInfo)
   def reloadRelayedPreimageInfos: Unit = relayedPreimageInfos.setItems(LNParams.cm.payBag.listRecentRelays(20) map LNParams.cm.payBag.toRelayedPreimageInfo)
   def reloadPayMarketInfos: Unit = lnUrlPayLinks.setItems(WalletApp.lnUrlPayBag.listRecentLinks(20) map WalletApp.lnUrlPayBag.toLinkInfo)
@@ -297,7 +300,7 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
         WalletApp.txDescriptions(tx.txid) = OpReturnTxDescription(myFulfills.map(_.ourPreimage), label = None, semanticOrder = txOrder)
         alert.dismiss
 
-        runFutureProcessOnUI(LNParams.chainWallets.lnWallet.broadcast(tx), onFail) {
+        runFutureProcessOnUI(notifyAndBroadcast(LNParams.chainWallets.lnWallet, tx), onFail) {
           case true => LNParams.cm.payBag.updDescription(infoDesc1, info.paymentHash)
           case false => onFail(error = me getString error_btc_broadcast_fail)
         }
@@ -414,7 +417,7 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
           bumpDescription = PlainTxDescription(chainAddress :: Nil, None, cpfpBumpOrder.asSome, None, cpfpOf = info.txid.asSome)
           // Record this description before sending, otherwise we won't be able to know a memo, label and semantic order
           _ = WalletApp.txDescriptions(cpfpResponse.tx.txid) = bumpDescription
-          isSent <- fromWallet.broadcast(cpfpResponse.tx)
+          isSent <- notifyAndBroadcast(fromWallet, cpfpResponse.tx)
         } if (isSent) {
           // Parent semantic order is already updated, now we also update CPFP parent info
           WalletApp.txDataBag.updDescription(parentDescWithOrder.withNewCpfpBy(cpfpResponse.tx.txid), info.txid)
@@ -488,7 +491,7 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
           bumpDescription = PlainTxDescription(addresses = Nil, None, rbfBumpOrder.asSome, None, None, rbfParams.asSome)
           // Record this description before sending, otherwise we won't be able to know a memo, label and semantic order
           _ = WalletApp.txDescriptions(rbfBumpResponse.tx.txid) = bumpDescription
-          isSent <- fromWallet.broadcast(rbfBumpResponse.tx)
+          isSent <- notifyAndBroadcast(fromWallet, rbfBumpResponse.tx)
         } if (isSent) {
           val parentLowestOrder = rbfBumpOrder.copy(order = Long.MaxValue)
           val parentDesc = info.description.withNewOrderCond(parentLowestOrder.asSome)
@@ -564,7 +567,7 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
           bumpDescription = PlainTxDescription(addresses = Nil, None, rbfBumpOrder.asSome, None, None, rbfParams.asSome)
           // Record this description before sending, otherwise we won't be able to know a memo, label and semantic order
           _ = WalletApp.txDescriptions(rbfReroute.tx.txid) = bumpDescription
-          isSent <- fromWallet.broadcast(rbfReroute.tx)
+          isSent <- notifyAndBroadcast(fromWallet, rbfReroute.tx)
         } if (isSent) {
           val parentLowestOrder = rbfBumpOrder.copy(order = Long.MaxValue)
           val parentDesc = info.description.withNewOrderCond(parentLowestOrder.asSome)
@@ -584,8 +587,8 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
     }
 
     def retry(info: PaymentInfo): Unit = new HasTypicalChainFee {
-      // When retrying we never cap max LN fee to chain because original failure may have happened because more expensive routes were omitted, but it's hard to figure that out with certainty
-      private val cmd = LNParams.cm.makeSendCmd(info.prExt, info.sent, LNParams.cm.all.values.toList, info.chainFee, capLNFeeToChain = false).modify(_.split.totalSum).setTo(info.sent)
+      private val feeReserve = LNParams.cm.feeReserve(info.sent, info.chainFee, capLNFeeToChain = false, LNParams.maxOffChainFeeAboveRatio)
+      private val cmd = LNParams.cm.makeSendCmd(info.prExt, LNParams.cm.all.values.toList, feeReserve, info.sent).modify(_.split.totalSum).setTo(info.sent)
       replaceOutgoingPayment(ext = info.prExt, description = info.description, action = info.action, sentAmount = cmd.split.myPart, seenAt = info.seenAt)
       LNParams.cm.localSend(cmd)
     }
@@ -617,7 +620,6 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
 
           val liveFeePaid = outgoingFSMOpt.map(_.data.usedFee).getOrElse(info.fee)
           val offChainFeePaid = WalletApp.denom.directedWithSign(0L.msat, liveFeePaid, cardOut, cardIn, cardZero, isIncoming = false)
-          val onChainFeeSaved = WalletApp.denom.directedWithSign(info.chainFee - liveFeePaid, 0L.msat, cardOut, cardIn, cardZero, info.chainFee > liveFeePaid)
           val shouldDisplayFee = liveFeePaid > 0L.msat && (info.status == PaymentStatus.SUCCEEDED || info.status != PaymentStatus.ABORTED && outgoingFSMOpt.isDefined)
           val shouldRetry = info.status == PaymentStatus.ABORTED && !info.prExt.pr.isExpired && info.description.split.isEmpty && info.description.toSelfPreimage.isEmpty
           val shouldShowPayee = !info.isIncoming && info.description.toSelfPreimage.isEmpty
@@ -631,7 +633,7 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
           addFlowChip(extraInfo, getString(popup_fiat).format(s"<font color=$cardIn>$fiatNow</font>", fiatThen), R.drawable.border_gray)
           addFlowChip(extraInfo, getString(popup_prior_chain_balance) format WalletApp.denom.parsedWithSign(info.balanceSnapshot, cardIn, cardZero), R.drawable.border_gray)
           if (info.isIncoming && info.status == PaymentStatus.PENDING) addFlowChip(extraInfo, getString(popup_view_invoice), R.drawable.border_blue, _ => self doViewInvoice info)
-          if (!info.isIncoming && shouldDisplayFee) addFlowChip(extraInfo, getString(popup_ln_fee).format(offChainFeePaid, onChainFeeSaved), R.drawable.border_gray)
+          if (!info.isIncoming && shouldDisplayFee) addFlowChip(extraInfo, getString(popup_ln_fee).format(offChainFeePaid, ratio(amount, liveFeePaid) + PERCENT), R.drawable.border_gray)
           if (shouldRetry) addFlowChip(extraInfo, getString(popup_retry), R.drawable.border_yellow, _ => self retry info)
 
           incomingFSMOpt.filter(info.isActivelyHolding).foreach { fsm =>
@@ -1088,7 +1090,8 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
             override def neutral(alert: AlertDialog): Unit = proceedSplit(prExt, origAmount, alert)
 
             override def send(alert: AlertDialog): Unit = {
-              val cmd = LNParams.cm.makeSendCmd(prExt, manager.resultMsat, LNParams.cm.all.values.toList, typicalChainTxFee, WalletApp.capLNFeeToChain).modify(_.split.totalSum).setTo(origAmount)
+              val feeReserve = LNParams.cm.feeReserve(manager.resultMsat, typicalChainTxFee, WalletApp.capLNFeeToChain, LNParams.maxOffChainFeeAboveRatio)
+              val cmd = LNParams.cm.makeSendCmd(prExt, LNParams.cm.all.values.toList, feeReserve, manager.resultMsat).modify(_.split.totalSum).setTo(origAmount)
               val pd = PaymentDescription(split = cmd.split.asSome, label = manager.resultExtraInput, semanticOrder = None, invoiceText = prExt.descriptionOpt getOrElse new String)
               replaceOutgoingPayment(prExt, pd, action = None, sentAmount = cmd.split.myPart)
               LNParams.cm.localSend(cmd)
@@ -1118,8 +1121,28 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
               val totalHuman = WalletApp.denom.parsedWithSign(origAmount, cardIn, cardZero)
               val title = new TitleView(getString(dialog_send_ln) format prExt.brDescription)
               val builder = titleBodyAsViewBuilder(title.asColoredView(R.color.cardLightning), manager.content)
-              addFlowChip(title.flow, getString(dialog_ln_requested).format(totalHuman), R.drawable.border_blue)
-              mkCheckFormNeutral(send, none, neutral, builder, dialog_ok, dialog_cancel, dialog_split)
+              val popup = mkCheckFormNeutral(send, none, neutral, builder, dialog_ok, dialog_cancel, dialog_split)
+
+              def fillFlow(value: CharSequence) = UITask {
+                runAnd(title.flow.removeAllViewsInLayout) {
+                  addFlowChip(title.flow, getString(dialog_ln_requested).format(totalHuman), R.drawable.border_blue)
+                  addFlowChip(title.flow, getString(dialog_ln_expected_fee).format(value), R.drawable.border_blue)
+                }
+              }
+
+              val sender = new CanBeRepliedTo {
+                override def process(reply: Any): Unit = reply match {
+                  case PathFinder.NotifyNotReady => fillFlow(getString(dialog_up_to).format(ExpectedRouteFees(Router.defAvgHops) highCapRatio origAmount) + PERCENT).run
+                  case exp: ExpectedRouteFees => fillFlow(getString(dialog_up_to).format(exp highCapRatio origAmount) + PERCENT).run
+                  case _ => fillFlow("n/a").run
+                }
+              }
+
+              val length = Router.DEFAULT_EXPECTED_ROUTE_LENGTH
+              val cmd = GetExpectedRouteFees(sender, prExt.pr.nodeId, length)
+              fillFlow(pctCollected.head).run
+              LNParams.cm.pf process cmd
+              popup
             }
 
             // Prefill with asked amount
@@ -1425,7 +1448,7 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
     lazy val process: Transaction => Unit = signedTx => {
       val transactionLabel = sendView.manager.resultExtraInput orElse uri.label orElse uri.message
       WalletApp.txDescriptions(signedTx.txid) = PlainTxDescription(uri.address :: Nil, transactionLabel)
-      val isSent = Await.result(fromWallet.broadcast(signedTx), atMost = 40.seconds)
+      val isSent = Await.result(notifyAndBroadcast(fromWallet, signedTx), atMost = 40.seconds)
       if (!isSent) onFail(me getString error_btc_broadcast_fail)
       alert.dismiss
     }
@@ -1494,7 +1517,7 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
 
     lazy val process: Transaction => Unit = signedTx => {
       WalletApp.txDescriptions(signedTx.txid) = PlainTxDescription(addressToAmount.values.firstItems.toList)
-      val isSent = Await.result(fromWallet.broadcast(signedTx), atMost = 40.seconds)
+      val isSent = Await.result(notifyAndBroadcast(fromWallet, signedTx), atMost = 40.seconds)
       if (!isSent) onFail(me getString error_btc_broadcast_fail)
       alert.dismiss
     }
@@ -1577,7 +1600,8 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
         def proceed(pf: PayRequestFinal): TimerTask = UITask {
           lnSendGuard(pf.prExt, container = contentWindow) { _ =>
             val paymentOrder = SemanticOrder(id = lnUrl.request, order = -System.currentTimeMillis)
-            val cmd = LNParams.cm.makeSendCmd(pf.prExt, manager.resultMsat, LNParams.cm.all.values.toList, typicalChainTxFee, WalletApp.capLNFeeToChain).modify(_.split.totalSum).setTo(minSendable)
+            val feeReserve = LNParams.cm.feeReserve(manager.resultMsat, typicalChainTxFee, WalletApp.capLNFeeToChain, LNParams.maxOffChainFeeAboveRatio)
+            val cmd = LNParams.cm.makeSendCmd(pf.prExt, LNParams.cm.all.values.toList, feeReserve, manager.resultMsat).modify(_.split.totalSum).setTo(minSendable)
             val pd = PaymentDescription(cmd.split.asSome, label = None, semanticOrder = paymentOrder.asSome, invoiceText = new String, meta = data.meta.textPlain.asSome)
             goToWithValue(value = SplitParams(pf.prExt, pf.successAction, pd, cmd, typicalChainTxFee), target = ClassNames.qrSplitActivityClass)
           }
@@ -1597,7 +1621,8 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
           lnSendGuard(pf.prExt, container = contentWindow) { _ =>
             val linkOrder = SemanticOrder(id = lnUrl.request, order = Long.MinValue)
             val paymentOrder = SemanticOrder(id = lnUrl.request, order = -System.currentTimeMillis)
-            val cmd = LNParams.cm.makeSendCmd(pf.prExt, manager.resultMsat, LNParams.cm.all.values.toList, typicalChainTxFee, WalletApp.capLNFeeToChain).modify(_.split.totalSum).setTo(manager.resultMsat)
+            val feeReserve = LNParams.cm.feeReserve(manager.resultMsat, typicalChainTxFee, WalletApp.capLNFeeToChain, LNParams.maxOffChainFeeAboveRatio)
+            val cmd = LNParams.cm.makeSendCmd(pf.prExt, LNParams.cm.all.values.toList, feeReserve, manager.resultMsat).modify(_.split.totalSum).setTo(manager.resultMsat)
             val pd = PaymentDescription(split = None, label = None, semanticOrder = paymentOrder.asSome, invoiceText = new String, meta = data.meta.textPlain.asSome)
             replaceOutgoingPayment(pf.prExt, pd, pf.successAction, sentAmount = cmd.split.myPart)
             LNParams.cm.localSend(cmd)
@@ -1677,5 +1702,10 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
     val fromVendor = action.domain.map(site => s"<br><br><b>$site</b>").getOrElse(new String)
     val title = getString(dialog_lnurl_from_vendor).format(fromVendor).asDefView
     new AlertDialog.Builder(me).setCustomTitle(title).setMessage(msg)
+  }
+
+  def notifyAndBroadcast(fromWallet: ElectrumEclairWallet, tx: Transaction): Future[Boolean] = {
+    WalletApp.app.quickToast(pctCollected.head)
+    fromWallet.broadcast(tx)
   }
 }

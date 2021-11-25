@@ -1,6 +1,7 @@
 package immortan.utils
 
 import java.text._
+
 import fr.acinq.eclair._
 
 
@@ -46,9 +47,11 @@ object SatDenomination extends Denomination { me =>
   val factor = 1000L
   val sign = "sat"
 
-  def parsedWithSign(msat: MilliSatoshi, mainColor: String, zeroColor: String): String = parsed(msat, mainColor, zeroColor) + "\u00A0" + sign
+  def parsedWithSign(msat: MilliSatoshi, mainColor: String, zeroColor: String): String =
+    parsed(msat, mainColor, zeroColor) + "\u00A0" + sign
 
-  def parsed(msat: MilliSatoshi, mainColor: String, zeroColor: String): String = s"<font color=$mainColor>" + fmt.format(me fromMsat msat) + "</font>"
+  def parsed(msat: MilliSatoshi, mainColor: String, zeroColor: String): String =
+    s"<font color=$mainColor>" + fmt.format(me fromMsat msat) + "</font>"
 }
 
 object BtcDenomination extends Denomination { me =>

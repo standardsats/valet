@@ -109,10 +109,11 @@
     <string name="dialog_send_ln"><![CDATA[Enviar pago <b>Lightning</b> %1$s]]></string>
     <string name="dialog_split_ln"><![CDATA[Dividir pago <b>Lightning</b> %1$s]]></string>
     <string name="dialog_split_ln_tip">Deja que alguien escanee una dividir,\nLuego pulsen en OK al mismo tiempo</string>
+    <string name="dialog_ln_expected_fee"><![CDATA[<b>expected fee</b> %1$s]]></string>
     <string name="dialog_ln_requested"><![CDATA[<b>solicitado</b>&#160;%1$s]]></string>
     <string name="dialog_ln_left"><![CDATA[<b>queda por pagar</b>&#160;%1$s]]></string>
 
-    <string name="btc_transfer_label"><![CDATA[Antigua ->  billetera moderna]]></string>
+    <string name="btc_transfer_label"><![CDATA[Antigua -> billetera moderna]]></string>
     <string name="btc_transfer_message"><![CDATA[Transferencia local de Bitcoin desde billetera antigua a billetera moderna]]></string>
     <string name="recovery_phrase_warning">Pulse para guardar la frase de recuperación de la billetera en caso de que pierdas o reemplaces tu teléfono.</string>
 
@@ -146,7 +147,7 @@
     <string name="error_ln_receive_reserve"><![CDATA[No se pueden solicitar pagos Lightning aún porque primero debes gastar al menos <b>%1$s</b> para crear algo de liquidez para recibir.]]></string>
 
     <string name="error_ln_send_small"><![CDATA[No se puede enviar este pago Lightning porque el monto solicitado de <b>%1$s</b> es muy pequeño, el monto mínimo es <b>%2$s</b>.]]></string>
-    <string name="error_ln_send_reserve"><![CDATA[No se pueden enviar pagos Lightning aún porque primero necesitas recibir al menos <b>%1$s</b> para crear algo de liquidez para enviar.]]></string>
+    <string name="error_ln_send_reserve"><![CDATA[Can\'t send Lightning payments yet because your payment channel is empty and you need to receive something into it first.]]></string>
     <string name="error_ln_send_no_secret"><![CDATA[No se puede enviar este pago Lightning porque la factura no contiene un secreto.]]></string>
     <string name="error_ln_send_network"><![CDATA[No se puede enviar este pago Lightning porque pertenece a una red desconocida.]]></string>
     <string name="error_ln_send_split"><![CDATA[No se puede proceder con esta factura dividida porque los parámetros de división son incorrectos.]]></string>
@@ -209,7 +210,7 @@
     <string name="popup_txid"><![CDATA[<b>txid</b>&#160;%1$s]]></string>
 
     <string name="popup_prior_chain_balance"><![CDATA[<b>anterior&#160;saldo</b>&#160;%1$s]]></string>
-    <string name="popup_ln_fee"><![CDATA[<b>tarifa</b>&#160;%1$s,&#160;<b>ahorrado</b>&#160;%2$s]]></string>
+    <string name="popup_ln_fee"><![CDATA[<b>tarifa</b>&#160;%1$s&#160;(%2$s)]]></string>
     <string name="popup_fiat"><![CDATA[<b>fiat&#160;value</b>&#160;%1$s&#160;(%2$s)]]></string>
     <string name="popup_chain_fee"><![CDATA[<b>cadena&#160;tarifa</b>&#160;%1$s]]></string>
     <string name="popup_hash"><![CDATA[<b>hash</b>&#160;%1$s]]></string>

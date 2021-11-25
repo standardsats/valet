@@ -37,6 +37,7 @@ import com.google.zxing.{BarcodeFormat, EncodeHintType}
 import com.journeyapps.barcodescanner.{BarcodeResult, BarcodeView}
 import com.ornach.nobobutton.NoboButton
 import com.softwaremill.quicklens._
+import com.sparrowwallet.hummingbird.registry.CryptoPSBT
 import com.sparrowwallet.hummingbird.{UR, UREncoder}
 import fr.acinq.bitcoin._
 import fr.acinq.eclair._
@@ -226,8 +227,7 @@ trait BaseActivity extends AppCompatActivity { me =>
   def runInFutureProcessOnUI[T](fun: => T, no: Throwable => Unit)(ok: T => Unit): Unit = runFutureProcessOnUI[T](Future(fun), no)(ok)
 
   def runFutureProcessOnUI[T](fun: Future[T], no: Throwable => Unit)(ok: T => Unit): Unit = fun onComplete {
-    case Success(result) => UITask(ok apply result).run
-    case Failure(error) => UITask(no apply error).run
+    case Success(result) => UITask(ok apply result).run case Failure(error) => UITask(no apply error).run
   }
 
   def setVis(isVisible: Boolean, view: View): Unit = {
@@ -535,9 +535,9 @@ trait BaseActivity extends AppCompatActivity { me =>
     val qrSlideshow: ImageView = host.findViewById(R.id.qrSlideshow).asInstanceOf[ImageView]
     var subscription: Option[Subscription] = None
 
-    def activate(bytes: Bytes): Unit = {
-      val encoder = new UREncoder(UR.fromBytes(bytes), 10, 100, 0)
-      val stringToQr: String => Bitmap = sourceChunk => QRActivity.get(sourceChunk, qrSize)
+    def activate(psbt: Psbt): Unit = {
+      val encoder = new UREncoder(new CryptoPSBT(Psbt write psbt).toUR, 100, 10, 0)
+      val stringToQr: String => Bitmap = sourceChunk => QRActivity.get(sourceChunk.toUpperCase, qrSize)
       val updateView: Bitmap => Unit = sourceQrCode => UITask(qrSlideshow setImageBitmap sourceQrCode).run
       subscription = Observable.interval(0.second, 700.millis).map(_ => encoder.nextPart).map(stringToQr).subscribe(updateView).asSome
     }
@@ -625,7 +625,7 @@ trait BaseActivity extends AppCompatActivity { me =>
       chainSlideshowView.chainButtonsView.chainEditButton setOnClickListener onButtonTap(me switchToEdit alert)
       chainSlideshowView.chainButtonsView.chainCancelButton setOnClickListener onButtonTap(alert.dismiss)
       runAnd(chainReaderView.barcodeReader.pause)(chainReaderView.barcodeReader.stopDecoding)
-      chainSlideshowView.activate(Psbt write psbt)
+      chainSlideshowView.activate(psbt)
       switchButtons(alert, on = false)
       switchTo(chainSlideshowView)
     }
@@ -655,10 +655,7 @@ trait BaseActivity extends AppCompatActivity { me =>
     case _ if !prExt.pr.features.allowPaymentSecret => snack(container, getString(error_ln_send_no_secret).html, dialog_ok, _.dismiss)
 
     case _ if LNParams.cm.operationalCncs(LNParams.cm.all.values).maxBy(_.commits.availableForSend).commits.availableForSend < LNParams.minPayment =>
-      val smallestReserve = -LNParams.cm.operationalCncs(LNParams.cm.all.values).minBy(_.commits.availableForSend).commits.availableForSend
-      val reserveHuman = WalletApp.denom.parsedWithSign(smallestReserve, cardIn, cardZero)
-      val msg = getString(error_ln_send_reserve).format(reserveHuman).html
-      snack(container, msg, dialog_ok, _.dismiss)
+      snack(container, getString(error_ln_send_reserve).html, dialog_ok, _.dismiss)
 
     case _ if prExt.pr.amount.exists(_ < LNParams.minPayment) =>
       val requestedHuman = WalletApp.denom.parsedWithSign(prExt.pr.amount.get, cardIn, cardZero)
@@ -681,7 +678,8 @@ trait BaseActivity extends AppCompatActivity { me =>
 
     case Some(cnc) =>
       if (cnc.commits.availableForReceive < 0L.msat) {
-        val reserveHuman = WalletApp.denom.parsedWithSign(-cnc.commits.availableForReceive, cardIn, cardZero)
+        val reservePlusMinPayment = cnc.commits.availableForReceive + LNParams.minPayment
+        val reserveHuman = WalletApp.denom.parsedWithSign(-reservePlusMinPayment, cardIn, cardZero)
         snack(container, getString(error_ln_receive_reserve).format(reserveHuman).html, dialog_ok, _.dismiss)
       } else onOk
   }
@@ -701,16 +699,14 @@ trait BaseActivity extends AppCompatActivity { me =>
       updatePopupButton(getPositiveButton(alert), isPayEnabled)
     }
 
-    // Load graph while user is looking at payment form
-    LNParams.cm.pf process PathFinder.CMDLoadGraph
-
     def neutral(alert: AlertDialog): Unit
     def send(alert: AlertDialog): Unit
     def isNeutralEnabled: Boolean
     def isPayEnabled: Boolean
 
     def baseSendNow(prExt: PaymentRequestExt, alert: AlertDialog): Unit = {
-      val cmd = LNParams.cm.makeSendCmd(prExt, manager.resultMsat, LNParams.cm.all.values.toList, typicalChainTxFee, WalletApp.capLNFeeToChain).modify(_.split.totalSum).setTo(manager.resultMsat)
+      val feeReserve = LNParams.cm.feeReserve(manager.resultMsat, typicalChainTxFee, WalletApp.capLNFeeToChain, LNParams.maxOffChainFeeAboveRatio)
+      val cmd = LNParams.cm.makeSendCmd(prExt, LNParams.cm.all.values.toList, feeReserve, manager.resultMsat).modify(_.split.totalSum).setTo(manager.resultMsat)
       val pd = PaymentDescription(split = None, label = manager.resultExtraInput, semanticOrder = None, invoiceText = prExt.descriptionOpt getOrElse new String)
       replaceOutgoingPayment(prExt, pd, action = None, sentAmount = cmd.split.myPart)
       LNParams.cm.localSend(cmd)
@@ -718,7 +714,8 @@ trait BaseActivity extends AppCompatActivity { me =>
     }
 
     def proceedSplit(prExt: PaymentRequestExt, origAmount: MilliSatoshi, alert: AlertDialog): Unit = {
-      val cmd = LNParams.cm.makeSendCmd(prExt, manager.resultMsat, LNParams.cm.all.values.toList, typicalChainTxFee, WalletApp.capLNFeeToChain).modify(_.split.totalSum).setTo(origAmount)
+      val feeReserve = LNParams.cm.feeReserve(manager.resultMsat, typicalChainTxFee, WalletApp.capLNFeeToChain, LNParams.maxOffChainFeeAboveRatio)
+      val cmd = LNParams.cm.makeSendCmd(prExt, LNParams.cm.all.values.toList, feeReserve, manager.resultMsat).modify(_.split.totalSum).setTo(origAmount)
       val pd = PaymentDescription(split = cmd.split.asSome, label = manager.resultExtraInput, semanticOrder = None, invoiceText = prExt.descriptionOpt getOrElse new String)
       goToWithValue(value = SplitParams(prExt, action = None, pd, cmd, typicalChainTxFee), target = ClassNames.qrSplitActivityClass)
       alert.dismiss
