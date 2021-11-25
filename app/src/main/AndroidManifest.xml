@@ -23,6 +23,7 @@
         android:normalScreens="true"/>
 
     <application
+        android:testOnly="false"
         android:largeHeap="true"
         android:supportsRtl="true"
         android:allowBackup="false"

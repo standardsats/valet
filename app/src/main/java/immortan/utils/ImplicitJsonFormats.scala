@@ -166,6 +166,7 @@ object ImplicitJsonFormats extends DefaultJsonProtocol {
     def write(unserialized: LNUrlData): JsValue = throw new RuntimeException
     def read(serialized: JsValue): LNUrlData = serialized.asJsObject fields TAG match {
       case JsString("hostedChannelRequest") => serialized.convertTo[HostedChannelRequest]
+      case JsString("fiatHostedChannelRequest") => serialized.convertTo[FiatHostedChannelRequest]
       case JsString("channelRequest") => serialized.convertTo[NormalChannelRequest]
       case JsString("withdrawRequest") => serialized.convertTo[WithdrawRequest]
       case JsString("payRequest") => serialized.convertTo[PayRequest]
@@ -180,6 +181,9 @@ object ImplicitJsonFormats extends DefaultJsonProtocol {
 
   implicit val hostedChannelRequestFmt: JsonFormat[HostedChannelRequest] = taggedJsonFmt(jsonFormat[String, Option[String], String,
     HostedChannelRequest](HostedChannelRequest.apply, "uri", "alias", "k1"), tag = "hostedChannelRequest")
+
+  implicit val fiatHostedChannelRequestFmt: JsonFormat[FiatHostedChannelRequest] = taggedJsonFmt(jsonFormat[String, Option[String], String,
+    FiatHostedChannelRequest](FiatHostedChannelRequest.apply, "uri", "alias", "k1"), tag = "hostedChannelRequest")
 
   implicit val withdrawRequestFmt: JsonFormat[WithdrawRequest] = taggedJsonFmt(jsonFormat[String, String, Long, String, Option[Long], Option[Long], Option[String], Option[String],
     WithdrawRequest](WithdrawRequest.apply, "callback", "k1", "maxWithdrawable", "defaultDescription", "minWithdrawable", "balance", "balanceCheck", "payLink"), tag = "withdrawRequest")

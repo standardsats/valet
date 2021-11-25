@@ -160,13 +160,13 @@ class ChanActivity extends ChanErrorHandlerActivity with ChoiceReceiver with Has
         setVis(isVisible = true, extraInfoText)
         extraInfoText.setText(getString(ln_info_opening).html)
         channelCard setOnClickListener bringChanOptions(normalChanActions.take(2), cs)
-        visibleExcept(R.id.progressBars, R.id.paymentsInFlight, R.id.canReceive, R.id.canSend)
+        visibleExcept(R.id.progressBars, R.id.fiatRate, R.id.fiatValue, R.id.paymentsInFlight, R.id.canReceive, R.id.canSend)
       } else if (Channel isOperational chan) {
         channelCard setOnClickListener bringChanOptions(normalChanActions, cs)
         setVis(isVisible = cs.updateOpt.isEmpty || tempFeeMismatch, extraInfoText)
         if (cs.updateOpt.isEmpty) extraInfoText.setText(ln_info_no_update)
         if (tempFeeMismatch) extraInfoText.setText(ln_info_fee_mismatch)
-        visibleExcept(goneRes = -1)
+        visibleExcept(R.id.fiatRate, R.id.fiatValue)
       } else {
         val closeInfoRes = chan.data match {
           case _: DATA_WAIT_FOR_REMOTE_PUBLISH_FUTURE_COMMITMENT => ln_info_await_close
@@ -179,7 +179,7 @@ class ChanActivity extends ChanErrorHandlerActivity with ChoiceReceiver with Has
         }
 
         channelCard setOnClickListener bringChanOptions(normalChanActions.take(2), cs)
-        visibleExcept(R.id.progressBars, R.id.canReceive, R.id.canSend)
+        visibleExcept(R.id.progressBars, R.id.fiatRate, R.id.fiatValue, R.id.canReceive, R.id.canSend)
         extraInfoText.setText(getString(closeInfoRes).html)
         setVis(isVisible = true, extraInfoText)
       }
@@ -348,11 +348,16 @@ class ChanActivity extends ChanErrorHandlerActivity with ChoiceReceiver with Has
     case (cs: NormalCommits, 0) => me share ChanActivity.getDetails(cs, cs.commitInput.outPoint.txid.toString)
     case (nc: HostedCommits, 0) => me share ChanActivity.getDetails(nc, fundingTxid = "n/a")
     case (hc: HostedCommits, 1) => me share ChanActivity.getHcState(hc)
+    case (nc: FiatHostedCommits, 0) => me share ChanActivity.getDetails(nc, fundingTxid = "n/a")
+    case (hc: FiatHostedCommits, 1) => me share ChanActivity.getFiatHcState(hc)
     case (cs: NormalCommits, 1) => closeNcToWallet(cs)
 
     case (hc: HostedCommits, 2) =>
       val builder = confirmationBuilder(hc, getString(confirm_ln_hosted_chan_drain).html)
       mkCheckForm(alert => runAnd(alert.dismiss)(me drainHc hc), none, builder, dialog_ok, dialog_cancel)
+    case (hc: FiatHostedCommits, 2) =>
+      val builder = confirmationBuilder(hc, getString(confirm_ln_hosted_chan_drain).html)
+      mkCheckForm(alert => runAnd(alert.dismiss)(me drainFiatHc hc), none, builder, dialog_ok, dialog_cancel)
 
     case (cs: NormalCommits, 2) => closeNcToAddress(cs)
     case (cs: Commitments, 3) => receiveIntoChan(cs)
@@ -362,6 +367,7 @@ class ChanActivity extends ChanErrorHandlerActivity with ChoiceReceiver with Has
   override def onException: PartialFunction[Malfunction, Unit] = {
     case (CMDException(reason, _: CMD_CLOSE), _, data: HasNormalCommitments) => chanError(data.channelId, reason, data.commitments.remoteInfo)
     case (CMDException(reason, _: CMD_HOSTED_STATE_OVERRIDE), _, hc: HostedCommits) => chanError(hc.channelId, reason, hc.remoteInfo)
+    case (CMDException(reason, _: CMD_FIAT_HOSTED_STATE_OVERRIDE), _, hc: FiatHostedCommits) => chanError(hc.channelId, reason, hc.remoteInfo)
   }
 
   def closeNcToWallet(cs: NormalCommits): Unit = {
@@ -393,6 +399,25 @@ class ChanActivity extends ChanErrorHandlerActivity with ChoiceReceiver with Has
   }
 
   def drainHc(hc: HostedCommits): Unit = {
+    val relatedHc = getChanByCommits(hc).toList
+    val maxSendable = LNParams.cm.maxSendable(relatedHc)
+    val preimage = randomBytes32
+
+    maxNormalReceivable match {
+      case _ if maxSendable < LNParams.minPayment => snack(chanContainer, getString(ln_hosted_chan_drain_impossible_few_funds).html, R.string.dialog_ok, _.dismiss)
+      case ncOpt if ncOpt.forall(_.maxReceivable < LNParams.minPayment) => snack(chanContainer, getString(ln_hosted_chan_drain_impossible_no_chans).html, R.string.dialog_ok, _.dismiss)
+      case Some(csAndMax) =>
+        val toSend = maxSendable.min(csAndMax.maxReceivable)
+        val pd = PaymentDescription(split = None, label = getString(tx_ln_label_reflexive).asSome, semanticOrder = None, invoiceText = new String, toSelfPreimage = preimage.asSome)
+        val prExt = LNParams.cm.makePrExt(toReceive = toSend, description = pd, allowedChans = csAndMax.commits, hash = Crypto.sha256(preimage), secret = randomBytes32)
+        val cmd = LNParams.cm.makeSendCmd(prExt, toSend, allowedChans = relatedHc, typicalChainTxFee, capLNFeeToChain = false).modify(_.split.totalSum).setTo(toSend)
+        WalletApp.app.quickToast(getString(dialog_lnurl_processing).format(me getString tx_ln_label_reflexive).html)
+        replaceOutgoingPayment(prExt, pd, action = None, sentAmount = prExt.pr.amount.get)
+        LNParams.cm.localSend(cmd)
+    }
+  }
+
+  def drainFiatHc(hc: FiatHostedCommits): Unit = {
     val relatedHc = getChanByCommits(hc).toList
     val maxSendable = LNParams.cm.maxSendable(relatedHc)
     val preimage = randomBytes32

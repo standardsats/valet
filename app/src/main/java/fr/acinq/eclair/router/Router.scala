@@ -84,7 +84,7 @@ object Router {
 
   case class RouteFound(route: Route, fullTag: FullPaymentTag, partId: ByteVector) extends RouteResponse
 
-  case class Data(channels: Map[Long, PublicChannel], hostedChannels: Map[Long, PublicChannel], graph: DirectedGraph) {
+  case class Data(channels: Map[Long, PublicChannel], hostedChannels: Map[Long, PublicChannel], fiatHostedChannels: Map[Long, PublicChannel], graph: DirectedGraph) {
     val defAvgHopParams = AvgHopParams(CltvExpiryDelta(144), feeProportionalMillionths = 500L, feeBaseMsat = 1000L.msat, sampleSize = 1)
 
     lazy val avgHopParams: AvgHopParams = if (channels.nonEmpty) {

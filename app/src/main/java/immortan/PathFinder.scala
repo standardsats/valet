@@ -43,7 +43,7 @@ object PathFinder {
   }
 }
 
-abstract class PathFinder(val normalBag: NetworkBag, val hostedBag: NetworkBag) extends StateMachine[Data] { me =>
+abstract class PathFinder(val normalBag: NetworkBag, val hostedBag: NetworkBag, val fiatHostedBag: NetworkBag) extends StateMachine[Data] { me =>
   private val extraEdgesCache = CacheBuilder.newBuilder.expireAfterWrite(1, TimeUnit.DAYS).maximumSize(500).build[java.lang.Long, GraphEdge]
   val extraEdges: mutable.Map[java.lang.Long, GraphEdge] = extraEdgesCache.asMap.asScala
 
@@ -58,7 +58,7 @@ abstract class PathFinder(val normalBag: NetworkBag, val hostedBag: NetworkBag) 
   private val CMDResync = "cmd-resync"
   private val RESYNC_PERIOD: Long = 1000L * 3600 * 72
   // We don't load routing data on every startup but when user (or system) actually needs it
-  become(Data(channels = Map.empty, hostedChannels = Map.empty, DirectedGraph.empty), WAITING)
+  become(Data(channels = Map.empty, hostedChannels = Map.empty, fiatHostedChannels = Map.empty, DirectedGraph.empty), WAITING)
 
   def getLastTotalResyncStamp: Long
   def getLastNormalResyncStamp: Long
@@ -111,8 +111,9 @@ abstract class PathFinder(val normalBag: NetworkBag, val hostedBag: NetworkBag) 
     case (CMDLoadGraph, WAITING) =>
       val normalShortIdToPubChan = normalBag.getRoutingData
       val hostedShortIdToPubChan = hostedBag.getRoutingData
-      val searchGraph1 = DirectedGraph.makeGraph(normalShortIdToPubChan ++ hostedShortIdToPubChan).addEdges(extraEdges.values)
-      become(Data(normalShortIdToPubChan, hostedShortIdToPubChan, searchGraph1), OPERATIONAL)
+      val fiatHostedShortIdToPubChan = fiatHostedBag.getRoutingData
+      val searchGraph1 = DirectedGraph.makeGraph(normalShortIdToPubChan ++ hostedShortIdToPubChan ++ fiatHostedShortIdToPubChan).addEdges(extraEdges.values)
+      become(Data(normalShortIdToPubChan, hostedShortIdToPubChan, fiatHostedShortIdToPubChan, searchGraph1), OPERATIONAL)
       if (data.channels.nonEmpty) listeners.foreach(_ process NotifyOperational)
 
     case (CMDResync, OPERATIONAL) if System.currentTimeMillis - getLastNormalResyncStamp > RESYNC_PERIOD =>
@@ -145,11 +146,13 @@ abstract class PathFinder(val normalBag: NetworkBag, val hostedBag: NetworkBag) 
     case (phcPure: CompleteHostedRoutingData, OPERATIONAL) =>
       // First, completely replace PHC data with obtained one
       hostedBag.processCompleteHostedData(phcPure)
+      fiatHostedBag.processCompleteHostedData(phcPure)
 
       // Then reconstruct graph with new PHC data
       val hostedShortIdToPubChan = hostedBag.getRoutingData
-      val searchGraph = DirectedGraph.makeGraph(data.channels ++ hostedShortIdToPubChan).addEdges(extraEdges.values)
-      become(Data(data.channels, hostedShortIdToPubChan, searchGraph), OPERATIONAL)
+      val fiatHostedShortIdToPubChan = fiatHostedBag.getRoutingData
+      val searchGraph = DirectedGraph.makeGraph(data.channels ++ hostedShortIdToPubChan ++ fiatHostedShortIdToPubChan).addEdges(extraEdges.values)
+      become(Data(data.channels, hostedShortIdToPubChan, fiatHostedShortIdToPubChan, searchGraph), OPERATIONAL)
       updateLastTotalResyncStamp(System.currentTimeMillis)
       listeners.foreach(_ process phcPure)
 
@@ -166,7 +169,7 @@ abstract class PathFinder(val normalBag: NetworkBag, val hostedBag: NetworkBag) 
       val ghostIds = normalShortIdToPubChan.keySet.diff(sync.provenShortIds)
       val normalShortIdToPubChan1 = normalShortIdToPubChan -- ghostIds -- oneSideShortIds
       val searchGraph = DirectedGraph.makeGraph(normalShortIdToPubChan1 ++ data.hostedChannels).addEdges(extraEdges.values)
-      become(Data(normalShortIdToPubChan1, data.hostedChannels, searchGraph), OPERATIONAL)
+      become(Data(normalShortIdToPubChan1, data.hostedChannels, data.fiatHostedChannels, searchGraph), OPERATIONAL)
       // Update normal checkpoint, if PHC sync fails this time we'll jump to it next time
       updateLastNormalResyncStamp(System.currentTimeMillis)
 

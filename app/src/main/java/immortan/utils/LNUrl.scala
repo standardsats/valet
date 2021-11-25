@@ -130,6 +130,19 @@ case class HostedChannelRequest(uri: String, alias: Option[String], k1: String) 
   val remoteInfo: RemoteNodeInfo = RemoteNodeInfo(pubKey, address, hostAddress)
 }
 
+case class FiatHostedChannelRequest(uri: String, alias: Option[String], k1: String) extends LNUrlData with HasRemoteInfo {
+
+  val secret: ByteVector32 = ByteVector32.fromValidHex(k1)
+
+  val InputParser.nodeLink(nodeKey, hostAddress, portNumber) = uri
+
+  val pubKey: PublicKey = PublicKey(ByteVector fromValidHex nodeKey)
+
+  val address: NodeAddress = NodeAddress.fromParts(hostAddress, portNumber.toInt)
+
+  val remoteInfo: RemoteNodeInfo = RemoteNodeInfo(pubKey, address, hostAddress)
+}
+
 // LNURL-WITHDRAW
 
 case class WithdrawRequest(callback: String, k1: String, maxWithdrawable: Long, defaultDescription: String,

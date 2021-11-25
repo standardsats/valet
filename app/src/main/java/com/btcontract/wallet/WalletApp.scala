@@ -149,6 +149,7 @@ object WalletApp {
 
     val normalBag = new SQLiteNetwork(graphInterface, NormalChannelUpdateTable, NormalChannelAnnouncementTable, NormalExcludedChannelTable)
     val hostedBag = new SQLiteNetwork(graphInterface, HostedChannelUpdateTable, HostedChannelAnnouncementTable, HostedExcludedChannelTable)
+    val fiatHostedBag = new SQLiteNetwork(graphInterface, FiatHostedChannelUpdateTable, FiatHostedChannelAnnouncementTable, FiatHostedExcludedChannelTable)
     val payBag = new SQLitePayment(extDataBag.db, preimageDb = essentialInterface)
 
     val chanBag = new SQLiteChannel(essentialInterface, channelTxFeesDb = extDataBag.db) {
@@ -163,7 +164,7 @@ object WalletApp {
       LNParams.fiatRates = new FiatRates(extDataBag)
     }
 
-    val pf = new PathFinder(normalBag, hostedBag) {
+    val pf = new PathFinder(normalBag, hostedBag, fiatHostedBag) {
       override def getLastTotalResyncStamp: Long = app.prefs.getLong(LAST_TOTAL_GOSSIP_SYNC, 0L)
       override def getLastNormalResyncStamp: Long = app.prefs.getLong(LAST_NORMAL_GOSSIP_SYNC, 0L)
       override def updateLastTotalResyncStamp(stamp: Long): Unit = app.prefs.edit.putLong(LAST_TOTAL_GOSSIP_SYNC, stamp).commit

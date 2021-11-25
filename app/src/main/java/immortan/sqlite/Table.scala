@@ -85,6 +85,10 @@ object HostedChannelAnnouncementTable extends ChannelAnnouncementTable("hosted_a
   val selectFromRelatedUpdateTable = s"SELECT ${HostedChannelUpdateTable.sid} FROM ${HostedChannelUpdateTable.table}"
 }
 
+object FiatHostedChannelAnnouncementTable extends ChannelAnnouncementTable("fiat_hosted_announcements") {
+  val selectFromRelatedUpdateTable = s"SELECT ${FiatHostedChannelUpdateTable.sid} FROM ${FiatHostedChannelUpdateTable.table}"
+}
+
 abstract class ChannelUpdateTable(val table: String, val useHeuristics: Boolean) extends Table {
   val (sid, timestamp, msgFlags, chanFlags, cltvExpiryDelta, minMsat, base, proportional, maxMsat, position, score, crc32) =
     ("shortchannelid", "timestamp", "messageflags", "channelflags", "cltvdelta", "htlcminimum", "feebase", "feeproportional", "htlcmaximum", "position", "score", "crc32")
@@ -120,6 +124,8 @@ object NormalChannelUpdateTable extends ChannelUpdateTable("normal_updates", use
 
 object HostedChannelUpdateTable extends ChannelUpdateTable("hosted_updates", useHeuristics = false)
 
+object FiatHostedChannelUpdateTable extends ChannelUpdateTable("fiat_hosted_updates", useHeuristics = false)
+
 abstract class ExcludedChannelTable(val table: String) extends Table {
   val Tuple2(shortChannelId, until) = ("shortchannelid", "excludeduntilstamp")
 
@@ -148,6 +154,10 @@ object NormalExcludedChannelTable extends ExcludedChannelTable("normal_excluded_
 
 object HostedExcludedChannelTable extends ExcludedChannelTable("hosted_excluded_updates") {
   val selectFromRelatedUpdateTable = s"SELECT ${HostedChannelUpdateTable.sid} FROM ${HostedChannelUpdateTable.table}"
+}
+
+object FiatHostedExcludedChannelTable extends ExcludedChannelTable("fiat_hosted_excluded_updates") {
+  val selectFromRelatedUpdateTable = s"SELECT ${FiatHostedChannelUpdateTable.sid} FROM ${FiatHostedChannelUpdateTable.table}"
 }
 
 // Database #3, unrecoverable, but not critically important data, will not go to backup
