@@ -156,10 +156,12 @@ case class SyncWorker(master: CanBeRepliedTo, keyPair: KeyPair, remoteInfo: Remo
 
     case (worker: CommsTower.Worker, data: SyncWorkerShortIdsData, SHORT_ID_SYNC) =>
       val tlv = QueryChannelRangeTlv.QueryFlags(QueryChannelRangeTlv.QueryFlags.WANT_ALL)
+      println("SyncMaster query SHORT_ID_SYNC")
       val query = QueryChannelRange(LNParams.chainHash, data.from, Int.MaxValue, TlvStream(tlv))
       worker.handler process query
 
     case (reply: ReplyChannelRange, data1: SyncWorkerShortIdsData, SHORT_ID_SYNC) =>
+      println("SyncMaster reply SHORT_ID_SYNC")
       val updatedData: SyncWorkerShortIdsData = data1.copy(ranges = reply +: data1.ranges)
       if (reply.syncComplete == 1) master process CMDShortIdsComplete(me, updatedData)
       else become(updatedData, SHORT_ID_SYNC)

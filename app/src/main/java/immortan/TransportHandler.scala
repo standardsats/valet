@@ -2,9 +2,8 @@ package immortan
 
 import java.nio.ByteOrder
 import java.util.concurrent.Executors
-
 import fr.acinq.bitcoin.Protocol
-import fr.acinq.eclair.wire.{LightningMessage, LightningMessageCodecs}
+import fr.acinq.eclair.wire.{Init, LightningMessage, LightningMessageCodecs}
 import immortan.TransportHandler._
 import immortan.crypto.Noise._
 import immortan.crypto.StateMachine

@@ -35,7 +35,9 @@ object FiatChannelHosted {
 abstract class FiatChannelHosted extends Channel { me =>
   def isOutOfSync(blockDay: Long): Boolean = math.abs(blockDay - LNParams.currentBlockDay) > 1
 
-  def doProcess(change: Any): Unit = Tuple3(data, change, state) match {
+  def doProcess(change: Any): Unit = {
+    println(s"FiatChannel ${Tuple2(change, state)}")
+    Tuple3(data, change, state) match {
     case (wait: WaitRemoteFiatHostedReply, CMD_SOCKET_ONLINE, WAIT_FOR_INIT) =>
       me SEND InvokeFiatHostedChannel(LNParams.chainHash, wait.refundScriptPubKey, wait.secret)
       BECOME(wait, WAIT_FOR_ACCEPT)
@@ -265,6 +267,7 @@ abstract class FiatChannelHosted extends Channel { me =>
     case (null, wait: WaitRemoteFiatHostedReply, -1) => super.become(wait, WAIT_FOR_INIT)
     case (null, hc: FiatHostedCommits, -1) => super.become(hc, SLEEPING)
     case _ =>
+  }
   }
 
   def rejectOverriddenOutgoingAdds(hc: FiatHostedCommits, hc1: FiatHostedCommits): Unit =
