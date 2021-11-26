@@ -223,7 +223,7 @@ class SyncParams {
 class TestNetSyncParams extends SyncParams {
   val sbw: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"03b8534f2d84de39a68d1359f6833fde819b731e188ddf633a666f7bf8c1d7650a"), NodeAddress.unresolved(9735, host = 45, 61, 187, 156), "SBW")
   val endurance: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"03933884aaf1d6b108397e5efe5c86bcf2d8ca8d2f700eda99db9214fc2712b134"), NodeAddress.unresolved(9735, host = 76, 223, 71, 211), "Endurance")
-  val localhost: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"038d5cdea665f68e597da00ae0612238bd30a06bdf08d34fa9af783b1f1b3ba9b7"), NodeAddress.unresolved(9735, host = 10, 0, 2, 2), "localhost")
+  val localhost: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"02135036d63f7e794fa836bfacc67daeec711e0b7c3183533edda3db252d2c0a09"), NodeAddress.unresolved(9735, host = 10, 0, 2, 2), "localhost")
   override val syncNodes: Set[RemoteNodeInfo] = Set(endurance, localhost, sbw)
   override val phcSyncNodes: Set[RemoteNodeInfo] = Set(localhost, sbw)
   override val minCapacity: MilliSatoshi = MilliSatoshi(100000000L)

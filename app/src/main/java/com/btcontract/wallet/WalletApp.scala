@@ -137,7 +137,7 @@ object WalletApp {
     LNParams.chainHash = Block.TestnetGenesisBlock.hash // Block.LivenetGenesisBlock.hash
     LNParams.routerConf = RouterConf(10, LNParams.maxCltvExpiryDelta)
     LNParams.ourInit = LNParams.createInit
-    LNParams.syncParams = new SyncParams
+    LNParams.syncParams = new TestNetSyncParams // new SyncParams
   }
 
   def makeOperational(secret: WalletSecret): Unit = {

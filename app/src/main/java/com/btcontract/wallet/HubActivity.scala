@@ -274,6 +274,7 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
       case info: DelayedRefunds => showPending(info)
       case info: LNUrlPayLink => doCallPayLink(info)
       case info: TransactionDetails =>
+        TransitionManager.beginDelayedTransition(itemsList)
         val isVisible = extraInfo.getVisibility == View.VISIBLE
         if (isVisible) collapse(info) else expand(info)
     }

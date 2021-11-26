@@ -699,6 +699,9 @@ trait BaseActivity extends AppCompatActivity { me =>
       updatePopupButton(getPositiveButton(alert), isPayEnabled)
     }
 
+    // Load graph while user is looking at payment form
+    LNParams.cm.pf process PathFinder.CMDLoadGraph
+
     def neutral(alert: AlertDialog): Unit
     def send(alert: AlertDialog): Unit
     def isNeutralEnabled: Boolean
