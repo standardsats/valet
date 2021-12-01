@@ -139,9 +139,9 @@
     <string name="error_nothing_useful">No se encontró nada útil</string>
 
     <string name="error_ln_no_chans"><![CDATA[No se puede enviar ni recibir pagos Lightning porque no hay canales abiertos.]]></string>
-    <string name="error_ln_waiting"><![CDATA[No se puede enviar ni recibir pagos Lightning porque ninguno de tus canales está abierto aún.<br><br>Por favor espere más confirmaciones del financiamiento del canal.]]></string>
+    <string name="error_ln_waiting"><![CDATA[No se puede enviar ni recibir pagos Lightning porque ninguno de tus canales está abierto aún.]]></string>
 
-    <string name="error_ln_receive_no_update"><![CDATA[No se pueden solicitar pagos Lightning porque los parámetros para recibir no están disponibles aún, por favor espere más confirmaciones del financiamineto del canal.]]></string>
+    <string name="error_ln_receive_no_update"><![CDATA[No se pueden solicitar pagos Lightning porque los parámetros para recibir no están disponibles aún.]]></string>
     <string name="error_ln_receive_reserve"><![CDATA[No se pueden solicitar pagos Lightning aún porque primero debes gastar al menos <b>%1$s</b> para crear algo de liquidez para recibir.]]></string>
 
     <string name="error_ln_send_small"><![CDATA[No se puede enviar este pago Lightning porque el monto solicitado de <b>%1$s</b> es muy pequeño, el monto mínimo es <b>%2$s</b>.]]></string>
