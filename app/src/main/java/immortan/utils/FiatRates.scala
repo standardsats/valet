@@ -1,8 +1,8 @@
 package immortan.utils
 
-import immortan.DataBag
 import immortan.utils.ImplicitJsonFormats._
 import immortan.crypto.{CanBeShutDown, Tools}
+import immortan.{DataBag, LNParams}
 import rx.lang.scala.{Observable, Subscription}
 
 
@@ -13,6 +13,8 @@ object FiatRates {
 }
 
 class FiatRates(bag: DataBag) extends CanBeShutDown {
+  override def becomeShutDown: Unit = listeners = Set.empty
+
   val customFiatSymbols: Map[String, String] = Map("rub" -> "\u20BD", "usd" -> "$", "inr" -> "₹", "gbp" -> "£", "cny" -> "CN¥", "jpy" -> "¥", "brl" -> "R$", "eur" -> "€", "krw" -> "₩",
     "cym" -> "￠", "lvl" -> "ℒ\uD835\uDCC8", "svc" -> "₡", "frf" -> "₣", "brl" -> "R$", "sos" -> "Sh.So.")
 
@@ -50,9 +52,9 @@ class FiatRates(bag: DataBag) extends CanBeShutDown {
   }
 
 
-  override def becomeShutDown: Unit = {
-    subscription.unsubscribe
-    listeners = Set.empty
+  def updateInfo(newRates: Tools.Fiat2Btc): Unit = {
+    info = FiatRatesInfo(newRates, info.rates, System.currentTimeMillis)
+    for (lst <- listeners) lst.onFiatRates(info)
   }
 
   var listeners: Set[FiatRatesListener] = Set.empty
