@@ -5,9 +5,11 @@ import immortan.{LNParams, SplitParams}
 
 import android.os.Bundle
 import android.widget.TextView
+import com.btcontract.walletfiat.BaseActivity.StringOps
+import com.btcontract.walletfiat.Colors._
+import com.ornach.nobobutton.NoboButton
 import immortan.crypto.Tools.none
 import immortan.utils.InputParser
-import com.ornach.nobobutton.NoboButton
 import BaseActivity.StringOps
 
 class QRSplitActivity extends QRActivity with ExternalDataChecker with HasTypicalChainFee { me =>
@@ -16,7 +18,7 @@ class QRSplitActivity extends QRActivity with ExternalDataChecker with HasTypica
   lazy private[this] val qrViewHolder = new QRViewHolder(me findViewById R.id.splitQr)
   lazy private[this] val dialogPay = getString(R.string.dialog_ok)
 
-  def INIT(state: Bundle): Unit = {
+  override def PROCEED(state: Bundle): Unit = {
     setContentView(R.layout.activity_qr_split_invoice)
     val splitCaption = getString(R.string.dialog_split_ln)
     splitQrCaption setText splitCaption.format(new String).html

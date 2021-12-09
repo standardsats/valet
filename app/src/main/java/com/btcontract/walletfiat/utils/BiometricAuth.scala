@@ -1,15 +1,14 @@
 package com.btcontract.walletfiat.utils
 
-import androidx.biometric.{BiometricManager, BiometricPrompt}
-import com.btcontract.walletfiat.BaseActivity.StringOps
-import androidx.core.content.ContextCompat
-import com.btcontract.walletfiat.R
 import android.view.View
-import androidx.biometric.BiometricManager.Authenticators
-import com.btcontract.walletfiat.BaseActivity
+import androidx.biometric.{BiometricManager, BiometricPrompt}
+import androidx.core.content.ContextCompat
+import com.btcontract.walletfiat.BaseActivity.StringOps
+import com.btcontract.walletfiat.{BaseActivity, R}
+import com.google.android.material.snackbar.Snackbar
 
 
-abstract class BiometricAuth(view: View, host: BaseActivity) {
+abstract class BiometricAuth(view: View, host: BaseActivity, onErrorSnackOk: Snackbar => Unit) {
   val biometricManager: BiometricManager = BiometricManager.from(host)
 
   def onAuthSucceeded: Unit
@@ -18,7 +17,7 @@ abstract class BiometricAuth(view: View, host: BaseActivity) {
   def onNoneEnrolled: Unit
   def onNoHardware: Unit
 
-  def checkAuth: Unit = biometricManager.canAuthenticate(Authenticators.BIOMETRIC_WEAK) match {
+  def checkAuth: Unit = biometricManager.canAuthenticate match {
     case BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE => onNoHardware
     case BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE => onHardwareUnavailable
     case BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED => onNoneEnrolled
@@ -27,12 +26,11 @@ abstract class BiometricAuth(view: View, host: BaseActivity) {
   }
 
   def callAuthDialog: Unit = {
-    val promptInfo: BiometricPrompt.PromptInfo =
-      (new BiometricPrompt.PromptInfo.Builder)
-        .setTitle(host getString R.string.settings_auth_title)
-        .setNegativeButtonText(host getString R.string.settings_auth_negative)
-        .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_WEAK)
-        .build
+    val promptInfo: BiometricPrompt.PromptInfo = {
+      val builder = new BiometricPrompt.PromptInfo.Builder
+      val title = host getString R.string.settings_auth_title
+      builder.setDeviceCredentialAllowed(true).setTitle(title).build
+    }
 
     val callback: BiometricPrompt.AuthenticationCallback = new BiometricPrompt.AuthenticationCallback {
       override def onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult): Unit = {
@@ -41,8 +39,8 @@ abstract class BiometricAuth(view: View, host: BaseActivity) {
       }
 
       override def onAuthenticationError(errorCode: Int, errString: CharSequence): Unit = {
-        val message = host.getString(R.string.settings_auth_error).format(errString, errorCode).html
-        host.snack(view, message, R.string.dialog_ok, _.dismiss)
+        val message = host.getString(R.string.settings_auth_error).format(errString).html
+        host.snack(view, message, R.string.dialog_ok, onErrorSnackOk)
         super.onAuthenticationError(errorCode, errString)
       }
 
