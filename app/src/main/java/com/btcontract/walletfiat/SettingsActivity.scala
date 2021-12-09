@@ -193,7 +193,7 @@ class SettingsActivity extends BaseActivity with HasTypicalChainFee with ChoiceR
         }
 
         def warnAndUpdateView: Unit = {
-          def onOk(snack: Snackbar): Unit = runAnd(snack.dismiss)(WalletApp.restartApplication)
+          def onOk(snack: Snackbar): Unit = runAnd(snack.dismiss)(WalletApp.restart)
           snack(settingsContainer, getString(settings_custom_electrum_restart_notice).html, R.string.dialog_ok, onOk)
           updateView
         }
@@ -265,7 +265,7 @@ class SettingsActivity extends BaseActivity with HasTypicalChainFee with ChoiceR
 
     view setOnClickListener onButtonTap {
       putBoolAndUpdateView(WalletApp.ENSURE_TOR, !WalletApp.ensureTor)
-      def onOk(snack: Snackbar): Unit = runAnd(snack.dismiss)(WalletApp.restartApplication)
+      def onOk(snack: Snackbar): Unit = runAnd(snack.dismiss)(WalletApp.restart)
       snack(settingsContainer, getString(settings_custom_electrum_restart_notice).html, R.string.dialog_ok, onOk)
     }
   }
@@ -337,7 +337,7 @@ class SettingsActivity extends BaseActivity with HasTypicalChainFee with ChoiceR
       settingsContainer.addView(viewStat.view)
       settingsContainer.addView(links.view)
     } else {
-      WalletApp.freePossiblyUsedResouces
+      WalletApp.freePossiblyUsedRuntimeResouces
       me exitTo ClassNames.mainActivityClass
     }
   }
