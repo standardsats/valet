@@ -3,6 +3,7 @@ package com.btcontract.walletfiat
 import java.io.{File, FileOutputStream}
 import java.lang.{Integer => JInt}
 import java.util.concurrent.TimeUnit
+
 import android.content.pm.PackageManager
 import android.content.{DialogInterface, Intent}
 import android.graphics.Bitmap.Config.ARGB_8888
@@ -20,10 +21,10 @@ import androidx.cardview.widget.CardView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.{ContextCompat, FileProvider}
 import androidx.recyclerview.widget.RecyclerView
-import BaseActivity.StringOps
-import Colors._
-import com.btcontract.walletfiat.sheets.HasUrDecoder
+import com.btcontract.walletfiat.BaseActivity.StringOps
+import com.btcontract.walletfiat.Colors._
 import com.btcontract.walletfiat.R.string._
+import com.btcontract.walletfiat.sheets.HasUrDecoder
 import com.chauthai.swipereveallayout.SwipeRevealLayout
 import com.cottacush.android.currencyedittext.CurrencyEditText
 import com.google.android.material.slider.Slider
@@ -716,8 +717,7 @@ trait BaseActivity extends AppCompatActivity { me =>
     def isPayEnabled: Boolean
 
     def baseSendNow(prExt: PaymentRequestExt, alert: AlertDialog): Unit = {
-      val feeReserve = LNParams.cm.feeReserve(manager.resultMsat, typicalChainTxFee, WalletApp.capLNFeeToChain, LNParams.maxOffChainFeeAboveRatio)
-      val cmd = LNParams.cm.makeSendCmd(prExt, LNParams.cm.all.values.toList, feeReserve, manager.resultMsat).modify(_.split.totalSum).setTo(manager.resultMsat)
+      val cmd = LNParams.cm.makeSendCmd(prExt, LNParams.cm.all.values.toList, LNParams.cm.feeReserve(manager.resultMsat), manager.resultMsat).modify(_.split.totalSum).setTo(manager.resultMsat)
       val pd = PaymentDescription(split = None, label = manager.resultExtraInput, semanticOrder = None, invoiceText = prExt.descriptionOpt getOrElse new String)
       replaceOutgoingPayment(prExt, pd, action = None, sentAmount = cmd.split.myPart)
       LNParams.cm.localSend(cmd)
@@ -725,8 +725,7 @@ trait BaseActivity extends AppCompatActivity { me =>
     }
 
     def proceedSplit(prExt: PaymentRequestExt, origAmount: MilliSatoshi, alert: AlertDialog): Unit = {
-      val feeReserve = LNParams.cm.feeReserve(manager.resultMsat, typicalChainTxFee, WalletApp.capLNFeeToChain, LNParams.maxOffChainFeeAboveRatio)
-      val cmd = LNParams.cm.makeSendCmd(prExt, LNParams.cm.all.values.toList, feeReserve, manager.resultMsat).modify(_.split.totalSum).setTo(origAmount)
+      val cmd = LNParams.cm.makeSendCmd(prExt, LNParams.cm.all.values.toList, LNParams.cm.feeReserve(manager.resultMsat), manager.resultMsat).modify(_.split.totalSum).setTo(origAmount)
       val pd = PaymentDescription(split = cmd.split.asSome, label = manager.resultExtraInput, semanticOrder = None, invoiceText = prExt.descriptionOpt getOrElse new String)
       goToWithValue(value = SplitParams(prExt, action = None, pd, cmd, typicalChainTxFee), target = ClassNames.qrSplitActivityClass)
       alert.dismiss
