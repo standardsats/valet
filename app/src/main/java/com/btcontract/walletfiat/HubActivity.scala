@@ -1089,7 +1089,9 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
   // Lifecycle methods
 
   override def onResume: Unit = {
-    checkExternalData(noneRunnable)
+    // Tor service could have been stopped in background
+    try LNParams.connectionProvider.notifyAppAvailable catch none
+    try checkExternalData(noneRunnable) catch none
     super.onResume
   }
 
