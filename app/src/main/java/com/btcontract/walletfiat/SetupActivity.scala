@@ -8,6 +8,7 @@ import android.widget.{ArrayAdapter, LinearLayout}
 import androidx.appcompat.app.AlertDialog
 import androidx.documentfile.provider.DocumentFile
 import androidx.transition.TransitionManager
+import com.btcontract.walletfiat.R.string._
 import com.btcontract.walletfiat.utils.LocalBackup
 import com.google.common.io.ByteStreams
 import com.ornach.nobobutton.NoboButton
@@ -42,12 +43,40 @@ object SetupActivity {
 }
 
 class SetupActivity extends BaseActivity { me =>
-  override def START(state: Bundle): Unit = setContentView(R.layout.activity_setup)
-
   private[this] lazy val activitySetupMain = findViewById(R.id.activitySetupMain).asInstanceOf[LinearLayout]
   private[this] lazy val restoreOptionsButton = findViewById(R.id.restoreOptionsButton).asInstanceOf[NoboButton]
   private[this] lazy val restoreOptions = findViewById(R.id.restoreOptions).asInstanceOf[LinearLayout]
   private[this] final val FILE_REQUEST_CODE = 112
+
+  lazy private[this] val enforceTor = new SettingsHolder(me) {
+    override def updateView: Unit = settingsCheck.setChecked(WalletApp.ensureTor)
+    settingsTitle.setText(settings_ensure_tor)
+    setVis(isVisible = false, settingsInfo)
+    disableIfOldAndroid
+
+    view setOnClickListener onButtonTap {
+      putBoolAndUpdateView(WalletApp.ENSURE_TOR, !WalletApp.ensureTor)
+    }
+  }
+
+  lazy private[this] val openHc = new SettingsHolder(me) {
+    override def updateView: Unit = settingsCheck.setChecked(WalletApp.openHc)
+    setVis(isVisible = false, settingsInfo)
+    settingsTitle.setText(rpa_request_hc_usd)
+
+    view setOnClickListener onButtonTap {
+      putBoolAndUpdateView(WalletApp.OPEN_HC, !WalletApp.openHc)
+    }
+  }
+
+  override def START(state: Bundle): Unit = {
+    setContentView(R.layout.activity_setup)
+    activitySetupMain.addView(openHc.view, 1)
+    activitySetupMain.addView(enforceTor.view, 2)
+
+    openHc.updateView
+    enforceTor.updateView
+  }
 
   private[this] lazy val englishWordList = {
     val rawData = getAssets.open("bip39_english_wordlist.txt")
