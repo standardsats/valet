@@ -28,7 +28,6 @@ import com.ornach.nobobutton.NoboButton
 import com.softwaremill.quicklens._
 import fr.acinq.bitcoin._
 import fr.acinq.eclair._
-import fr.acinq.eclair.blockchain.CurrentBlockCount
 import fr.acinq.eclair.blockchain.electrum.ElectrumWallet.{GenerateTxResponse, RBFResponse, WalletReady}
 import fr.acinq.eclair.blockchain.electrum.{ElectrumEclairWallet, ElectrumWallet}
 import fr.acinq.eclair.blockchain.fee.FeeratePerByte
@@ -77,15 +76,11 @@ object HubActivity {
 
   def requestHostedChannel(ticker: Ticker): Unit = {
     val localParams = LNParams.makeChannelParams(isFunder = false, LNParams.minChanDustLimit)
+    def implant(cs: Commitments, channel: ChannelHosted): Unit = RemotePeerActivity.implantNewChannel(cs, channel)
     new HCOpenHandler(LNParams.syncParams.satm, randomBytes32, localParams.defaultFinalScriptPubKey, ticker, LNParams.cm) {
       // Stop automatic HC opening attempts on getting any kind of local/remote error, this won't be triggered on disconnect
-      def onFailure(reason: Throwable): Unit = WalletApp.app.prefs.edit.putBoolean(WalletApp.OPEN_HC, false).commit
       def onEstablished(cs: Commitments, channel: ChannelHosted): Unit = implant(cs, channel)
-    }
-
-    def implant(cs: Commitments, channel: ChannelHosted): Unit = {
-      WalletApp.app.prefs.edit.putBoolean(WalletApp.OPEN_HC, false).commit
-      RemotePeerActivity.implantNewChannel(cs, channel)
+      def onFailure(reason: Throwable): Unit = none
     }
   }
 
@@ -944,7 +939,7 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
       val localOutCount = LNParams.cm.opm.data.payments.count { case (fullTag, _) => fullTag.tag == PaymentTagTlv.LOCALLY_SENT }
 
       val change = LNParams.fiatRates.info.pctDifference(WalletApp.fiatCode).map(_ + "<br>").getOrElse(new String)
-      val unitRate = WalletApp.msatInFiatHuman(LNParams.fiatRates.info.rates, WalletApp.fiatCode, 100000000000L.msat, immortan.utils.Denomination.formatFiatShort)
+      val unitRate = WalletApp.msatInFiatHuman(LNParams.fiatRates.info.rates, WalletApp.fiatCode, 100000000000L.msat, Denomination.formatFiatShort)
 
       TransitionManager.beginDelayedTransition(defaultHeader)
       fiatUnitPriceAndChange.setText(s"<small>$change</small>$unitRate".html)
@@ -1003,11 +998,6 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
   private var inFinalizedSubscription = Option.empty[Subscription]
 
   private val chainListener = new WalletEventsListener {
-    override def onChainTipKnown(currentBlockCount: CurrentBlockCount): Unit = {
-      val openHc = WalletApp.openHc && LNParams.isMainnet && LNParams.cm.allHostedCommits.isEmpty
-      if (openHc) HubActivity.requestHostedChannel(USD_TICKER)
-    }
-
     override def onChainMasterSelected(event: InetSocketAddress): Unit = UITask {
       TransitionManager.beginDelayedTransition(walletCards.defaultHeader)
       setVis(isVisible = false, walletCards.offlineIndicator)
