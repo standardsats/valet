@@ -5,8 +5,8 @@ import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey}
 import fr.acinq.bitcoin.{ByteVector32, ByteVector64, Crypto, Protocol, Satoshi}
 import fr.acinq.eclair._
 import fr.acinq.eclair.blockchain.fee.FeeratePerKw
-import fr.acinq.eclair.payment.PaymentRequest
-import fr.acinq.eclair.router.{Announcements, Sync}
+import fr.acinq.eclair.payment.Bolt11Invoice.ExtraHop
+import fr.acinq.eclair.router.Announcements
 import immortan.crypto.Tools
 import immortan.{ChannelMaster, LNParams, RemoteNodeInfo, Ticker}
 import scodec.DecodeResult
@@ -24,7 +24,7 @@ sealed trait UpdateMessage extends HtlcMessage
 sealed trait HasTemporaryChannelId extends LightningMessage { def temporaryChannelId: ByteVector32 }
 sealed trait HasChannelId extends LightningMessage { def channelId: ByteVector32 }
 
-case class Init(features: Features, tlvs: TlvStream[InitTlv] = TlvStream.empty) extends LightningMessage {
+case class Init(features: Features[InitFeature], tlvs: TlvStream[InitTlv] = TlvStream.empty) extends LightningMessage {
   val networks: Seq[ByteVector32] = tlvs.get[InitTlv.Networks].map(_.chainHashes).getOrElse(Nil)
 }
 
@@ -104,9 +104,9 @@ case class UpdateFee(channelId: ByteVector32, feeratePerKw: FeeratePerKw) extend
 
 case class AnnouncementSignatures(channelId: ByteVector32, shortChannelId: Long, nodeSignature: ByteVector64, bitcoinSignature: ByteVector64) extends HasChannelId
 
-case class ChannelAnnouncement(nodeSignature1: ByteVector64, nodeSignature2: ByteVector64, bitcoinSignature1: ByteVector64, bitcoinSignature2: ByteVector64, features: Features,
-                               chainHash: ByteVector32, shortChannelId: Long, nodeId1: PublicKey, nodeId2: PublicKey, bitcoinKey1: PublicKey, bitcoinKey2: PublicKey,
-                               unknownFields: ByteVector = ByteVector.empty) extends LightningMessage {
+case class ChannelAnnouncement(nodeSignature1: ByteVector64, nodeSignature2: ByteVector64, bitcoinSignature1: ByteVector64, bitcoinSignature2: ByteVector64,
+                               features: Features[FeatureScope], chainHash: ByteVector32, shortChannelId: Long, nodeId1: PublicKey, nodeId2: PublicKey, bitcoinKey1: PublicKey,
+                               bitcoinKey2: PublicKey, unknownFields: ByteVector = ByteVector.empty) extends LightningMessage {
 
   def getNodeIdSameSideAs(cu: ChannelUpdate): PublicKey = if (cu.position == ChannelUpdate.POSITION1NODE) nodeId1 else nodeId2
 
@@ -175,7 +175,7 @@ case class Domain(domain: String, port: Int) extends NodeAddress {
   override def toString: String = s"$domain:$port"
 }
 
-case class NodeAnnouncement(signature: ByteVector64, features: Features, timestamp: Long, nodeId: PublicKey, rgbColor: Color,
+case class NodeAnnouncement(signature: ByteVector64, features: Features[FeatureScope], timestamp: Long, nodeId: PublicKey, rgbColor: Color,
                             alias: String, addresses: List[NodeAddress], unknownFields: ByteVector = ByteVector.empty) extends LightningMessage {
 
   def toRemoteInfo: RemoteNodeInfo = RemoteNodeInfo(nodeId, addresses.minBy { case _: IPv4 => 1 case _: IPv6 => 2 case _ => 3 }, alias)
@@ -202,7 +202,7 @@ case class ChannelUpdate(signature: ByteVector64, chainHash: ByteVector32, short
 
   lazy val core: UpdateCore = UpdateCore(position, shortChannelId, feeBaseMsat, feeProportionalMillionths, cltvExpiryDelta, htlcMaximumMsat)
 
-  def extraHop(nodeId: PublicKey): PaymentRequest.ExtraHop = PaymentRequest.ExtraHop(nodeId, shortChannelId, feeBaseMsat, feeProportionalMillionths, cltvExpiryDelta)
+  def extraHop(nodeId: PublicKey): ExtraHop = ExtraHop(nodeId, shortChannelId, feeBaseMsat, feeProportionalMillionths, cltvExpiryDelta)
 
   // Point useless fields to same object, db-restored should be same, make sure it does not erase channelUpdateChecksumCodec fields
   def lite: ChannelUpdate = copy(signature = ByteVector64.Zeroes, LNParams.chainHash, unknownFields = ByteVector.empty)
