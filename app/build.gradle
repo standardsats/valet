@@ -2,7 +2,7 @@ apply plugin: "com.android.application"
 apply plugin: "jp.leafytree.android-scala"
 
 task wrapper(type: Wrapper) {
-    gradleVersion = '7.4.2'
+    gradleVersion = '5.4.1'
 }
 
 android {
