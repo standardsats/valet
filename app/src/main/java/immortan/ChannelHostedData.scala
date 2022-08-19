@@ -51,7 +51,8 @@ case class HostedCommits(remoteInfo: RemoteNodeInfo, localSpec: CommitmentSpec, 
   lazy val availableForReceive: MilliSatoshi = nextLocalSpec.toRemote
 
   // Calculation from constant equation s1 / f1 = s2 / f2
-  lazy val availableForSend: MilliSatoshi = MilliSatoshi(math round currentHostRate.toLong.toDouble / lastCrossSignedState.rate.toLong.toDouble * reserveSats.toLong.toDouble)
+  lazy val availableForSend: MilliSatoshi = reserveSats
+  lazy val trueAvailableForSend: MilliSatoshi = MilliSatoshi(math round currentHostRate.toLong.toDouble / lastCrossSignedState.rate.toLong.toDouble * reserveSats.toLong.toDouble)
 
   lazy val reserveSats: MilliSatoshi = nextLocalSpec.toLocal
 

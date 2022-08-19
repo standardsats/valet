@@ -279,7 +279,7 @@ class ChanActivity extends ChanErrorHandlerActivity with ChoiceReceiver with Has
 
       totalCapacityText.setText(sumOrNothing(capacity, cardIn).html)
       canReceiveText.setText(sumOrNothing(hc.availableForReceive, cardOut).html)
-      canSendText.setText(sumOrNothing(hc.availableForSend, cardIn).html)
+      canSendText.setText(sumOrNothing(hc.trueAvailableForSend, cardIn).html)
       reserveText.setText(sumOrNothing(hc.reserveSats, cardIn).html)
       paymentsInFlightText.setText(sumOrNothing(inFlight, cardIn).html)
 

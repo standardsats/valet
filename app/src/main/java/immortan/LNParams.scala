@@ -48,7 +48,7 @@ object LNParams {
   val maxInChannelHtlcs: Int = 10
   val maxHoldSecs: Long = 600L
 
-  val maxOffChainFeeRatio: Double = 0.01 // We are OK with paying up to this % of LN fee relative to payment amount
+  val maxOffChainFeeRatio: Double = 0.0001 // We are OK with paying up to this % of LN fee relative to payment amount
   val maxOffChainFeeAboveRatio: MilliSatoshi = MilliSatoshi(10000L) // For small amounts we always accept fee up to this
 
   val shouldSendUpdateFeerateDiff = 5.0
