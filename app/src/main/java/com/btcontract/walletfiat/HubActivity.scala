@@ -11,6 +11,7 @@ import android.widget._
 import androidx.appcompat.app.AlertDialog
 import androidx.recyclerview.widget.RecyclerView
 import androidx.transition.TransitionManager
+import androidx.cardview.widget.CardView
 import com.btcontract.walletfiat.BaseActivity.StringOps
 import com.btcontract.walletfiat.Colors._
 import com.btcontract.walletfiat.HubActivity._
