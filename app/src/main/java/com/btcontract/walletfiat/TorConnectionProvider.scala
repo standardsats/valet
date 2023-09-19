@@ -1,4 +1,4 @@
-package com.btcontract.wallet
+package com.btcontract.walletfiat
 
 import java.net.{InetSocketAddress, Socket}
 import java.util.concurrent.TimeUnit

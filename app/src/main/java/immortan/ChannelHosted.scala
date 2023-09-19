@@ -20,11 +20,12 @@ import scala.collection.mutable
 
 
 object ChannelHosted {
-  def make(initListeners: Set[ChannelListener], paymentListeners: mutable.Set[ExternalPaymentListener], hostedData: HostedCommits, bag: ChannelBag): ChannelHosted = new ChannelHosted {
+  def make(initListeners: Set[ChannelListener], hostedData: HostedCommits, bag: ChannelBag): ChannelHosted = new ChannelHosted {
     def SEND(msgs: LightningMessage*): Unit = CommsTower.sendMany(msgs.map(LightningMessageCodecs.prepareNormal), hostedData.remoteInfo.nodeSpecificPair)
+
     def STORE(hostedData: PersistentChannelData): PersistentChannelData = bag.put(hostedData)
+
     listeners = initListeners
-    externalPaymentListeners = paymentListeners
     doProcess(hostedData)
   }
 

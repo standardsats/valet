@@ -25,14 +25,13 @@ class FiatRates(bag: DataBag) extends CanBeShutDown {
     "frf" -> "French franc", "svc" -> "Salvadoran colón", "esd" -> "Salvadoran dollar", "sps" -> "Salvadoran peso", "eip" -> "Punt na hÉireann", "brl" -> "Brazilian Real", "sos" -> "Somali Shilling")
 
   def reloadData: Tools.Fiat2Btc = focused.map(_.toLowerCase) match {
-    case Some("sos") => to[Bitpay](Tools.get("https://bitpay.com/rates").string).data.map { case BitpayItem(code, rate) => code.toLowerCase -> rate }.toMap
+    case Some("sos") => to[Bitpay](LNParams.connectionProvider.get("https://bitpay.com/rates").string).data.map { case BitpayItem(code, rate) => code.toLowerCase -> rate }.toMap
     case _ => fr.acinq.eclair.secureRandom nextInt 3 match {
-      case 0 => to[CoinGecko](Tools.get("https://api.coingecko.com/api/v3/exchange_rates").string).rates.map { case (code, item) => code.toLowerCase -> item.value }
-      case 1 => to[FiatRates.BlockchainInfoItemMap](Tools.get("https://blockchain.info/ticker").string).map { case (code, item) => code.toLowerCase -> item.last }
-      case _ => to[Bitpay](Tools.get("https://bitpay.com/rates").string).data.map { case BitpayItem(code, rate) => code.toLowerCase -> rate }.toMap
+      case 0 => to[CoinGecko](LNParams.connectionProvider.get("https://api.coingecko.com/api/v3/exchange_rates").string).rates.map { case (code, item) => code.toLowerCase -> item.value }
+      case 1 => to[FiatRates.BlockchainInfoItemMap](LNParams.connectionProvider.get("https://blockchain.info/ticker").string).map { case (code, item) => code.toLowerCase -> item.last }
+      case _ => to[Bitpay](LNParams.connectionProvider.get("https://bitpay.com/rates").string).data.map { case BitpayItem(code, rate) => code.toLowerCase -> rate }.toMap
     }
   }
-
 
   def enrichFiats(fs: Tools.Fiat2Btc): Tools.Fiat2Btc = {
     val eur = fs.get("eur").getOrElse(0.0)

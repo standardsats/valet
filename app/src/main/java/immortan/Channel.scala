@@ -29,9 +29,9 @@ object Channel {
   // Single stacking thread for all channels, must be used when asking channels for pending payments to avoid race conditions
   implicit val channelContext: ExecutionContextExecutor = scala.concurrent.ExecutionContext fromExecutor Executors.newSingleThreadExecutor
 
-  def load(listeners: Set[ChannelListener], paymentListeners: mutable.Set[ExternalPaymentListener], bag: ChannelBag): Map[ByteVector32, Channel] = bag.all.map {
+  def load(listeners: Set[ChannelListener], bag: ChannelBag): Map[ByteVector32, Channel] = bag.all.map {
     case data: HasNormalCommitments => data.channelId -> ChannelNormal.make(listeners, data, bag)
-    case data: HostedCommits => data.channelId -> ChannelHosted.make(listeners, paymentListeners, data, bag)
+    case data: HostedCommits => data.channelId -> ChannelHosted.make(listeners, data, bag)
     case _ => throw new RuntimeException
   }.toMap
 
