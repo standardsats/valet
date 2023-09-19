@@ -12,7 +12,7 @@ import android.util.AttributeSet;
 
 import androidx.appcompat.widget.AppCompatImageView;
 
-import com.btcontract.wallet.R;
+import com.btcontract.walletfiat.R;
 
 /**
  * ImageView that is animated like a progress view and clips
