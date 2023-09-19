@@ -1,4 +1,4 @@
-FROM debian:sid-slim
+FROM debian:sid-slim as BUILD
 
 RUN set -ex; \
     mkdir -p /usr/share/man/man1/; \
@@ -15,10 +15,14 @@ RUN set -ex; \
     mkdir -p "/app/sdk/licenses" "/app/sdk/ndk" "/app/valet/"; \
     printf "\n24333f8a63b6825ea9c5514f83c2829b004d1fee" > "/app/sdk/licenses/android-sdk-license"; \
     cd /app/sdk/; \
-    wget https://dl.google.com/android/repository/android-ndk-r22b-linux-x86_64.zip; \
+    wget https://dl.google.com/android/repository/android-ndk-r22b-linux-x86_64.zip;
+
+RUN cd /app/sdk/; \
     unzip android-ndk-r22b-linux-x86_64.zip; \
     rm android-ndk-r22b-linux-x86_64.zip; \
     mv android-ndk-r22b "/app/sdk/ndk/22.1.7171670/";
+
+FROM BUILD
 
 WORKDIR /app/valet/wallet/
 
