@@ -63,9 +63,9 @@ case class InFlightPayments(out: Map[FullPaymentTag, OutgoingAdds], in: Map[Full
   val allTags: Set[FullPaymentTag] = out.keySet ++ in.keySet
 }
 
-trait ExternalPaymentListener {
-  def onPaymentRequest(description: String, invoice: PaymentRequest): Unit = none
-}
+//trait ExternalPaymentListener {
+//  def onPaymentRequest(description: String, invoice: PaymentRequest): Unit = none
+//}
 
 class ChannelMaster(val payBag: PaymentBag, val chanBag: ChannelBag, val dataBag: DataBag, val pf: PathFinder) extends ChannelListener with ConnectionListener with CanBeShutDown { me =>
   val initResolveMemo: LoadingCache[UpdateAddHtlcExt, IncomingResolution] = memoize(initResolve)

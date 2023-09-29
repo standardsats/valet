@@ -178,9 +178,9 @@ abstract class ChannelHosted extends Channel { me =>
       }
       events.notifyResolvers
 
-    case (hc: HostedCommits, msg: ProposeInvoice, OPEN) =>
-      println(s"Got poposal with description ${msg.description} and invoice: ${msg.invoice}")
-      for (lst <- externalPaymentListeners) lst.onPaymentRequest(msg.description, msg.invoice)
+//    case (hc: HostedCommits, msg: ProposeInvoice, OPEN) =>
+//      println(s"Got poposal with description ${msg.description} and invoice: ${msg.invoice}")
+//      for (lst <- externalPaymentListeners) lst.onPaymentRequest(msg.description, msg.invoice)
 
     case (hc: HostedCommits, CMD_HOSTED_QUERY_RATE(), OPEN) =>
       println("Requesting server rate")

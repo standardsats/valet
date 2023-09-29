@@ -1,7 +1,6 @@
 package fr.acinq.eclair.wire
 
 import fr.acinq.eclair._
-import fr.acinq.eclair.payment.PaymentRequest
 import fr.acinq.eclair.wire.ChannelCodecs._
 import fr.acinq.eclair.wire.CommonCodecs._
 import immortan.Ticker
@@ -277,9 +276,9 @@ object LightningMessageCodecs {
     tag withContext "tag"
   }.as[Ticker]
 
-  val paymentRequestCodec = {
-    variableSizeBytes(uint16, utf8).narrow(invoice => Attempt.Successful(PaymentRequest.read(invoice)), (invoice: PaymentRequest) => PaymentRequest.write(invoice))
-  }.as[PaymentRequest]
+//  val paymentRequestCodec = {
+//    variableSizeBytes(uint16, utf8).narrow(invoice => Attempt.Successful(PaymentRequest.read(invoice)), (invoice: PaymentRequest) => PaymentRequest.write(invoice))
+//  }.as[PaymentRequest]
 
   val invokeHostedChannelCodec = {
     (bytes32 withContext "chainHash") ::
@@ -366,10 +365,10 @@ object LightningMessageCodecs {
 
   lazy val replyCurrentRateCodec = (millisatoshi withContext "rate").as[ReplyCurrentRate]
 
-  lazy val proposeInvoiceCodec = {
-    (variableSizeBytes(uint16, utf8) withContext "description") ::
-      (paymentRequestCodec withContext "invoice")
-  }.as[ProposeInvoice]
+//  lazy val proposeInvoiceCodec = {
+//    (variableSizeBytes(uint16, utf8) withContext "description") ::
+//      (paymentRequestCodec withContext "invoice")
+//  }.as[ProposeInvoice]
 
   final val HC_INVOKE_HOSTED_CHANNEL_TAG = 55535
 
@@ -599,7 +598,7 @@ object LightningMessageCodecs {
 
       case HC_QUERY_RATE_TAG => provide(QueryCurrentRate())
       case HC_REPLY_RATE_TAG => replyCurrentRateCodec
-      case HC_PROPOSE_INVOICE_TAG => proposeInvoiceCodec
+      //case HC_PROPOSE_INVOICE_TAG => proposeInvoiceCodec
 
       case SWAP_IN_REQUEST_MESSAGE_TAG => provide(SwapInRequest)
       case SWAP_IN_PAYMENT_REQUEST_MESSAGE_TAG => swapInPaymentRequestCodec
@@ -637,7 +636,7 @@ object LightningMessageCodecs {
     case msg: AskBrandingInfo => UnknownMessage(HC_ASK_BRANDING_INFO, askBrandingInfoCodec.encode(msg).require.toByteVector)
     case msg: QueryCurrentRate => UnknownMessage(HC_QUERY_RATE_TAG, provide(QueryCurrentRate).encode(QueryCurrentRate).require.toByteVector)
     case msg: ReplyCurrentRate => UnknownMessage(HC_REPLY_RATE_TAG, replyCurrentRateCodec.encode(msg).require.toByteVector)
-    case msg: ProposeInvoice => UnknownMessage(HC_PROPOSE_INVOICE_TAG, proposeInvoiceCodec.encode(msg).require.toByteVector)
+    //case msg: ProposeInvoice => UnknownMessage(HC_PROPOSE_INVOICE_TAG, proposeInvoiceCodec.encode(msg).require.toByteVector)
 
     case SwapInRequest => UnknownMessage(SWAP_IN_REQUEST_MESSAGE_TAG, provide(SwapInRequest).encode(SwapInRequest).require.toByteVector)
     case msg: SwapInPaymentRequest => UnknownMessage(SWAP_IN_PAYMENT_REQUEST_MESSAGE_TAG, swapInPaymentRequestCodec.encode(msg).require.toByteVector)

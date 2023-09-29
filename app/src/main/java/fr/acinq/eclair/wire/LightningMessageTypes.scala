@@ -331,7 +331,7 @@ case class ReplyCurrentRate(rate: MilliSatoshi) extends HostedChannelMessage
 
 // Propose invoice
 
-case class ProposeInvoice(description: String, invoice: PaymentRequest) extends HostedChannelMessage
+//case class ProposeInvoice(description: String, invoice: PaymentRequest) extends HostedChannelMessage
 
 // Swap In/Out
 
