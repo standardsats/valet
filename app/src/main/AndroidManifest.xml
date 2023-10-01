@@ -98,6 +98,7 @@
             android:theme="@style/AppThemeNoActionBar"/>
 
         <activity
+            android:exported="true"
             android:name="com.btcontract.walletfiat.HubActivity"
             android:launchMode="singleTask"
             android:screenOrientation="portrait"

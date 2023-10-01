@@ -37,7 +37,7 @@ object ChannelHosted {
 }
 
 abstract class ChannelHosted extends Channel { me =>
-  var externalPaymentListeners: mutable.Set[ExternalPaymentListener] = mutable.Set.empty
+  //var externalPaymentListeners: mutable.Set[ExternalPaymentListener] = mutable.Set.empty
 
   def isOutOfSync(blockDay: Long): Boolean = math.abs(blockDay - LNParams.currentBlockDay) > 1
 

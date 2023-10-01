@@ -109,9 +109,9 @@ class ChannelMaster(val payBag: PaymentBag, val chanBag: ChannelBag, val dataBag
   }
 
   // Here the requests from HC channels are pumped to UI
-  var externalPaymentRequestListeners: mutable.Set[ExternalPaymentListener] = {
-    mutable.Set()
-  }
+//  var externalPaymentRequestListeners: mutable.Set[ExternalPaymentListener] = {
+//    mutable.Set()
+//  }
 
   var all = Map.empty[ByteVector32, Channel]
 
