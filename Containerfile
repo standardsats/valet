@@ -1,4 +1,4 @@
-FROM debian:sid-slim as BUILD
+FROM docker.io/debian:sid-slim as BUILD
 
 RUN set -ex; \
     mkdir -p /usr/share/man/man1/; \
