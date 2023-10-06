@@ -17,8 +17,8 @@ android {
         targetSdkVersion 33
         minSdkVersion 21
 
-        versionName '4.2.0'
-        versionCode 101
+        versionName '4.3.0'
+        versionCode 102
     }
 
     dexOptions {
