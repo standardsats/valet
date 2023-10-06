@@ -223,6 +223,7 @@
     <string name="rpa_request_channel">Share your node ID with remote peer and keep this page open to get an incoming channel.</string>
     <string name="rpa_request_hc_usd">Request USD fiat channel</string>
     <string name="rpa_request_hc_eur">Request EUR fiat channel</string>
+    <string name="rpa_request_ln_resync">Request LN graph resync</string>
     <string name="rpa_share_node_id">Share node ID</string>
     <string name="rpa_open_nc">Fund new channel</string>
 

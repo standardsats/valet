@@ -223,6 +223,7 @@
     <string name="rpa_request_channel">Поделитесь своим node ID с удаленным узлом и оставьте открытой эту страницу до получения входящего канала</string>
     <string name="rpa_request_hc_usd">Запросить USD фиатный канал</string>
     <string name="rpa_request_hc_eur">Запросить EUR фиатный канал</string>
+    <string name="rpa_request_ln_resync">Пересинхронизировать LN граф</string>
     <string name="rpa_share_node_id">Поделиться Node ID</string>
     <string name="rpa_open_nc">Открыть новый канал</string>
 

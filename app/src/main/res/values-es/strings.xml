@@ -223,6 +223,7 @@
     <string name="rpa_request_channel">Comparte el ID de tu nodo con el par remoto y mantén esta página abierta para obtener un canal entrante.</string>
     <string name="rpa_request_hc_usd">Solicitar USD canal hospedado</string>
     <string name="rpa_request_hc_eur">Solicitar EUR canal hospedado</string>
+    <string name="rpa_request_ln_resync">Solicitar resincronización del gráfico LN</string>
     <string name="rpa_share_node_id">Compartir ID del nodo</string>
     <string name="rpa_open_nc">Financiar nuevo canal</string>
 

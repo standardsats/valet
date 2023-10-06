@@ -28,6 +28,7 @@ object PathFinder {
   val CMDStartPeriodicResync = "cmd-start-periodic-resync"
   val CMDLoadGraph = "cmd-load-graph"
   val CMDResync = "cmd-resync"
+  val CMDForceResync = "cmd-force-resync"
 
   val WAITING = 0
   val OPERATIONAL = 1
@@ -101,23 +102,12 @@ abstract class PathFinder(val normalBag: NetworkBag, val hostedBag: NetworkBag) 
       val searchGraph1 = DirectedGraph.makeGraph(normalShortIdToPubChan ++ hostedShortIdToPubChan).addEdges(extraEdges.values)
       become(Data(normalShortIdToPubChan, hostedShortIdToPubChan, searchGraph1), OPERATIONAL)
 
+    case (CMDForceResync, OPERATIONAL) =>
+      attemptNormalSync
+      attemptPHCSync
+
     case (CMDResync, OPERATIONAL) if System.currentTimeMillis - getLastNormalResyncStamp > RESYNC_PERIOD =>
-      val setupData = SyncMasterShortIdData(LNParams.syncParams.syncNodes, getExtraNodes, Set.empty, Map.empty)
-
-      val requestNodeAnnounceForChan = for {
-        info <- getExtraNodes ++ getPHCExtraNodes
-        edges <- data.graph.vertices.get(info.nodeId)
-      } yield shuffle(edges).head.desc.shortChannelId
-
-      val normalSync = new SyncMaster(normalBag.listExcludedChannels, requestNodeAnnounceForChan, data, LNParams.syncParams.maxNodesToSyncFrom) { self =>
-        override def onNodeAnnouncement(nodeAnnouncement: NodeAnnouncement): Unit = listeners.foreach(_ process nodeAnnouncement)
-        override def onChunkSyncComplete(pureRoutingData: PureRoutingData): Unit = me process pureRoutingData
-        override def onTotalSyncComplete: Unit = me process self
-      }
-
-      syncMaster = normalSync.asSome
-      listeners.foreach(_ process CMDResync)
-      normalSync process setupData
+      attemptNormalSync
 
     case (CMDResync, OPERATIONAL) if System.currentTimeMillis - getLastTotalResyncStamp > RESYNC_PERIOD =>
       // Normal resync has happened recently, but PHC resync is outdated (PHC failed last time due to running out of attempts)
@@ -244,6 +234,28 @@ abstract class PathFinder(val normalBag: NetworkBag, val hostedBag: NetworkBag) 
       val master = new PHCSyncMaster(data) { override def onSyncComplete(pure: CompleteHostedRoutingData): Unit = me process pure }
       master process SyncMasterPHCData(LNParams.syncParams.phcSyncNodes, getPHCExtraNodes, activeSyncs = Set.empty)
     } else updateLastTotalResyncStamp(System.currentTimeMillis)
+  }
+
+  def attemptNormalSync(): Unit = {
+    val setupData = SyncMasterShortIdData(LNParams.syncParams.syncNodes, getExtraNodes, Set.empty, Map.empty)
+
+    val requestNodeAnnounceForChan = for {
+      info <- getExtraNodes ++ getPHCExtraNodes
+      edges <- data.graph.vertices.get(info.nodeId)
+    } yield shuffle(edges).head.desc.shortChannelId
+
+    val normalSync = new SyncMaster(normalBag.listExcludedChannels, requestNodeAnnounceForChan, data, LNParams.syncParams.maxNodesToSyncFrom) {
+      self =>
+      override def onNodeAnnouncement(nodeAnnouncement: NodeAnnouncement): Unit = listeners.foreach(_ process nodeAnnouncement)
+
+      override def onChunkSyncComplete(pureRoutingData: PureRoutingData): Unit = me process pureRoutingData
+
+      override def onTotalSyncComplete: Unit = me process self
+    }
+
+    syncMaster = normalSync.asSome
+    listeners.foreach(_ process CMDResync)
+    normalSync process setupData
   }
 
   def calcExpectedFees(nodeId: PublicKey): ExpectedFees = {
