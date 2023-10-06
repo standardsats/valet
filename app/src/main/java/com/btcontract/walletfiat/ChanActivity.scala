@@ -308,8 +308,10 @@ class ChanActivity extends ChanErrorHandlerActivity with ChoiceReceiver with Has
       mkCheckForm(alert => runAnd(alert.dismiss)(me drainHc hc), none, builder, dialog_ok, dialog_cancel)
 
     case (cs: NormalCommits, 2) => closeNcToAddress(cs)
-    case (cs: Commitments, 3) => receiveIntoChan(cs)
+    case (cs: Commitments, 3) => receiveIntoChan(cs, privateNodeId = true)
     case (cs: Commitments, 4) => startRefillChan(cs)
+
+    case (cs: Commitments, 5) => receiveIntoChan(cs, privateNodeId = false)
 
     case _ =>
   }
@@ -358,7 +360,9 @@ class ChanActivity extends ChanErrorHandlerActivity with ChoiceReceiver with Has
       case Some(csAndMax) =>
         val toSend = maxSendable.min(csAndMax.maxReceivable)
         val pd = PaymentDescription(split = None, label = getString(tx_ln_label_reflexive).asSome, semanticOrder = None, invoiceText = new String, toSelfPreimage = preimage.asSome)
-        val prExt = LNParams.cm.makePrExt(toReceive = toSend, description = pd, allowedChans = csAndMax.commits, hash = Crypto.sha256(preimage), secret = randomBytes32)
+        val secret = randomBytes32
+        val node_key = LNParams.secret.keys.fakeInvoiceKey(secret)
+        val prExt = LNParams.cm.makePrExt(toReceive = toSend, description = pd, allowedChans = csAndMax.commits, hash = Crypto.sha256(preimage), secret, node_key)
         val cmd = LNParams.cm.makeSendCmd(prExt, allowedChans = relatedHc, LNParams.cm.feeReserve(toSend), toSend).modify(_.split.totalSum).setTo(toSend)
         WalletApp.app.quickToast(getString(dialog_lnurl_processing).format(me getString tx_ln_label_reflexive).html)
         replaceOutgoingPayment(prExt, pd, action = None, sentAmount = prExt.pr.amountOpt.get)
@@ -384,7 +388,9 @@ class ChanActivity extends ChanErrorHandlerActivity with ChoiceReceiver with Has
         case Some(csAndMax) =>
           val toSend = amount.min(maxSendable.min(csAndMax.maxReceivable))
           val pd = PaymentDescription(split = None, label = getString(tx_ln_label_reflexive).asSome, semanticOrder = None, invoiceText = new String, toSelfPreimage = preimage.asSome)
-          val prExt = LNParams.cm.makePrExt(toReceive = toSend, description = pd, allowedChans = csAndMax.commits, hash = Crypto.sha256(preimage), secret = randomBytes32)
+          val secret = randomBytes32
+          val node_key = LNParams.secret.keys.fakeInvoiceKey(secret)
+          val prExt = LNParams.cm.makePrExt(toReceive = toSend, description = pd, allowedChans = csAndMax.commits, hash = Crypto.sha256(preimage), secret, node_key)
           val cmd = LNParams.cm.makeSendCmd(prExt, allowedChans = otherChans, LNParams.cm.feeReserve(toSend), toSend).modify(_.split.totalSum).setTo(toSend)
           WalletApp.app.quickToast(getString(dialog_lnurl_processing).format(me getString tx_ln_label_reflexive).html)
           replaceOutgoingPayment(prExt, pd, action = None, sentAmount = prExt.pr.amountOpt.get)
@@ -394,9 +400,9 @@ class ChanActivity extends ChanErrorHandlerActivity with ChoiceReceiver with Has
 
   }
 
-  def receiveIntoChan(commits: Commitments): Unit = {
+  def receiveIntoChan(commits: Commitments, privateNodeId: Boolean): Unit = {
     lnReceiveGuard(getChanByCommits(commits).toList, chanContainer) {
-      new OffChainReceiver(getChanByCommits(commits).toList, initMaxReceivable = Long.MaxValue.msat, initMinReceivable = 0L.msat) {
+      new OffChainReceiver(getChanByCommits(commits).toList, initMaxReceivable = Long.MaxValue.msat, initMinReceivable = 0L.msat, privateNodeId) {
         override def getManager: RateManager = new RateManager(body, getString(dialog_add_description).asSome, dialog_visibility_sender, LNParams.fiatRates.info.rates, WalletApp.fiatCode)
         override def getDescription: PaymentDescription = PaymentDescription(split = None, label = None, semanticOrder = None, invoiceText = manager.resultExtraInput getOrElse new String)
         override def processInvoice(prExt: PaymentRequestExt): Unit = goToWithValue(ClassNames.qrInvoiceActivityClass, prExt)
@@ -407,7 +413,7 @@ class ChanActivity extends ChanErrorHandlerActivity with ChoiceReceiver with Has
 
   def startRefillChan(hc: Commitments): Unit = {
     lnReceiveGuard(getChanByCommits(hc).toList, chanContainer) {
-      new OffChainReceiver(getChanByCommits(hc).toList, initMaxReceivable = Long.MaxValue.msat, initMinReceivable = 0L.msat) {
+      new OffChainReceiver(getChanByCommits(hc).toList, initMaxReceivable = Long.MaxValue.msat, initMinReceivable = 0L.msat, privateNodeId = true) {
         override def getManager: RateManager = new RateManager(body, getString(dialog_add_description).asSome, dialog_visibility_sender, LNParams.fiatRates.info.rates, WalletApp.fiatCode)
         override def getDescription: PaymentDescription = PaymentDescription(split = None, label = None, semanticOrder = None, invoiceText = manager.resultExtraInput getOrElse new String)
         override def processInvoice(prExt: PaymentRequestExt): Unit = ()

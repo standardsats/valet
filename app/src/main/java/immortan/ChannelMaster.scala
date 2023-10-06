@@ -274,9 +274,8 @@ class ChannelMaster(val payBag: PaymentBag, val chanBag: ChannelBag, val dataBag
       prExt.pr.paymentMetadata, feeReserve, allowedChans, fullTag.paymentSecret, prExt.extraEdges)
   }
 
-  def makePrExt(toReceive: MilliSatoshi, description: PaymentDescription, allowedChans: Seq[ChanAndCommits], hash: ByteVector32, secret: ByteVector32): PaymentRequestExt = {
+  def makePrExt(toReceive: MilliSatoshi, description: PaymentDescription, allowedChans: Seq[ChanAndCommits], hash: ByteVector32, secret: ByteVector32, node_key: PrivateKey): PaymentRequestExt = {
     val hops = allowedChans.map(_.commits.updateOpt).zip(allowedChans).collect { case Some(usableUpdate) ~ ChanAndCommits(_, commits) => usableUpdate.extraHop(commits.remoteInfo.nodeId) :: Nil }
-    val node_key = if (allowedChans.length == 1) LNParams.secret.keys.ourFakeNodeIdKey(allowedChans.head.commits.remoteInfo.nodeId).privateKey else LNParams.secret.keys.fakeInvoiceKey(secret)
     val pr = Bolt11Invoice(LNParams.chainHash, Some(toReceive), hash, secret, node_key, description.invoiceText, LNParams.incomingFinalCltvExpiry, hops.toList)
     PaymentRequestExt.from(pr)
   }

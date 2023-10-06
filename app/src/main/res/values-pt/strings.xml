@@ -382,6 +382,7 @@
         <item><![CDATA[Close channel to address]]></item>
         <item><![CDATA[Receive to channel]]></item>
         <item><![CDATA[Recarga de outros canais]]></item>
+        <item><![CDATA[Recebimento direto e não privado para o canal]]></item>
     </array>
 
     <array name="ln_hosted_chan_actions">
@@ -390,6 +391,7 @@
         <item><![CDATA[Equilíbrio do canal de drenagem]]></item>
         <item><![CDATA[Receber no canal]]></item>
         <item><![CDATA[Recarga de outros canais]]></item>
+        <item><![CDATA[Recebimento direto e não privado para o canal]]></item>
     </array>
 
     <string name="ln_hc_override">Substituir proposta</string>

@@ -738,7 +738,7 @@ trait BaseActivity extends AppCompatActivity { me =>
     }
   }
 
-  abstract class OffChainReceiver(into: Iterable[Channel], initMaxReceivable: MilliSatoshi, initMinReceivable: MilliSatoshi) {
+  abstract class OffChainReceiver(into: Iterable[Channel], initMaxReceivable: MilliSatoshi, initMinReceivable: MilliSatoshi, privateNodeId: Boolean) {
     val body: ViewGroup = getLayoutInflater.inflate(R.layout.frag_input_off_chain, null).asInstanceOf[ViewGroup]
     val CommitsAndMax(cs, maxReceivable) = LNParams.cm.maxReceivable(LNParams.cm sortedReceivable into).get
     val manager: RateManager = getManager
@@ -752,7 +752,9 @@ trait BaseActivity extends AppCompatActivity { me =>
     def receive(alert: AlertDialog): Unit = {
       val preimage: ByteVector32 = randomBytes32
       val description: PaymentDescription = getDescription
-      val prExt = LNParams.cm.makePrExt(toReceive = manager.resultMsat, description, allowedChans = cs, Crypto.sha256(preimage), randomBytes32)
+      val secret = randomBytes32
+      val node_key = if (privateNodeId || cs.length > 1) LNParams.secret.keys.fakeInvoiceKey(secret) else LNParams.secret.keys.ourFakeNodeIdKey(cs.head.commits.remoteInfo.nodeId).privateKey
+      val prExt = LNParams.cm.makePrExt(toReceive = manager.resultMsat, description, allowedChans = cs, Crypto.sha256(preimage), secret, node_key)
       LNParams.cm.payBag.replaceIncomingPayment(prExt, preimage, description, BaseActivity.totalBalance, LNParams.fiatRates.info.rates)
       WalletApp.app.showStickyNotification(incoming_notify_title, incoming_notify_body, manager.resultMsat)
       // This must be called AFTER PaymentInfo is present in db

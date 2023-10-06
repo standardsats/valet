@@ -385,6 +385,7 @@
         <item><![CDATA[Close channel to address]]></item>
         <item><![CDATA[Receive to channel]]></item>
         <item><![CDATA[Refill from other channels]]></item>
+        <item><![CDATA[Direct not private receive to channel]]></item>
     </array>
 
     <array name="ln_hosted_chan_actions">
@@ -393,6 +394,7 @@
         <item><![CDATA[Drain channel balance]]></item>
         <item><![CDATA[Receive to channel]]></item>
         <item><![CDATA[Refill from other channels]]></item>
+        <item><![CDATA[Direct not private receive to channel]]></item>
     </array>
 
     <string name="ln_hc_override">Override proposal</string>

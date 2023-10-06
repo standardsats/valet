@@ -375,6 +375,8 @@
         <item><![CDATA[Sluit kanaal naar portemonnee]]></item>
         <item><![CDATA[Sluit kanaal naar adres]]></item>
         <item><![CDATA[Ontvang op kanaal]]></item>
+        <item><![CDATA[Recarregue de outros canais]]></item>
+        <item><![CDATA[Directe, niet-privé-ontvangst naar kanaal]]></item>
     </array>
 
     <array name="ln_hosted_chan_actions">
@@ -382,6 +384,8 @@
         <item><![CDATA[Exporteer kanaaltoestand]]></item>
         <item><![CDATA[Drain kanaal balance]]></item>
         <item><![CDATA[Ontvang op kanaal]]></item>
+        <item><![CDATA[Recarregue de outros canais]]></item>
+        <item><![CDATA[Directe, niet-privé-ontvangst naar kanaal]]></item>
     </array>
 
     <string name="ln_hc_override">Overschrijfvoorstel</string>

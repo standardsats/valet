@@ -383,6 +383,7 @@
         <item><![CDATA[Cerrar canal a la direccion]]></item>
         <item><![CDATA[Recibir a este canal]]></item>
         <item><![CDATA[Recarga desde otros canales]]></item>
+        <item><![CDATA[Recepción directa no privada al canal]]></item>
     </array>
 
     <array name="ln_hosted_chan_actions">
@@ -391,6 +392,7 @@
         <item><![CDATA[Vaciar saldo del canal]]></item>
         <item><![CDATA[Recibir a este canal]]></item>
         <item><![CDATA[Recarga desde otros canales]]></item>
+        <item><![CDATA[Recepción directa no privada al canal]]></item>
     </array>
 
     <string name="ln_hc_override">Propuesta de anulación</string>
