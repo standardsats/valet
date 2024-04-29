@@ -377,7 +377,5 @@ class SettingsActivity extends BaseCheckActivity with HasTypicalChainFee with Ch
     settingsContainer.addView(viewCode.view)
     settingsContainer.addView(viewStat.view)
     settingsContainer.addView(links.view)
-
-    backupLocation.updateView
   }
 }
