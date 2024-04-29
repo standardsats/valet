@@ -263,6 +263,10 @@
     <string name="settings_view_revocery_phrase">View BIP39 recovery phrase</string>
     <string name="settings_stats">Usage statistics</string>
 
+    <string name="settings_backup_location">Where to store local backup</string>
+    <string name="settings_backup_location_too_old">Android version is too old to select directory</string>
+    <string name="settings_choose_directory">Choose directory</string>
+
     <!-- /Settings activity -->
 
     <array name="parts_in_flight">

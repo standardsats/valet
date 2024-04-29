@@ -1,5 +1,6 @@
 package com.btcontract.walletfiat
 
+import android.app.Activity
 import android.content.Intent
 import android.os.{Build, Bundle}
 import android.view.{View, ViewGroup}
@@ -55,9 +56,11 @@ class SettingsActivity extends BaseCheckActivity with HasTypicalChainFee with Ch
   private[this] val CHOICE_FIAT_DENOMINATION_TAG = "choiceFiatDenominationTag"
   private[this] val CHOICE_BTC_DENOMINATON_TAG = "choiceBtcDenominationTag"
   private[this] val units = List(SatDenomination, BtcDenomination)
+  private[this] final val DIRECTORY_REQUEST_CODE = 113
 
   override def onResume: Unit = {
     storeLocalBackup.updateView
+    backupLocation.updateView
     chainWallets.updateView
     electrum.updateView
     setFiat.updateView
@@ -105,6 +108,48 @@ class SettingsActivity extends BaseCheckActivity with HasTypicalChainFee with Ch
       startActivity(intent1)
     }
   }
+
+  lazy private[this] val backupLocation = new SettingsHolder(me) {
+    setVis(isVisible = false, settingsCheck)
+
+    def updateView: Unit = {
+      val customLocation = WalletApp.customBackupLocation
+      val info: String = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+        customLocation match {
+          case Some(path) => path.getPath
+          case None => me getString settings_backup_where
+        }
+      } else me getString settings_backup_location_too_old
+      settingsTitle.setText(settings_backup_location)
+      settingsInfo.setText(info)
+    }
+
+    view setOnClickListener onButtonTap {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+        val i = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
+        i.addCategory(Intent.CATEGORY_DEFAULT)
+        i.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+        i.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+        startActivityForResult(Intent.createChooser(i, me getString settings_choose_directory), DIRECTORY_REQUEST_CODE)
+      }
+    }
+  }
+
+  override def onActivityResult(requestCode: Int, resultCode: Int, resultData: Intent): Unit =
+    if (requestCode == DIRECTORY_REQUEST_CODE && resultCode == Activity.RESULT_OK && resultData != null) {
+      def saveDirectory(directory: String) = WalletApp.app.prefs.edit.putString(WalletApp.CUSTOM_BACKUP_LOCATION, directory)
+      WalletApp.customBackupLocation match {
+        case Some(uri) => {
+            getContentResolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+        }
+        case _ => ()
+      }
+      val uri = resultData.getData
+      getContentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+      saveDirectory(uri.toString).commit
+      backupLocation.updateView
+      WalletApp.backupSaveWorker.replaceWork(true)
+    }
 
   lazy private[this] val chainWallets: SettingsHolder = new SettingsHolder(me) {
     setVisMany(false -> settingsCheck, false -> settingsInfo)
@@ -320,6 +365,7 @@ class SettingsActivity extends BaseCheckActivity with HasTypicalChainFee with Ch
 
     settingsContainer.addView(settingsPageitle.view)
     settingsContainer.addView(storeLocalBackup.view)
+    settingsContainer.addView(backupLocation.view)
     settingsContainer.addView(chainWallets.view)
     settingsContainer.addView(addHardware.view)
     settingsContainer.addView(electrum.view)
@@ -331,5 +377,7 @@ class SettingsActivity extends BaseCheckActivity with HasTypicalChainFee with Ch
     settingsContainer.addView(viewCode.view)
     settingsContainer.addView(viewStat.view)
     settingsContainer.addView(links.view)
+
+    backupLocation.updateView
   }
 }
