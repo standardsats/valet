@@ -266,7 +266,7 @@
     <string name="settings_backup_location">Dónde almacenar la copia de seguridad local</string>
     <string name="settings_backup_location_too_old">La versión de Android es demasiado antigua para seleccionar el directorio</string>
     <string name="settings_choose_directory">Elegir directorio</string>
-    
+
     <!-- /Settings activity -->
 
     <array name="parts_in_flight">
