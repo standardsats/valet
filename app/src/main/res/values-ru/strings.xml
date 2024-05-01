@@ -233,7 +233,8 @@
 
     <string name="settings_backup_disabled">Включить локальное резервирование</string>
     <string name="settings_backup_enabled">Локальное резервирование включено</string>
-    <string name="settings_backup_where">Файл сохраняется в папке Загрузки</string>
+    <string name="settings_backup_info">Установите системные разрешения</string>
+    <string name="settings_backup_where">По умолчанию в папке Загрузки</string>
     <string name="settings_backup_how">Разрешения -> Хранилище</string>
 
     <string name="settings_hardware_add">Добавить аппаратный кошелек</string>

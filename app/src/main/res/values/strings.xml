@@ -233,7 +233,8 @@
 
     <string name="settings_backup_disabled">Enable local channel backup</string>
     <string name="settings_backup_enabled">Local channel backup is enabled</string>
-    <string name="settings_backup_where">File gets stored in Download folder</string>
+    <string name="settings_backup_info">Set up system permission</string>
+    <string name="settings_backup_where">By default in Download folder</string>
     <string name="settings_backup_how">App permissions -> Storage</string>
 
     <string name="settings_hardware_add">Add hardware wallet</string>

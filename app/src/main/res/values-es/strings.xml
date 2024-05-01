@@ -233,7 +233,8 @@
 
     <string name="settings_backup_disabled">Habilitar respaldo de canal local</string>
     <string name="settings_backup_enabled">Respaldo de canal local ha sido habilitado</string>
-    <string name="settings_backup_where">El archivo se guarda en la carpeta Descargas</string>
+    <string name="settings_backup_info">Configurar el permiso del sistema</string>
+    <string name="settings_backup_where">Por defecto en la carpeta Descargas</string>
     <string name="settings_backup_how">Permisos -> Almacenamiento</string>
 
     <string name="settings_hardware_add">Agregar billetera hardware</string>

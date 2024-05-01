@@ -97,7 +97,7 @@ class SettingsActivity extends BaseCheckActivity with HasTypicalChainFee with Ch
       val backupAllowed = LocalBackup.isAllowed(context = WalletApp.app)
       if (backupAllowed && LNParams.cm.all.nonEmpty) WalletApp.backupSaveWorker.replaceWork(false)
       val title = if (backupAllowed) settings_backup_enabled else settings_backup_disabled
-      val info = if (backupAllowed) settings_backup_where else settings_backup_how
+      val info = settings_backup_info
       settingsTitle.setText(title)
       settingsInfo.setText(info)
     }

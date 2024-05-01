@@ -232,7 +232,8 @@
 
     <string name="settings_backup_disabled">Schakel lokale kanaalback-up in</string>
     <string name="settings_backup_enabled">Lokale kanaalback-up is ingeschakeld</string>
-    <string name="settings_backup_where">Bestand wordt opgeslagen in de Download-map</string>
+    <string name="settings_backup_info">Systeemrechten instellen</string>
+    <string name="settings_backup_where">Standaard in Download-map</string>
     <string name="settings_backup_how">Apprechten -> Opslag</string>
 
     <string name="settings_hardware_add">Voeg hardwareportemonnee toe</string>
