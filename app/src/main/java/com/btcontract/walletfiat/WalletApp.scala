@@ -3,8 +3,8 @@ package com.btcontract.walletfiat
 import java.net.InetSocketAddress
 import java.text.{DecimalFormat, SimpleDateFormat}
 import java.util.Date
-
 import akka.actor.Props
+import android.net.Uri
 import android.app.{Application, NotificationChannel, NotificationManager}
 import android.content._
 import android.os.{Build, VibrationEffect}
@@ -64,7 +64,7 @@ object WalletApp {
     private def doAttemptStore: Unit = {
       LocalBackup.encryptAndWritePlainBackup(app, dbFileNameEssential, LNParams.chainHash, LNParams.secret.seed)
       // Uncommented only in development builds
-      // LocalBackup.writeCompressedGraph(app, dbFileNameGraph,  LNParams.chainHash)
+      // LocalBackup.writeCompressedGraph(app, dbFileNameGraph, LNParams.chainHash)
     }
     def process(useDelay: Boolean, unitAfterDelay: Any): Unit = if (LocalBackup isAllowed app) try doAttemptStore catch none
     def work(useDelay: Boolean): Observable[Any] = if (useDelay) Rx.ioQueue.delay(4.seconds) else Observable.just(null)
@@ -77,6 +77,7 @@ object WalletApp {
   final val LAST_TOTAL_GOSSIP_SYNC = "lastTotalGossipSync"
   final val LAST_NORMAL_GOSSIP_SYNC = "lastNormalGossipSync"
   final val CUSTOM_ELECTRUM_ADDRESS = "customElectrumAddress"
+  final val CUSTOM_BACKUP_LOCATION = "customBackupLocation"
   final val SHOW_RATE_US = "showRateUs"
 
   def useAuth: Boolean = AppLock.isEnrolled(app)
@@ -97,6 +98,16 @@ object WalletApp {
   def customElectrumAddress: Try[NodeAddress] = Try {
     val rawAddress = app.prefs.getString(CUSTOM_ELECTRUM_ADDRESS, new String)
     nodeaddress.decode(BitVector fromValidHex rawAddress).require.value
+  }
+
+  def customBackupLocation: Option[Uri] = {
+    val hasIt = app.prefs.contains(CUSTOM_BACKUP_LOCATION)
+    if (hasIt) {
+      val dir = Try {
+        Uri parse app.prefs.getString(WalletApp.CUSTOM_BACKUP_LOCATION, new String)
+      }
+      dir.toOption
+    } else None
   }
 
   def isAlive: Boolean = null != txDataBag && null != lnUrlPayBag && null != chainWalletBag && null != extDataBag && null != app

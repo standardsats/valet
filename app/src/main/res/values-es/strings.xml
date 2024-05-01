@@ -233,7 +233,8 @@
 
     <string name="settings_backup_disabled">Habilitar respaldo de canal local</string>
     <string name="settings_backup_enabled">Respaldo de canal local ha sido habilitado</string>
-    <string name="settings_backup_where">El archivo se guarda en la carpeta Descargas</string>
+    <string name="settings_backup_info">Configurar el permiso del sistema</string>
+    <string name="settings_backup_where">Por defecto en la carpeta Descargas</string>
     <string name="settings_backup_how">Permisos -> Almacenamiento</string>
 
     <string name="settings_hardware_add">Agregar billetera hardware</string>
@@ -262,6 +263,10 @@
     <string name="settings_view_revocery_phrase_ext">Estas palabras permiten restaurar el saldo de la billetera en cualquier dispositivo, por favor mantenlas en secreto en todo momento!</string>
     <string name="settings_view_revocery_phrase">Ver la frase de recuperación BIP39</string>
     <string name="settings_stats">Estadísticas de uso</string>
+
+    <string name="settings_backup_location">Dónde almacenar la copia de seguridad local</string>
+    <string name="settings_backup_location_too_old">La versión de Android es demasiado antigua para seleccionar el directorio</string>
+    <string name="settings_choose_directory">Elegir directorio</string>
 
     <!-- /Settings activity -->
 

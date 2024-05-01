@@ -233,7 +233,8 @@
 
     <string name="settings_backup_disabled">Включить локальное резервирование</string>
     <string name="settings_backup_enabled">Локальное резервирование включено</string>
-    <string name="settings_backup_where">Файл сохраняется в папке Загрузки</string>
+    <string name="settings_backup_info">Установите системные разрешения</string>
+    <string name="settings_backup_where">По умолчанию в папке Загрузки</string>
     <string name="settings_backup_how">Разрешения -> Хранилище</string>
 
     <string name="settings_hardware_add">Добавить аппаратный кошелек</string>
@@ -262,6 +263,10 @@
     <string name="settings_view_revocery_phrase_ext">Эти слова позволяют вам восстановить кошелек со средствами на любом устройстве, пожалуйста, все время храните их в тайне!</string>
     <string name="settings_view_revocery_phrase">Фраза для восстановления</string>
     <string name="settings_stats">Статистика использования</string>
+
+    <string name="settings_backup_location">Место хранения локальной резервной копии</string>
+    <string name="settings_backup_location_too_old">Версия Android слишком стара для выбора директории</string>
+    <string name="settings_choose_directory">Выбрать директорию</string>
 
     <!-- /Settings activity -->
 

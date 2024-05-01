@@ -233,7 +233,8 @@
 
     <string name="settings_backup_disabled">Enable local channel backup</string>
     <string name="settings_backup_enabled">Local channel backup is enabled</string>
-    <string name="settings_backup_where">File gets stored in Download folder</string>
+    <string name="settings_backup_info">Set up system permission</string>
+    <string name="settings_backup_where">By default in Download folder</string>
     <string name="settings_backup_how">App permissions -> Storage</string>
 
     <string name="settings_hardware_add">Add hardware wallet</string>
@@ -262,6 +263,10 @@
     <string name="settings_view_revocery_phrase_ext">These words allow to restore wallet balance on any device, please keep it secret at all times!</string>
     <string name="settings_view_revocery_phrase">View BIP39 recovery phrase</string>
     <string name="settings_stats">Usage statistics</string>
+
+    <string name="settings_backup_location">Where to store local backup</string>
+    <string name="settings_backup_location_too_old">Android version is too old to select directory</string>
+    <string name="settings_choose_directory">Choose directory</string>
 
     <!-- /Settings activity -->
 

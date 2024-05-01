@@ -233,7 +233,8 @@
 
     <string name="settings_backup_disabled">Habilitar backup do canal</string>
     <string name="settings_backup_enabled">Backup do canal está habilitado</string>
-    <string name="settings_backup_where">Armazenado na pasta Download</string>
+    <string name="settings_backup_info">Configurar a permissão do sistema</string>
+    <string name="settings_backup_where">Por defeito, na pasta Download</string>
     <string name="settings_backup_how">Permissões do app -> Armazenar</string>
 
     <string name="settings_hardware_add">Add hardware wallet</string>
@@ -262,6 +263,10 @@
     <string name="settings_view_revocery_phrase_ext">Estas palavras permitem recuperar o saldo da sua carteira em qualquer dispositivo, por favor mantenha-as sempre em segredo!</string>
     <string name="settings_view_revocery_phrase">Ver a frase de recuperação BIP39</string>
     <string name="settings_stats">Estatísticas de uso</string>
+
+    <string name="settings_backup_location">Onde armazenar o backup local</string>
+    <string name="settings_backup_location_too_old">Versão do Android muito antiga para selecionar diretório</string>
+    <string name="settings_choose_directory">Escolha o diretório</string>
 
     <!-- /Settings activity -->
 

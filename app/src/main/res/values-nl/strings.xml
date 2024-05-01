@@ -232,7 +232,8 @@
 
     <string name="settings_backup_disabled">Schakel lokale kanaalback-up in</string>
     <string name="settings_backup_enabled">Lokale kanaalback-up is ingeschakeld</string>
-    <string name="settings_backup_where">Bestand wordt opgeslagen in de Download-map</string>
+    <string name="settings_backup_info">Systeemrechten instellen</string>
+    <string name="settings_backup_where">Standaard in Download-map</string>
     <string name="settings_backup_how">Apprechten -> Opslag</string>
 
     <string name="settings_hardware_add">Voeg hardwareportemonnee toe</string>
@@ -261,6 +262,10 @@
     <string name="settings_view_revocery_phrase_ext">Met deze woorden kun je je portemonneesaldo herstellen op elk apparaat, hou het te allen tijde geheim!</string>
     <string name="settings_view_revocery_phrase">Bekijk BIP39-herstelzin</string>
     <string name="settings_stats">Gebruiksstatistieken</string>
+
+    <string name="settings_backup_location">Waar de lokale back-up op te slaan</string>
+    <string name="settings_backup_location_too_old">Android-versie is te oud om de map te selecteren</string>
+    <string name="settings_choose_directory">Kies map</string>
 
     <!-- /Settings activity -->
 
@@ -423,6 +428,16 @@
     <string name="tx_rbf_err_rbf_disabled">Kan deze transactie geen boost geven omdat de RBF-vlag is ervan uitgezet</string>
     <string name="tx_rbf_err_foreign_inputs">Kan deze transactie geen boost geven omdat het inputs bevat die niet tot deze portemonnee behoren</string>
     <string name="tx_rbf_err_parents_missing">Kan deze transactie geen boost geven omdat de ouders ervan in deze portemonnee ontbreken</string>
+    <string name="fiat_wallet">Fiat</string>
+    <string name="fiat_wallet_usd">USD</string>
+    <string name="fiat_wallet_eur">EUR</string>
+    <string name="chan_reserve">Reserveren</string>
+    <string name="chan_server_rate">Servertarief</string>
+    <string name="chan_fiat_rate">Gemiddelde score</string>
+    <string name="chan_fiat_value">Fiat-balans</string>
+    <string name="ln_hosted_chan_refill_impossible">"Onmogelijk om fiat-kanaal bij te vullen "</string>
+    <string name="ln_hosted_chan_refill_low_funds">Niet genoeg geld om het fiatkanaal aan te vullen</string>
+    <string name="dialog_refill_ln">" <![CDATA[Kanaal aanvullen via <b>Lightning</b>]]>"</string>
 
     <!-- /CPFP/RBF -->
 

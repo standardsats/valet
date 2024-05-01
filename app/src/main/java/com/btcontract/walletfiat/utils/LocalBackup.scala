@@ -8,10 +8,12 @@ import android.content.pm.PackageManager
 import androidx.core.app.ActivityCompat
 import fr.acinq.eclair.randomBytes
 import com.google.common.io.{ByteStreams, Files}
-import android.content.{ContentValues, Context}
+import android.content.{ContentResolver, ContentValues, Context}
 import android.net.Uri
 import android.os.{Build, Environment}
-import android.provider.MediaStore
+import android.provider.{DocumentsContract, MediaStore}
+import androidx.documentfile.provider.DocumentFile
+import com.btcontract.walletfiat.WalletApp
 import scodec.bits.{BitVector, ByteVector}
 import immortan.crypto.Tools
 import immortan.wire.ExtCodecs
@@ -49,23 +51,53 @@ object LocalBackup { me =>
 
 //  val finalUri : Uri? = copyFileToDownloads(context, downloadedFile)
 
-  def copyFileToDownloads(context: Context, downloadedFile: File): Uri = {
+  def copyFileToDirectory(context: Context, directory: Option[Uri], downloadedFile: File): Uri = {
     val resolver = context.getContentResolver
-    val downloadedUri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-      val contentValues = new ContentValues()
-      contentValues.put(MediaStore.MediaColumns.IS_PENDING, true)
-      contentValues.put(MediaStore.MediaColumns.DISPLAY_NAME, downloadedFile.getName)
-      contentValues.put(MediaStore.MediaColumns.MIME_TYPE, resolver.getType(android.net.Uri.fromFile(downloadedFile)))
-      contentValues.put(MediaStore.MediaColumns.SIZE, String.valueOf(downloadedFile.length()))
+    val downloadedUri: Uri = directory match {
+      case None => {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
 
-      resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
-    } else {
-      val authority = s"${context.getPackageName}.provider"
-      val destinyFile = new File(DOWNLOAD_DIR, downloadedFile.getName)
-      FileProvider.getUriForFile(context, authority, destinyFile)
+          val contentValues = new ContentValues()
+          contentValues.put(MediaStore.MediaColumns.IS_PENDING, true)
+          contentValues.put(MediaStore.MediaColumns.DISPLAY_NAME, downloadedFile.getName)
+          contentValues.put(MediaStore.MediaColumns.MIME_TYPE, resolver.getType(android.net.Uri.fromFile(downloadedFile)))
+          contentValues.put(MediaStore.MediaColumns.SIZE, String.valueOf(downloadedFile.length()))
+
+          resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+        } else {
+          val authority = s"${context.getPackageName}.provider"
+          val destinyFile = new File(directory.map(uri => new File(uri.getPath)).getOrElse(DOWNLOAD_DIR), downloadedFile.getName)
+          FileProvider.getUriForFile(context, authority, destinyFile)
+        }
+      }
+      case Some(uri) => {
+        val triedUri = Try {
+          println("Got custom directory " + uri)
+          val dirFile: DocumentFile = DocumentFile.fromTreeUri(context, uri)
+          println("Can create files in directory: " ++ dirFile.canWrite.toString)
+          dirFile.listFiles.find(_.getName.equals(downloadedFile.getName)) match {
+            case Some(existingFile) =>
+              println("We found file to rewrite: " ++ existingFile.getUri.toString)
+              existingFile.getUri
+
+            case None =>
+              println("Creating new file")
+              DocumentsContract.createDocument(resolver, dirFile.getUri, "application/valet", downloadedFile.getName)
+          }
+        }
+        triedUri match {
+          case util.Failure(exception) => {
+            println(exception.getMessage)
+            exception.printStackTrace()
+          }
+          case _ => ()
+        }
+        triedUri.get
+      }
     }
+    println("Will write backup to: " ++ downloadedUri.toString)
 
-    val outputStream = resolver.openOutputStream(downloadedUri)
+    val outputStream = resolver.openOutputStream(downloadedUri, "wt")
     val brr = Array.ofDim[Byte](1024)
     var len: Int = 0
     val bufferedInputStream = new BufferedInputStream(new FileInputStream(downloadedFile.getAbsoluteFile))
@@ -90,7 +122,7 @@ object LocalBackup { me =>
     val cipherBytes = encryptBackup(ByteVector.view(Files toByteArray dataBaseFile), seed)
     val backupFile = getBackupFileUnsafe(context, chainHash, seed)
     atomicWrite(backupFile, cipherBytes)
-    copyFileToDownloads(context, backupFile)
+    copyFileToDirectory(context, WalletApp.customBackupLocation, backupFile)
   }
 
   // It is assumed that we try to decrypt a backup before running this and only proceed on success
