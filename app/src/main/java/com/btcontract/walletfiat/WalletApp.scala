@@ -14,7 +14,7 @@ import android.widget.{EditText, Toast}
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.multidex.MultiDex
 import BaseActivity.StringOps
-import com.btcontract.walletfiat.utils.{AwaitService, DelayedNotification, LocalBackup}
+import com.btcontract.walletfiat.utils.{AwaitService, LocalBackup}
 import com.btcontract.walletfiat.sqlite.DBInterfaceSQLiteAndroidMisc
 import com.btcontract.walletfiat.utils.DelayedNotification
 import com.btcontract.walletfiat.R.string._
@@ -120,7 +120,7 @@ object WalletApp {
     try LNParams.fiatRates.becomeShutDown catch none
     try LNParams.feeRates.becomeShutDown catch none
     try LNParams.cm.becomeShutDown catch none
-    // Make non-alive and non-operational
+    // Make non-alive and non-operational`
     LNParams.secret = null
     txDataBag = null
   }
