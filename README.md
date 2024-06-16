@@ -1,6 +1,6 @@
-**Valet** is a fork of [Simple Bitcoin Wallet (aka SBW)](https://github.com/btcontract/wallet).
+**Valet** is a fork of [Simple Bitcoin Wallet (aka SBW)](https://github.com/akumaigorodski/wallet).
 
-As the original it uses an [IMMORTAN](https://github.com/btcontract/IMMORTAN) library that allows
+As the original it uses an [IMMORTAN](https://github.com/standardsats/immortan) library that allows
 extensive Lightning Network support in addition to non-custodial Bitcoin wallet features in Android. 
 
 As much as SBW, it is fully autonomous and does not rely on any kind of centralized service 
@@ -11,12 +11,14 @@ for example US Dollar or Euro. This is technically achieved by assigning a speci
 channel and adding satoshis-denominated "rate" into fiat channel state 
 ([more...](https://github.com/standardsats/fiat-channels-rfc)).
 
-<a href="https://play.google.com/store/apps/details?id=com.btcontract.walletfiat"><img alt="Get it on Google Play" src="https://play.google.com/intl/en_us/badges/images/apps/en-play-badge.png" height="80pt"/></a>&nbsp;<a href="https://f-droid.org/repository/browse/?fdid=com.btcontract.wallet"><img alt="Get it on F-Droid" src="https://f-droid.org/wiki/images/5/55/F-Droid-button_get-it-on_bigger.png" height="80pt"/></a>
+<a href="https://play.google.com/store/apps/details?id=com.btcontract.walletfiat"><img alt="Get it on Google Play" src="https://play.google.com/intl/en_us/badges/images/apps/en-play-badge.png" height="80pt"/></a>
+
+Valet project [Roadmap](./ROADMAP.md)
 
 ## Building from source
 
 ```
-git clone https://github.com/standardsats/wallet.git
+git clone https://github.com/standardsats/valet.git
 cd wallet
 git checkout 4.1.1
 podman build -t valet .
@@ -72,3 +74,9 @@ Original SBW Project couldn't be done without LNBig support and A. Kumaigorodski
     </tr>
   </tbody>
 </table>
+
+### Donate
+
+There is permanent campaign going [on Geyser](https://geyser.fund/project/valetlightning) and
+[Tourniquet](https://tourniquet.app/donate/Valet) for supporting maintenance and development of
+this project.
