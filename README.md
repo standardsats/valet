@@ -13,7 +13,7 @@ channel and adding satoshis-denominated "rate" into fiat channel state
 
 <a href="https://play.google.com/store/apps/details?id=com.btcontract.walletfiat"><img alt="Get it on Google Play" src="https://play.google.com/intl/en_us/badges/images/apps/en-play-badge.png" height="80pt"/></a>
 
-Valet project [Roadmap](./ROADMAP.md)
+Valet project [Roadmap](./ROADMAP.md).
 
 ## Building from source
 
