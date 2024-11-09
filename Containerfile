@@ -26,4 +26,5 @@ FROM BUILD
 
 WORKDIR /app/valet/wallet/
 
+# add --stacktrace --info for debugging
 CMD ./gradlew assembleRelease && ./gradlew bundleRelease

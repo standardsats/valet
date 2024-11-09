@@ -1,4 +1,4 @@
-package com.btcontract.walletfiat
+package finance.valet
 
 import org.junit.{Ignore, Test}
 import immortan.{ClearnetConnectionProvider, LNParams, PureRoutingData, SyncMaster, SyncMasterShortIdData, SyncParams}

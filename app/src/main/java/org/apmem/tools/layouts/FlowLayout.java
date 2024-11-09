@@ -10,7 +10,7 @@ import android.view.View;
 import android.view.ViewDebug;
 import android.view.ViewGroup;
 
-import com.btcontract.walletfiat.R;
+import finance.valet.R;
 
 import org.apmem.tools.layouts.logic.CommonLogic;
 import org.apmem.tools.layouts.logic.ConfigDefinition;

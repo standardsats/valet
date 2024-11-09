@@ -44,7 +44,7 @@ import com.hootsuite.nachos.tokenizer.SpanChipTokenizer;
 import com.hootsuite.nachos.validator.ChipifyingNachoValidator;
 import com.hootsuite.nachos.validator.IllegalCharacterIdentifier;
 import com.hootsuite.nachos.validator.NachoValidator;
-import com.btcontract.walletfiat.R;
+import finance.valet.R;
 
 import java.util.ArrayList;
 import java.util.Arrays;

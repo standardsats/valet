@@ -1,14 +1,15 @@
 **Valet** is a fork of [Simple Bitcoin Wallet (aka SBW)](https://github.com/akumaigorodski/wallet).
 
-As the original it uses an [IMMORTAN](https://github.com/standardsats/immortan) library that allows
-extensive Lightning Network support in addition to non-custodial Bitcoin wallet features in Android. 
+As formerly the original, it uses an [IMMORTAN](https://github.com/standardsats/immortan) library
+that allows extensive Lightning Network support in addition to non-custodial Bitcoin wallet features
+in Android.
 
-As much as SBW, it is fully autonomous and does not rely on any kind of centralized service 
+As much as SBW, it is fully autonomous and does not rely on any kind of centralized service
 (such as Google services, routing servers, special LSP nodes etc). The destinctive feature of Valet
-as opposed to the original SBW is Fiat Channels support that replaces original Hosted Channels 
+as opposed to the original SBW is Fiat Channels support that replaces original Hosted Channels
 solution and allows users to have "Hosted" Channels capacities tied to value of some other assets
 for example US Dollar or Euro. This is technically achieved by assigning a special "ticker" to each
-channel and adding satoshis-denominated "rate" into fiat channel state 
+channel and adding satoshis-denominated "rate" into fiat channel state
 ([more...](https://github.com/standardsats/fiat-channels-rfc)).
 
 <a href="https://play.google.com/store/apps/details?id=com.btcontract.walletfiat"><img alt="Get it on Google Play" src="https://play.google.com/intl/en_us/badges/images/apps/en-play-badge.png" height="80pt"/></a>
@@ -20,7 +21,7 @@ Valet project [Roadmap](./ROADMAP.md).
 ```
 git clone https://github.com/standardsats/valet.git
 cd wallet
-git checkout 4.1.1
+git checkout 4.4.3
 podman build -t valet .
 podman run -v $PWD:/app/valet/wallet:z valet
 ```
@@ -30,15 +31,15 @@ podman run -v $PWD:/app/valet/wallet:z valet
 Install Android SDK, create a `keystore.jks` using `keytool`.
 
 ```
-$ <Android SDK dir>/build-tools/<version>/zipalign -v 4 app/build/outputs/apk/release/SBW-3.0.0.apk app/build/outputs/apk/release/SBW-3.0.0-aligned.apk
+$ <Android SDK dir>/build-tools/<version>/zipalign -v 4 app/build/outputs/apk/release/Valet-4.4.3.apk app/build/outputs/apk/release/Valet-4.4.3-aligned.apk
 
-$ <Android SDK dir>/build-tools/<version>/apksigner sign --ks <path to keystore.jks> --ks-key-alias <signing key alias> --v1-signing-enabled true --v2-signing-enabled true app/build/outputs/apk/release/SBW-3.0.0-aligned.apk
+$ <Android SDK dir>/build-tools/<version>/apksigner sign --ks <path to keystore.jks> --ks-key-alias <signing key alias> --v1-signing-enabled true --v2-signing-enabled true app/build/outputs/apk/release/Valet-4.4.3-aligned.apk
 ```
 
 ## Verification with `apksigner`
 
 ```
-$ '<Android SDK dir>/build-tools/<version>/apksigner' verify --print-certs --verbose SBW-3.0.0.apk
+$ '<Android SDK dir>/build-tools/<version>/apksigner' verify --print-certs --verbose Valet-4.4.3.apk
 ```
 
 Output should contain the following info:
@@ -61,7 +62,8 @@ Signer #1 public key MD5 digest: e4e1f847e0cb0a9703dc4f9323fd6d87
 
 ### Acknowledgements
 
-Original SBW Project couldn't be done without LNBig support and A. Kumaigorodski development efforts. 
+Original SBW Project couldn't be done without LNBig support
+and [A. Kumaigorodski](https://github.com/akumaigorodski) development efforts.
 
 <table>
   <tbody>
@@ -78,5 +80,5 @@ Original SBW Project couldn't be done without LNBig support and A. Kumaigorodski
 ### Donate
 
 There is permanent campaign going [on Geyser](https://geyser.fund/project/valetlightning) and
-[Tourniquet](https://tourniquet.app/donate/Valet) for supporting maintenance and development of
-this project.
+[Tourniquet](https://tourniquet.app/donate/Valet) for supporting maintenance and development of this
+project.
