@@ -3,7 +3,7 @@
 set -xe
 echo $PATH
 zipalign=~/Android/Sdk/build-tools/30.0.3/zipalign
-VERSION=4.4.1
+VERSION=4.4.3
 rm app/build/outputs/apk/release/Valet-$VERSION-aligned.apk || true
 $zipalign -v 4 app/build/outputs/apk/release/Valet-$VERSION.apk app/build/outputs/apk/release/Valet-$VERSION-aligned.apk
 apksigner sign --ks release.keystore --ks-key-alias release --v1-signing-enabled true --v2-signing-enabled true app/build/outputs/apk/release/Valet-$VERSION-aligned.apk
