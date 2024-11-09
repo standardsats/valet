@@ -13,3 +13,4 @@ build/
 build.sbt
 project/
 target/
+*.keystore
