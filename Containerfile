@@ -24,7 +24,7 @@ RUN cd /app/sdk/; \
 
 FROM BUILD
 
-WORKDIR /app/valet/wallet/
+WORKDIR /app/valet/
 
 # add --stacktrace --info for debugging
 CMD ./gradlew assembleRelease && ./gradlew bundleRelease

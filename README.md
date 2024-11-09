@@ -12,7 +12,7 @@ for example US Dollar or Euro. This is technically achieved by assigning a speci
 channel and adding satoshis-denominated "rate" into fiat channel state
 ([more...](https://github.com/standardsats/fiat-channels-rfc)).
 
-<a href="https://play.google.com/store/apps/details?id=com.btcontract.walletfiat"><img alt="Get it on Google Play" src="https://play.google.com/intl/en_us/badges/images/apps/en-play-badge.png" height="80pt"/></a>
+<a href="https://play.google.com/store/apps/details?id=finance.valet"><img alt="Get it on Google Play" src="https://play.google.com/intl/en_us/badges/images/apps/en-play-badge.png" height="80pt"/></a>
 
 Valet project [Roadmap](./ROADMAP.md).
 
@@ -20,10 +20,10 @@ Valet project [Roadmap](./ROADMAP.md).
 
 ```
 git clone https://github.com/standardsats/valet.git
-cd wallet
+cd valet
 git checkout 4.4.3
 podman build -t valet .
-podman run -v $PWD:/app/valet/wallet:z valet
+podman run -v $PWD:/app/valet:z valet
 ```
 
 ### Signing with your self-signed certificate

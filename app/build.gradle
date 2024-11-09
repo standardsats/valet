@@ -12,7 +12,7 @@ android {
 
     defaultConfig {
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
-        applicationId 'finance.walletfiat'
+        applicationId 'finance.valet'
         multiDexEnabled true
         targetSdkVersion 33
         minSdkVersion 21
