@@ -100,7 +100,7 @@ class EsploraFeeProvider(val url: String) extends FeeRatesProvider {
   // First we keep only fee ranges with a max block delay below the limit
   // out of all the remaining fee ranges, we select the one with the minimum higher bound
   def extractFeerate(structure: EsploraFeeStructure, maxBlockDelay: Int): FeeratePerKB = {
-    val belowLimit = structure.filterKeys(_.toInt <= maxBlockDelay).values
+    val belowLimit = structure.filter { case (key, _) => key.toInt <= maxBlockDelay }.values
     FeeratePerKB(belowLimit.min.sat * 1000L)
   }
 }
@@ -131,7 +131,7 @@ object BitgoFeeProvider extends FeeRatesProvider {
   // first we keep only fee ranges with a max block delay below the limit
   // out of all the remaining fee ranges, we select the one with the minimum higher bound
   def extractFeerate(structure: BitGoFeeRateStructure, maxBlockDelay: Int): FeeratePerKB = {
-    val belowLimit = structure.feeByBlockTarget.filterKeys(_.toInt <= maxBlockDelay).values
+    val belowLimit = structure.feeByBlockTarget.filter { case (key, _) => key.toInt <= maxBlockDelay }.values
     FeeratePerKB(belowLimit.min.sat)
   }
 }
