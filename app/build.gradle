@@ -17,7 +17,7 @@ android {
         targetSdkVersion 33
         minSdkVersion 21
 
-        versionName '4.4.3'
+        versionName '4.4.4'
         versionCode 105
     }
 

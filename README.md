@@ -21,7 +21,7 @@ Valet project [Roadmap](./ROADMAP.md).
 ```
 git clone https://github.com/standardsats/valet.git
 cd valet
-git checkout 4.4.3
+git checkout 4.4.4
 podman build -t valet .
 podman run -v $PWD:/app/valet:z valet
 ```
@@ -31,15 +31,15 @@ podman run -v $PWD:/app/valet:z valet
 Install Android SDK, create a `keystore.jks` using `keytool`.
 
 ```
-$ <Android SDK dir>/build-tools/<version>/zipalign -v 4 app/build/outputs/apk/release/Valet-4.4.3.apk app/build/outputs/apk/release/Valet-4.4.3-aligned.apk
+$ <Android SDK dir>/build-tools/<version>/zipalign -v 4 app/build/outputs/apk/release/Valet-4.4.4.apk app/build/outputs/apk/release/Valet-4.4.4-aligned.apk
 
-$ <Android SDK dir>/build-tools/<version>/apksigner sign --ks <path to keystore.jks> --ks-key-alias <signing key alias> --v1-signing-enabled true --v2-signing-enabled true app/build/outputs/apk/release/Valet-4.4.3-aligned.apk
+$ <Android SDK dir>/build-tools/<version>/apksigner sign --ks <path to keystore.jks> --ks-key-alias <signing key alias> --v1-signing-enabled true --v2-signing-enabled true app/build/outputs/apk/release/Valet-4.4.4-aligned.apk
 ```
 
 ## Verification with `apksigner`
 
 ```
-$ '<Android SDK dir>/build-tools/<version>/apksigner' verify --print-certs --verbose Valet-4.4.3.apk
+$ '<Android SDK dir>/build-tools/<version>/apksigner' verify --print-certs --verbose Valet-4.4.4.apk
 ```
 
 Output should contain the following info:

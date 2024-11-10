@@ -3,4 +3,4 @@
 echo "Devices"
 adb devices
 #adb -d uninstall finance.valet
-adb -d install -r ./app/build/outputs/apk/debug/Valet-4.4.3.apk
+adb -d install -r ./app/build/outputs/apk/debug/Valet-4.4.4.apk
