@@ -1,5 +1,0 @@
-That is fork of original SBW wallet that is modified to support synthetic stables based on hosted channels. You can read about them here: https://standardsats.github.io
-
-Besides that the wallet provides all original features of the SBW:
-- non custodial bitcoin storage
-- full Lightning node inside your phone

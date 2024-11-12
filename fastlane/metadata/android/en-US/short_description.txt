@@ -1,1 +1,0 @@
-The Bitcoin Lightning Wallet with synthetic assets

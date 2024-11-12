@@ -1,0 +1,6 @@
+Valet is a fork of the original SBW wallet, modified to support synthetic "stable sats" based on hosted channels. You can read more about stable sats on standardsats.github.io.
+
+In addition to this feature, the wallet retains all the original capabilities of SBW, including:
+
+Non-custodial Bitcoin storage
+A fully-featured Lightning node within your mobile device

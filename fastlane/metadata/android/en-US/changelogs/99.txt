@@ -1,5 +1,0 @@
-* The new client side currency Somali Shilling (SOS) that has dynamic exchange rate based on data from bitpay.com. As the other sources doesn't provide rates for SOS the privacy will be reduced a bit for users who selected the SOS currency. Other currencies are not affected.
-
-* The wallet now can request new rates when the user desires. You need to pick again the currency in settings menu to force the wallet to fetch new exchange rates. The old behavior fetched new rates only on periodic manner (each 30 minutes).
-
-* Android 12 fixes on launch.
