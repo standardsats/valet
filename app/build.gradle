@@ -6,6 +6,17 @@ task wrapper(type: Wrapper) {
 }
 
 android {
+    signingConfigs {
+        release {
+            if (System.getenv("SIGNING_KEY_ALIAS")) {
+                storeFile file(System.getenv("SIGNING_STORE_FILENAME"))
+                keyAlias System.getenv("SIGNING_KEY_ALIAS")
+                keyPassword System.getenv("SIGNING_KEY_PASSWORD")
+                storePassword System.getenv("SIGNING_STORE_PASSWORD")
+            }
+        }
+    }
+
     compileSdkVersion 33
     buildToolsVersion "30.0.3"
     ndkVersion '22.1.7171670'
@@ -19,6 +30,9 @@ android {
 
         versionName '4.4.4'
         versionCode 105
+        if (System.getenv("SIGNING_KEY_ALIAS")) {
+            signingConfig signingConfigs.release
+        }
     }
 
     dexOptions {
@@ -26,11 +40,13 @@ android {
     }
 
     buildTypes {
-        release {
+        debug {
+            shrinkResources false
             minifyEnabled false
             proguardFiles 'proguard-rules.pro'
         }
-        debug {
+        release {
+            shrinkResources false
             minifyEnabled false
             proguardFiles 'proguard-rules.pro'
         }

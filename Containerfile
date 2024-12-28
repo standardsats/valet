@@ -1,8 +1,11 @@
-FROM docker.io/debian:sid-slim as BUILD
+FROM registry.gitlab.com/fdroid/fdroidserver:buildserver-bookworm as BUILD
 
 RUN set -ex; \
     mkdir -p /usr/share/man/man1/; \
+    echo "deb https://deb.debian.org/debian bullseye main" > /etc/apt/sources.list.d/bullseye.list; \
     apt-get update; \
+    apt-get install -y -t bullseye openjdk-11-jdk-headless; \
+    update-java-alternatives --set java-1.11.0-openjdk-amd64; \
     apt-get install --yes --no-install-recommends openjdk-11-jdk git wget unzip; \
     rm -rf /var/lib/apt/lists/*; 
 
@@ -25,6 +28,7 @@ RUN cd /app/sdk/; \
 FROM BUILD
 
 WORKDIR /app/valet/
+COPY keystore-docker.jks /app/valet
 
 # add --stacktrace --info for debugging
 CMD ./gradlew assembleRelease && ./gradlew bundleRelease
