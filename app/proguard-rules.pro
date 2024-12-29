@@ -1,6 +1,9 @@
 -dontobfuscate
 -dontpreverify
 -ignorewarnings
+-dontnote
+-dontwarn
+-keepparameternames
 
 -dontwarn scala.**
 
