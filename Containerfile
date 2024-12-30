@@ -28,7 +28,6 @@ RUN cd /app/sdk/; \
 FROM BUILD
 
 WORKDIR /app/valet/
-COPY keystore-docker.jks /app/valet
 
 # add --stacktrace --info for debugging
-CMD ./gradlew assembleRelease && ./gradlew bundleRelease
+CMD export SOURCE_DATE_EPOCH=$(date +%s) && ./gradlew assembleRelease && ./gradlew bundleRelease

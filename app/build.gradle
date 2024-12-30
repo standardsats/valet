@@ -6,6 +6,10 @@ task wrapper(type: Wrapper) {
 }
 
 android {
+    buildOptions {
+        sourceDateEpoch = System.getenv('SOURCE_DATE_EPOCH')?.toLong() ?: 0
+    }
+
     signingConfigs {
         release {
             if (System.getenv("SIGNING_KEY_ALIAS")) {
@@ -54,8 +58,8 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_11
-        targetCompatibility JavaVersion.VERSION_11
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
     }
 
     applicationVariants.all { variant ->
@@ -65,8 +69,8 @@ android {
     }
 
     packagingOptions {
-        exclude 'META-INF/**'
-        exclude 'META-INF/services/java.security.Provider'
+        exclude '**/META-INF/**'
+        exclude '**/meta-inf/**'
     }
 }
 
