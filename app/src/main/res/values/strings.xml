@@ -310,6 +310,8 @@
     <string name="popup_hold">Hold up to %1$s minutes</string>
     <string name="popup_identity">Attach wallet identity</string>
 
+    <string name="confirm_ignoring_metadata_mismatch">&#9888; LNURL metadata hash mismatch</string>
+
     <!-- lnurl-auth -->
 
     <string name="lnurl_auth_register">Register</string>

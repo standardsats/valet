@@ -1734,10 +1734,25 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
       } map { rawResponse =>
         val payRequestFinal = to[PayRequestFinal](rawResponse)
         val descriptionHashOpt = payRequestFinal.prExt.pr.description.right.toOption
-        require(descriptionHashOpt.contains(data.metaDataHash), s"Metadata hash mismatch, original=${data.metaDataHash}, later provided=$descriptionHashOpt")
-        require(payRequestFinal.prExt.pr.amountOpt.contains(amount), s"Payment amount mismatch, requested by wallet=$amount, provided in invoice=${payRequestFinal.prExt.pr.amountOpt}")
-        payRequestFinal.modify(_.successAction.each.domain).setTo(data.callbackUri.getHost.asSome)
-      }
+
+        def continueLnurlFlow: PayRequestFinal = {
+          require(payRequestFinal.prExt.pr.amountOpt.contains(amount), s"Payment amount mismatch, requested by wallet=$amount, provided in invoice=${payRequestFinal.prExt.pr.amountOpt}")
+          payRequestFinal.modify(_.successAction.each.domain).setTo(data.callbackUri.getHost.asSome)
+        }
+
+        if (descriptionHashOpt.contains(data.metaDataHash)) continueLnurlFlow
+        else {
+          // Show warning when there is no metadata or mismatch takes place
+          // https://github.com/lnurl/luds/pull/234
+          UITask {
+            snack(contentWindow, getString(confirm_ignoring_metadata_mismatch).html, dialog_ok, _.dismiss) foreach { snackbar =>
+              // Optional: Add any additional snackbar handling here
+              snackbar.show()
+            }
+          }.run
+          continueLnurlFlow
+        }
+    }
 
       manager.updateText(minSendable)
       expectedIds.wantsAuth.foreach { expectedAuth =>

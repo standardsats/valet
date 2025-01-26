@@ -6,10 +6,6 @@ task wrapper(type: Wrapper) {
 }
 
 android {
-    buildOptions {
-        sourceDateEpoch = System.getenv('SOURCE_DATE_EPOCH')?.toLong() ?: 0
-    }
-
     signingConfigs {
         release {
             if (System.getenv("SIGNING_KEY_ALIAS")) {
@@ -64,7 +60,7 @@ android {
 
     applicationVariants.all { variant ->
         variant.outputs.all {
-            outputFileName = "Valet-${defaultConfig.versionName}.apk"
+            outputFileName = "finance.valet_${defaultConfig.versionCode}.apk"
         }
     }
 
@@ -127,4 +123,35 @@ tasks.withType(Jar).configureEach {
 tasks.withType(Jar).configureEach {
     outputs.upToDateWhen { false }
     from { files.sort() }
+}
+
+import java.util.zip.*
+
+task normalizeApkTimestamps {
+    doLast {
+        def sourceDateEpoch = System.getenv('SOURCE_DATE_EPOCH')?.toLong() ?: 0
+        def apkFile = file("${buildDir}/outputs/apk/release/finance.valet_105.apk")
+        def tempFile = file("${apkFile}.tmp")
+
+        new ZipOutputStream(new FileOutputStream(tempFile)).withCloseable { zos ->
+            new ZipFile(apkFile).withCloseable { zip ->
+                zip.entries().each { entry ->
+                    def newEntry = new ZipEntry(entry.name)
+                    newEntry.time = sourceDateEpoch * 1000
+                    zos.putNextEntry(newEntry)
+                    if (!entry.isDirectory()) {
+                        zos.write(zip.getInputStream(entry).bytes)
+                    }
+                    zos.closeEntry()
+                }
+            }
+        }
+
+        apkFile.delete()
+        tempFile.renameTo(apkFile)
+    }
+}
+
+tasks.matching { it.name.startsWith("assembleRelease") }.configureEach {
+    finalizedBy(normalizeApkTimestamps)
 }
