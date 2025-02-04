@@ -12,7 +12,14 @@ for example US Dollar or Euro. This is technically achieved by assigning a speci
 channel and adding satoshis-denominated "rate" into fiat channel state
 ([more...](https://github.com/standardsats/fiat-channels-rfc)).
 
-<a href="https://play.google.com/store/apps/details?id=finance.valet"><img alt="Get it on Google Play" src="https://play.google.com/intl/en_us/badges/images/apps/en-play-badge.png" height="80pt"/></a>
+[<img src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png"
+     alt="Get it on F-Droid"
+     height="80">](https://f-droid.org/packages/finance.valet/)
+[<img src="https://play.google.com/intl/en_us/badges/images/generic/en-play-badge.png"
+     alt="Get it on Google Play"
+     height="80">](https://play.google.com/store/apps/details?id=finance.valet)
+
+Or download the latest APK from the [Releases Section](https://github.com/standardsats/valet/releases/latest).
 
 Valet project [Roadmap](./ROADMAP.md).
 
