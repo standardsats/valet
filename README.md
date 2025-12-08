@@ -15,9 +15,6 @@ channel and adding satoshis-denominated "rate" into fiat channel state
 [<img src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png"
      alt="Get it on F-Droid"
      height="80">](https://f-droid.org/packages/finance.valet/)
-[<img src="https://play.google.com/intl/en_us/badges/images/generic/en-play-badge.png"
-     alt="Get it on Google Play"
-     height="80">](https://play.google.com/store/apps/details?id=finance.valet)
 
 Or download the latest APK from the [Releases Section](https://github.com/standardsats/valet/releases/latest).
 
