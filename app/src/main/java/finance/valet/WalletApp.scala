@@ -15,6 +15,7 @@ import androidx.appcompat.app.AppCompatDelegate
 import androidx.multidex.MultiDex
 import BaseActivity.StringOps
 import finance.valet.utils.{AwaitService, LocalBackup}
+import finance.valet.nwc.{NWCDatabase, NWCManager}
 import finance.valet.sqlite.DBInterfaceSQLiteAndroidMisc
 import finance.valet.utils.DelayedNotification
 import finance.valet.R.string._
@@ -52,6 +53,7 @@ object WalletApp {
   var lnUrlPayBag: SQLiteLNUrlPay = _
   var txDataBag: SQLiteTx = _
   var app: WalletApp = _
+  var nwcManager: NWCManager = _
 
   val txDescriptions = mutable.Map.empty[ByteVector32, TxDescription]
   var currentChainNode: Option[InetSocketAddress] = None
@@ -313,6 +315,11 @@ object WalletApp {
       val fiatObs = Rx.initDelay(fiatRepeat, LNParams.fiatRates.info.stamp, fiatPeriodSecs * 1000L)
       fiatObs.foreach(LNParams.fiatRates.updateInfo, none)
     }
+
+    // Initialize NWC Manager and start all connections
+    val nwcDb = NWCDatabase.init(app)
+    nwcManager = new NWCManager(nwcDb)
+    nwcManager.startAll()
   }
 
   def vulnerableChannelsExist: Boolean = LNParams.cm.allNormal.flatMap(Channel.chanAndCommitsOpt).exists {
