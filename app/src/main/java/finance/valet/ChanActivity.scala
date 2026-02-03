@@ -1,6 +1,7 @@
 package finance.valet
 
 import java.util.{Date, Timer, TimerTask}
+import android.content.pm.PackageManager
 import android.graphics.{Bitmap, BitmapFactory}
 import android.os.Bundle
 import android.text.Spanned
@@ -77,7 +78,8 @@ class ChanActivity extends ChanErrorHandlerActivity with ChoiceReceiver with Has
         case (ChanAndCommits(chan: ChannelHosted, hc: HostedCommits), view: HostedViewHolder) => view.fill(chan, hc)
         case (ChanAndCommits(chan: ChannelHosted, hc: HostedCommits), _) =>
           val hview = new HostedViewHolder(card).fill(chan, hc)
-          hview.queryRates(chan)
+          // Only query rates for Fiat channels, not standard Hosted Channels
+          if (!hc.isStandardHostedChannel) hview.queryRates(chan)
           hview
         case (ChanAndCommits(chan: ChannelNormal, commits: NormalCommits), view: NormalViewHolder) => view.fill(chan, commits)
         case (ChanAndCommits(chan: ChannelNormal, commits: NormalCommits), _) => new NormalViewHolder(card).fill(chan, commits)
@@ -269,13 +271,17 @@ class ChanActivity extends ChanErrorHandlerActivity with ChoiceReceiver with Has
       baseBar.setSecondaryProgress(barCanSend + barCanReceive)
       baseBar.setProgress(barCanSend)
 
-      setVis(isVisible = true, serverRateText)
-//      setVis(isVisible = true, rateText)
-      setVis(isVisible = true, fiatText)
+      // For standard Hosted Channels (SAT), hide fiat-related UI elements
+      val isFiatChannel = !hc.isStandardHostedChannel
+      setVis(isVisible = isFiatChannel, serverRateText)
+//      setVis(isVisible = isFiatChannel, rateText)
+      setVis(isVisible = isFiatChannel, fiatText)
 //      setVis(isVisible = true, reserveText)
-      serverRateText.setText(fiatOrNothing(serverRate, cardIn,s"${ticker.tag}/BTC").html)
-//      rateText.setText(fiatOrNothing(rate, cardIn,s"${ticker.tag}/BTC").html)
-      fiatText.setText(fiatOrNothing(hc.fiatValue, cardIn, ticker.tag).html)
+      if (isFiatChannel) {
+        serverRateText.setText(fiatOrNothing(serverRate, cardIn,s"${ticker.tag}/BTC").html)
+//        rateText.setText(fiatOrNothing(rate, cardIn,s"${ticker.tag}/BTC").html)
+        fiatText.setText(fiatOrNothing(hc.fiatValue, cardIn, ticker.tag).html)
+      }
 
       totalCapacityText.setText(sumOrNothing(capacity, cardIn).html)
       canReceiveText.setText(sumOrNothing(hc.availableForReceive, cardOut).html)
@@ -458,13 +464,33 @@ class ChanActivity extends ChanErrorHandlerActivity with ChoiceReceiver with Has
       title.backArrow.setVisibility(View.VISIBLE)
       chanList.addHeaderView(title.view)
 
-      val footer = new TitleView(me getString chan_open)
-      addFlowChip(footer.flow, getString(chan_open_scan), R.drawable.border_blue, _ => scanNodeQr)
-      if (LNParams.isMainnet) addFlowChip(footer.flow, getString(chan_open_lnbig), R.drawable.border_blue, _ => me browse "https://lnbig.com/#/open-channel")
-      if (LNParams.isMainnet) addFlowChip(footer.flow, getString(chan_open_bitrefill), R.drawable.border_blue, _ => me browse "https://www.bitrefill.com/buy/lightning-channel")
-      if (LNParams.isMainnet && LNParams.cm.allHostedCommits.isEmpty) addFlowChip(footer.flow, getString(rpa_request_hc_usd), R.drawable.border_yellow, _ => requestHostedChannel)
-      addFlowChip(footer.flow, getString(rpa_request_ln_resync), R.drawable.border_blue, _ => LNParams.cm.pf process PathFinder.CMDForceResync)
-      chanList.addFooterView(footer.view)
+      // Channel footer with vertical buttons
+      val footerView = getLayoutInflater.inflate(R.layout.frag_chan_footer, null).asInstanceOf[LinearLayout]
+      footerView.findViewById(R.id.footerTitle).asInstanceOf[TextView].setText(me getString chan_open)
+
+      val btnScanNodeQr = footerView.findViewById(R.id.btnScanNodeQr).asInstanceOf[NoboButton]
+      btnScanNodeQr.setOnClickListener(me onButtonTap scanNodeQr)
+
+      val btnLnbig = footerView.findViewById(R.id.btnLnbig).asInstanceOf[NoboButton]
+      val btnBitrefill = footerView.findViewById(R.id.btnBitrefill).asInstanceOf[NoboButton]
+      val btnFiatChannelUsd = footerView.findViewById(R.id.btnFiatChannelUsd).asInstanceOf[NoboButton]
+      val btnLnResync = footerView.findViewById(R.id.btnLnResync).asInstanceOf[NoboButton]
+
+      if (LNParams.isMainnet) {
+        btnLnbig.setVisibility(View.VISIBLE)
+        btnLnbig.setOnClickListener(me onButtonTap { me browse "https://lnbig.com/#/open-channel" })
+
+        btnBitrefill.setVisibility(View.VISIBLE)
+        btnBitrefill.setOnClickListener(me onButtonTap { me browse "https://www.bitrefill.com/buy/lightning-channel" })
+
+        if (LNParams.cm.allHostedCommits.isEmpty) {
+          btnFiatChannelUsd.setVisibility(View.VISIBLE)
+          btnFiatChannelUsd.setOnClickListener(me onButtonTap requestHostedChannel)
+        }
+      }
+
+      btnLnResync.setOnClickListener(me onButtonTap { LNParams.cm.pf process PathFinder.CMDForceResync })
+      chanList.addFooterView(footerView)
       chanList.setAdapter(chanAdapter)
       chanList.setDividerHeight(0)
       chanList.setDivider(null)
@@ -482,6 +508,12 @@ class ChanActivity extends ChanErrorHandlerActivity with ChoiceReceiver with Has
   private def requestHostedChannel: Unit = {
     HubActivity.requestHostedChannel(USD_TICKER)
     finish
+  }
+
+  type GrantResults = Array[Int]
+
+  override def onRequestPermissionsResult(reqCode: Int, permissions: Array[String], results: GrantResults): Unit = {
+    if (reqCode == scannerRequestCode && results.nonEmpty && results.head == PackageManager.PERMISSION_GRANTED) scanNodeQr
   }
 
   private def getBrandingInfos = for {

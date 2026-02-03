@@ -17,12 +17,11 @@ import fr.acinq.eclair.blockchain.fee.{FeeratePerByte, FeeratePerKw}
 import fr.acinq.eclair.channel.{Commitments, DATA_WAIT_FOR_FUNDING_CONFIRMED, DATA_WAIT_FOR_FUNDING_INTERNAL}
 import fr.acinq.eclair.transactions.Scripts
 import fr.acinq.eclair.wire._
-import immortan.Ticker.{EUR_TICKER, USD_TICKER}
+import immortan.Ticker.{EUR_TICKER, SAT_TICKER, USD_TICKER}
 import immortan._
 import immortan.crypto.Tools._
 import immortan.fsm.{HCOpenHandler, NCFundeeOpenHandler, NCFunderOpenHandler}
 import immortan.utils._
-import org.apmem.tools.layouts.FlowLayout
 import rx.lang.scala.Observable
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -48,14 +47,22 @@ object RemotePeerActivity {
 }
 
 class RemotePeerActivity extends ChanErrorHandlerActivity with ExternalDataChecker { me =>
+  private[this] lazy val peerNodeAlias = findViewById(R.id.peerNodeAlias).asInstanceOf[TextView]
   private[this] lazy val peerNodeKey = findViewById(R.id.peerNodeKey).asInstanceOf[TextView]
   private[this] lazy val peerIpAddress = findViewById(R.id.peerIpAddress).asInstanceOf[TextView]
+  private[this] lazy val shareNodeId = findViewById(R.id.shareNodeId).asInstanceOf[TextView]
 
-  private[this] lazy val featuresList = findViewById(R.id.featuresList).asInstanceOf[FlowLayout]
+  private[this] lazy val featuresList = findViewById(R.id.featuresList).asInstanceOf[android.widget.GridLayout]
+  private[this] lazy val featuresLabel = findViewById(R.id.featuresLabel).asInstanceOf[TextView]
   private[this] lazy val viewNoFeatureSupport = findViewById(R.id.viewNoFeatureSupport).asInstanceOf[TextView]
   private[this] lazy val viewYesFeatureSupport = findViewById(R.id.viewYesFeatureSupport).asInstanceOf[LinearLayout]
   private[this] lazy val optionHostedChannelUsd = findViewById(R.id.optionHostedChannelUsd).asInstanceOf[NoboButton]
   private[this] lazy val optionHostedChannelEur = findViewById(R.id.optionHostedChannelEur).asInstanceOf[NoboButton]
+  private[this] lazy val optionHostedChannelSat = findViewById(R.id.optionHostedChannelSat).asInstanceOf[NoboButton]
+
+  private[this] lazy val nodeDetailsToggle = findViewById(R.id.nodeDetailsToggle).asInstanceOf[TextView]
+  private[this] lazy val nodeDetailsContent = findViewById(R.id.nodeDetailsContent).asInstanceOf[LinearLayout]
+  private[this] var nodeDetailsExpanded = false
 
   private[this] lazy val criticalFeatures = Set(BasicMultiPartPayment, DataLossProtect, StaticRemoteKey)
 
@@ -120,11 +127,14 @@ class RemotePeerActivity extends ChanErrorHandlerActivity with ExternalDataCheck
       setVis(isVisible = !criticalSupportAvailable, viewNoFeatureSupport)
       setVis(isVisible = theirInitSupports(HostedChannels), optionHostedChannelUsd)
       setVis(isVisible = theirInitSupports(HostedChannels), optionHostedChannelEur)
+      setVis(isVisible = theirInitSupports(HostedChannels), optionHostedChannelSat)
       setVis(isVisible = true, featuresList)
+      setVis(isVisible = true, featuresLabel)
     }.run
   }
 
   def activateInfo(info: HasRemoteInfo): Unit = {
+    peerNodeAlias.setText(info.remoteInfo.alias)
     peerNodeKey.setText(info.remoteInfo.nodeId.toString.take(16).humanFour)
     peerIpAddress.setText(info.remoteInfo.address.toString)
     hasInfo = info
@@ -149,6 +159,14 @@ class RemotePeerActivity extends ChanErrorHandlerActivity with ExternalDataCheck
 
   override def PROCEED(state: Bundle): Unit = {
     setContentView(R.layout.activity_remote_peer)
+    // Set up the Share Node ID text with "Share" highlighted
+    val shareText = getString(R.string.rpa_share_node_id_btn) + " " + getString(R.string.rpa_share_node_id_suffix)
+    val spannable = new android.text.SpannableString(shareText)
+    val shareWord = getString(R.string.rpa_share_node_id_btn)
+    spannable.setSpan(new android.text.style.StyleSpan(android.graphics.Typeface.BOLD), 0, shareWord.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+    spannable.setSpan(new android.text.style.UnderlineSpan(), 0, shareWord.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+    spannable.setSpan(new android.text.style.ForegroundColorSpan(getResources.getColor(R.color.colorAccent)), 0, shareWord.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+    shareNodeId.setText(spannable)
     checkExternalData(whenBackPressed)
   }
 
@@ -271,16 +289,33 @@ class RemotePeerActivity extends ChanErrorHandlerActivity with ExternalDataCheck
 
   def sharePeerSpecificNodeId(view: View): Unit = share(hasInfo.remoteInfo.nodeSpecificPubKey.toString)
 
+  def toggleNodeDetails(view: View): Unit = {
+    nodeDetailsExpanded = !nodeDetailsExpanded
+    if (nodeDetailsExpanded) {
+      nodeDetailsContent.setVisibility(View.VISIBLE)
+      nodeDetailsToggle.setText(R.string.rpa_node_details_hide)
+      nodeDetailsToggle.setCompoundDrawablesWithIntrinsicBounds(0, 0, android.R.drawable.arrow_up_float, 0)
+    } else {
+      nodeDetailsContent.setVisibility(View.GONE)
+      nodeDetailsToggle.setText(R.string.rpa_node_details_show)
+      nodeDetailsToggle.setCompoundDrawablesWithIntrinsicBounds(0, 0, android.R.drawable.arrow_down_float, 0)
+    }
+  }
+
   def requestHostedChannelUsd(view: View): Unit = askHostedChannel(randomBytes32, USD_TICKER)
   def requestHostedChannelEur(view: View): Unit = askHostedChannel(randomBytes32, EUR_TICKER)
+  def requestHostedChannelSat(view: View): Unit = askHostedChannel(randomBytes32, SAT_TICKER)
 
   def askHostedChannel(secret: ByteVector32, ticker: Ticker): Unit = {
     val title = ticker match {
       case USD() => rpa_request_hc_usd
       case EUR() => rpa_request_hc_eur
-      case _ => rpa_request_hc_eur
+      case SAT() => rpa_request_hc_sat
+      case _ => rpa_request_hc_sat
     }
-    val builder = new AlertDialog.Builder(me).setTitle(title).setMessage(getString(rpa_hc_warn).html)
+    // Show different warning for standard HC (SAT) vs Fiat channels
+    val warningMsg = if (Ticker.isHostedChannel(ticker)) getString(rpa_hc_sat_warn) else getString(rpa_hc_warn)
+    val builder = new AlertDialog.Builder(me).setTitle(title).setMessage(warningMsg.html)
     mkCheckForm(doAskHostedChannel, none, builder, dialog_ok, dialog_cancel)
 
     def doAskHostedChannel(alert: AlertDialog): Unit = {

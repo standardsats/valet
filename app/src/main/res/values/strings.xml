@@ -217,15 +217,24 @@
     <!-- Remote peer activity -->
 
     <string name="rpa_title">Remote peer connection</string>
+    <string name="rpa_node_key_label">Node Key</string>
+    <string name="rpa_node_ip_label">Node IP</string>
+    <string name="rpa_features_label">Supported Features</string>
     <string name="rpa_disconnected">Remote peer disconnected</string>
     <string name="rpa_no_feature_support">Can not open channels with this node since some important features are not supported by remote peer.</string>
     <string name="rpa_hc_warn"><![CDATA[<br><b>Attention!</b><br><br>Your hosted channel funds will be stored on a host side, make sure you trust this peer to not exit scam. <br><br> Your balance will be tight to the fiat balance and the amount in sats will be floating. ]]></string>
     <string name="rpa_request_channel">Share your node ID with remote peer and keep this page open to get an incoming channel.</string>
-    <string name="rpa_request_hc_usd">Request USD fiat channel</string>
-    <string name="rpa_request_hc_eur">Request EUR fiat channel</string>
+    <string name="rpa_request_hc_usd">Fiat Channel (USD)</string>
+    <string name="rpa_request_hc_eur">Fiat Channel (EUR)</string>
+    <string name="rpa_request_hc_sat">Hosted Channel (SAT)</string>
+    <string name="rpa_hc_sat_warn"><![CDATA[<br><b>Attention!</b><br><br>Your hosted channel funds will be stored on a host side, make sure you trust this peer to not exit scam. <br><br> Unlike fiat channels, this is a standard hosted channel denominated in satoshis. ]]></string>
     <string name="rpa_request_ln_resync">Request LN graph resync</string>
     <string name="rpa_share_node_id">Share node ID</string>
-    <string name="rpa_open_nc">Fund new channel</string>
+    <string name="rpa_share_node_id_btn">Share</string>
+    <string name="rpa_share_node_id_suffix">your Node ID with the peer to receive a channel</string>
+    <string name="rpa_node_details_show">Node Details</string>
+    <string name="rpa_node_details_hide">Hide Details</string>
+    <string name="rpa_open_nc">Normal Channel</string>
 
     <!-- /Remote peer activity -->
 

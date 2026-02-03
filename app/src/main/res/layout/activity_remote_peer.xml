@@ -14,82 +14,149 @@
             android:text="@string/rpa_title"
             android:textSize="@dimen/header_size"/>
 
+        <!-- Node Alias (name) - prominently displayed -->
         <TextView
             style="@style/BoundedView"
-            android:id="@+id/peerNodeKey"
+            android:id="@+id/peerNodeAlias"
             android:layout_marginTop="15dp"
-            android:layout_marginBottom="15dp"
+            android:textSize="18sp"
+            android:textStyle="bold"
             android:textColor="@color/colorAccent"/>
+
+        <!-- Share Node ID for incoming channels -->
+        <TextView
+            android:id="@+id/shareNodeId"
+            style="@style/BoundedView"
+            android:layout_marginTop="20dp"
+            android:textSize="15sp"
+            android:onClick="sharePeerSpecificNodeId"
+            android:clickable="true"
+            android:focusable="true"/>
 
         <TextView
             style="@style/BoundedView"
-            android:id="@+id/peerIpAddress"
-            android:textColor="@color/colorAccent"/>
-
-        <!-- Features and actions -->
-
-        <org.apmem.tools.layouts.FlowLayout
-            android:layout_marginBottom="5dp"
-            android:layout_marginTop="25dp"
-            android:id="@+id/featuresList"
-            style="@style/BoundedView"
-            android:visibility="gone"
-            f:layout_newLine="true">
-
-            <TextView style="@style/ChipTextGrayMargin" android:id="@+id/ChannelRangeQueriesExtended"/>
-            <TextView style="@style/ChipTextGrayMargin" android:id="@+id/OptionDataLossProtect"/>
-            <TextView style="@style/ChipTextGrayMargin" android:id="@+id/BasicMultiPartPayment"/>
-            <TextView style="@style/ChipTextGrayMargin" android:id="@+id/StaticRemoteKey"/>
-            <TextView style="@style/ChipTextGrayMargin" android:id="@+id/HostedChannels"/>
-            <TextView style="@style/ChipTextGrayMargin" android:id="@+id/ChainSwap"/>
-            <TextView style="@style/ChipTextGrayMargin" android:id="@+id/Wumbo"/>
-        </org.apmem.tools.layouts.FlowLayout>
-
-        <TextView
-            style="@style/BoundedView"
-            android:layout_marginTop="25dp"
+            android:layout_marginTop="20dp"
             android:text="@string/rpa_no_feature_support"
             android:id="@+id/viewNoFeatureSupport"
             android:visibility="gone"/>
 
-        <!-- Actions -->
+        <!-- Action Buttons -->
 
         <LinearLayout
             android:visibility="gone"
             android:id="@+id/viewYesFeatureSupport"
             style="@style/StandardLinearLayout">
 
+            <!-- Normal (on-chain funded) Channel -->
             <com.ornach.nobobutton.NoboButton
                 app:nb_text="@string/rpa_open_nc"
                 android:onClick="fundNewChannel"
-                android:layout_marginTop="25dp"
+                android:layout_marginTop="20dp"
                 style="@style/GreenButton"/>
 
-            <TextView
-                style="@style/BoundedView"
-                android:layout_marginTop="25dp"
-                android:text="@string/rpa_request_channel"/>
-
+            <!-- Hosted Channel (SAT) -->
             <com.ornach.nobobutton.NoboButton
-                android:layout_marginTop="@dimen/chip_default_padding_edge"
-                android:onClick="sharePeerSpecificNodeId"
-                app:nb_text="@string/rpa_share_node_id"
+                app:nb_text="@string/rpa_request_hc_sat"
+                android:id="@+id/optionHostedChannelSat"
+                android:layout_marginTop="12dp"
+                android:onClick="requestHostedChannelSat"
                 style="@style/GrayButton"/>
 
+            <!-- Fiat Channel (USD) -->
             <com.ornach.nobobutton.NoboButton
                 app:nb_text="@string/rpa_request_hc_usd"
                 android:id="@+id/optionHostedChannelUsd"
-                android:layout_marginTop="@dimen/large_button_margin"
+                android:layout_marginTop="12dp"
                 android:onClick="requestHostedChannelUsd"
                 style="@style/GrayButton"/>
 
+            <!-- Fiat Channel (EUR) -->
             <com.ornach.nobobutton.NoboButton
                 app:nb_text="@string/rpa_request_hc_eur"
                 android:id="@+id/optionHostedChannelEur"
-                android:layout_marginTop="@dimen/large_button_margin"
+                android:layout_marginTop="12dp"
                 android:onClick="requestHostedChannelEur"
                 style="@style/GrayButton"/>
 
         </LinearLayout>
+
+        <!-- Collapsible Node Details Section -->
+        <TextView
+            android:id="@+id/nodeDetailsToggle"
+            style="@style/BoundedView"
+            android:layout_marginTop="30dp"
+            android:text="@string/rpa_node_details_show"
+            android:textColor="@color/colorAccent"
+            android:textSize="16sp"
+            android:onClick="toggleNodeDetails"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?android:attr/selectableItemBackground"
+            android:drawableEnd="@android:drawable/arrow_down_float"/>
+
+        <LinearLayout
+            android:id="@+id/nodeDetailsContent"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <!-- Node Key -->
+            <TextView
+                style="@style/BoundedView"
+                android:text="@string/rpa_node_key_label"
+                android:layout_marginTop="15dp"
+                android:textSize="12sp"/>
+
+            <TextView
+                style="@style/BoundedView"
+                android:id="@+id/peerNodeKey"
+                android:layout_marginTop="4dp"
+                android:textColor="@color/colorAccent"/>
+
+            <!-- Node IP -->
+            <TextView
+                style="@style/BoundedView"
+                android:text="@string/rpa_node_ip_label"
+                android:layout_marginTop="15dp"
+                android:textSize="12sp"/>
+
+            <TextView
+                style="@style/BoundedView"
+                android:id="@+id/peerIpAddress"
+                android:layout_marginTop="4dp"
+                android:textColor="@color/colorAccent"/>
+
+            <!-- Supported Features -->
+            <TextView
+                style="@style/BoundedView"
+                android:text="@string/rpa_features_label"
+                android:layout_marginTop="20dp"
+                android:textSize="12sp"
+                android:id="@+id/featuresLabel"
+                android:visibility="gone"/>
+
+            <GridLayout
+                android:layout_marginTop="10dp"
+                android:id="@+id/featuresList"
+                android:columnCount="2"
+                android:alignmentMode="alignBounds"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:visibility="gone">
+
+                <!-- Alphabetical by display name: Chain Swap, Data Loss Protect, Direct Refund, Fast Graph Sync, Hosted Channels, Large Channels, Multi Payment -->
+                <TextView style="@style/ChipTextGrayMargin" android:id="@+id/ChainSwap"/>
+                <TextView style="@style/ChipTextGrayMargin" android:id="@+id/OptionDataLossProtect"/>
+                <TextView style="@style/ChipTextGrayMargin" android:id="@+id/StaticRemoteKey"/>
+                <TextView style="@style/ChipTextGrayMargin" android:id="@+id/ChannelRangeQueriesExtended"/>
+                <TextView style="@style/ChipTextGrayMargin" android:id="@+id/HostedChannels"/>
+                <TextView style="@style/ChipTextGrayMargin" android:id="@+id/Wumbo"/>
+                <TextView style="@style/ChipTextGrayMargin" android:id="@+id/BasicMultiPartPayment"/>
+
+            </GridLayout>
+
+        </LinearLayout>
+
     </LinearLayout>
 </ScrollView>
