@@ -849,19 +849,24 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
 
     val usdCard: CardView = view.findViewById(R.id.usdCard).asInstanceOf[CardView]
     val eurCard: CardView = view.findViewById(R.id.eurCard).asInstanceOf[CardView]
+    val satCard: CardView = view.findViewById(R.id.satCard).asInstanceOf[CardView]
 
     val totalLightningBalance: TextView = view.findViewById(R.id.totalLightningBalance).asInstanceOf[TextView]
     val totalUsdBalance: TextView = view.findViewById(R.id.totalUsdBalance).asInstanceOf[TextView]
     val totalEurBalance: TextView = view.findViewById(R.id.totalEurBalance).asInstanceOf[TextView]
+    val totalSatBalance: TextView = view.findViewById(R.id.totalSatBalance).asInstanceOf[TextView]
     val channelStateIndicators: RelativeLayout = view.findViewById(R.id.channelStateIndicators).asInstanceOf[RelativeLayout]
     val channelStateIndicatorsUsd: RelativeLayout = view.findViewById(R.id.channelStateIndicatorsUsd).asInstanceOf[RelativeLayout]
     val channelStateIndicatorsEur: RelativeLayout = view.findViewById(R.id.channelStateIndicatorsEur).asInstanceOf[RelativeLayout]
+    val channelStateIndicatorsSat: RelativeLayout = view.findViewById(R.id.channelStateIndicatorsSat).asInstanceOf[RelativeLayout]
     val channelIndicator: ChannelIndicatorLine = view.findViewById(R.id.channelIndicator).asInstanceOf[ChannelIndicatorLine]
     val channelIndicatorUsd: ChannelIndicatorLine = view.findViewById(R.id.channelIndicatorUsd).asInstanceOf[ChannelIndicatorLine]
     val channelIndicatorEur: ChannelIndicatorLine = view.findViewById(R.id.channelIndicatorEur).asInstanceOf[ChannelIndicatorLine]
+    val channelIndicatorSat: ChannelIndicatorLine = view.findViewById(R.id.channelIndicatorSat).asInstanceOf[ChannelIndicatorLine]
     val lnBalanceFiat: TextView = view.findViewById(R.id.lnBalanceFiat).asInstanceOf[TextView]
     val lnBalanceFiatUsd: TextView = view.findViewById(R.id.lnBalanceFiatUsd).asInstanceOf[TextView]
     val lnBalanceFiatEur: TextView = view.findViewById(R.id.lnBalanceFiatEur).asInstanceOf[TextView]
+    val lnBalanceSat: TextView = view.findViewById(R.id.lnBalanceSat).asInstanceOf[TextView]
 
     val inFlightIncoming: TextView = view.findViewById(R.id.inFlightIncoming).asInstanceOf[TextView]
     val inFlightOutgoing: TextView = view.findViewById(R.id.inFlightOutgoing).asInstanceOf[TextView]
@@ -926,12 +931,14 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
       val allChannels = LNParams.cm.allBtc.values.take(8)
       val usdChannels = LNParams.cm.fiatUsd.values.take(8)
       val eurChannels = LNParams.cm.fiatEur.values.take(8)
+      val satChannels = LNParams.cm.standardHostedChannels.values.take(8)
 
       val lnBalance = Channel.totalBalance(LNParams.cm.allBtc.values.map(_._1))
       val lnBalanceUsd = LNParams.cm.fiatUsd.values.map(_._2.fiatValue).sum
       val lnBalanceUsdSats = LNParams.cm.fiatUsd.values.map(_._1.data.ourBalance).sum
       val lnBalanceEur = LNParams.cm.fiatEur.values.map(_._2.fiatValue).sum
       val lnBalanceEurSats = LNParams.cm.fiatEur.values.map(_._1.data.ourBalance).sum
+      val lnBalanceSatSats = LNParams.cm.standardHostedChannels.values.map(_._1.data.ourBalance).sum
 
       val localInCount = LNParams.cm.inProcessors.count { case (fullTag, _) => fullTag.tag == PaymentTagTlv.FINAL_INCOMING }
       val trampolineCount = LNParams.cm.inProcessors.count { case (fullTag, _) => fullTag.tag == PaymentTagTlv.TRAMPLOINE_ROUTED }
@@ -960,11 +967,17 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
       lnBalanceFiatEur.setText(WalletApp currentMsatInFiatHuman lnBalanceEurSats)
       channelIndicatorEur.createIndicators(eurChannels.map(_._1).toArray)
 
+      // SAT Hosted channel
+      totalSatBalance.setText(WalletApp.denom.parsedWithSign(lnBalanceSatSats, cardIn, lnCardZero).html)
+      lnBalanceSat.setText(WalletApp currentMsatInFiatHuman lnBalanceSatSats)
+      channelIndicatorSat.createIndicators(satChannels.map(_._1).toArray)
+
       setVisMany(allChannels.nonEmpty -> channelStateIndicators,
         allChannels.nonEmpty -> totalLightningBalance,
         allChannels.isEmpty -> addChannelTip,
         usdChannels.nonEmpty -> usdCard,
-        eurChannels.nonEmpty -> eurCard)
+        eurChannels.nonEmpty -> eurCard,
+        satChannels.nonEmpty -> satCard)
 
       // We have updated chain wallet balances at this point because listener in WalletApp gets called first
       chainCards.update(LNParams.chainWallets.wallets)

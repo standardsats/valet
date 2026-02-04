@@ -441,6 +441,7 @@
     <string name="fiat_wallet">Fiat</string>
     <string name="fiat_wallet_usd">USD</string>
     <string name="fiat_wallet_eur">EUR</string>
+    <string name="hosted_wallet_sat">Hosted</string>
     <!-- /CPFP/RBF -->
 
 </resources>

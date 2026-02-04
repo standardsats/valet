@@ -164,7 +164,8 @@ abstract class ChannelHosted extends Channel { me =>
     case (hc: HostedCommits, remoteSU: StateUpdate, OPEN) if (remoteSU.localSigOfRemoteLCSS != hc.lastCrossSignedState.remoteSigOfLocal) && hc.error.isEmpty =>
       attemptStateUpdate(remoteSU, hc)
 
-    case (hc: HostedCommits, msg: ReplyCurrentRate, OPEN) =>
+    case (hc: HostedCommits, msg: ReplyCurrentRate, OPEN) if !hc.isStandardHostedChannel =>
+      // Only process rate updates for Fiat channels, not standard Hosted Channels
       println(s"Got new server rate ${msg.rate}")
       val hc1 = hc.copy(currentHostRate = msg.rate)
       STORE(hc1)
@@ -182,7 +183,8 @@ abstract class ChannelHosted extends Channel { me =>
 //      println(s"Got poposal with description ${msg.description} and invoice: ${msg.invoice}")
 //      for (lst <- externalPaymentListeners) lst.onPaymentRequest(msg.description, msg.invoice)
 
-    case (hc: HostedCommits, CMD_HOSTED_QUERY_RATE(), OPEN) =>
+    case (hc: HostedCommits, CMD_HOSTED_QUERY_RATE(), OPEN) if !hc.isStandardHostedChannel =>
+      // Only query rates for Fiat channels, not standard Hosted Channels
       println("Requesting server rate")
       SEND(QueryCurrentRate())
 
@@ -250,7 +252,8 @@ abstract class ChannelHosted extends Channel { me =>
       StoreBecomeSend(hc.copy(resizeProposal = resize.asSome, marginProposal = None), state, resize)
       process(CMD_SIGN)
 
-    case (hc: HostedCommits, cmd: HC_CMD_MARGIN, OPEN | SLEEPING) if hc.marginProposal.isEmpty && hc.error.isEmpty =>
+    case (hc: HostedCommits, cmd: HC_CMD_MARGIN, OPEN | SLEEPING) if hc.marginProposal.isEmpty && hc.error.isEmpty && !hc.isStandardHostedChannel =>
+      // Margin commands only for Fiat channels, not standard Hosted Channels
       val margin = MarginChannel(cmd.newCapacity, cmd.newRate).sign(hc.remoteInfo.nodeSpecificPrivKey)
       StoreBecomeSend(hc.copy(marginProposal = margin.asSome, resizeProposal = None), state, margin)
       process(CMD_SIGN)
@@ -261,8 +264,9 @@ abstract class ChannelHosted extends Channel { me =>
       if (isLocalSigOk) StoreBecomeSend(hc.copy(resizeProposal = resize.asSome), state)
       else localSuspend(hc, ERR_HOSTED_INVALID_RESIZE)
 
-    case (hc: HostedCommits, margin: MarginChannel, OPEN | SLEEPING) if hc.marginProposal.isEmpty && hc.error.isEmpty =>
+    case (hc: HostedCommits, margin: MarginChannel, OPEN | SLEEPING) if hc.marginProposal.isEmpty && hc.error.isEmpty && !hc.isStandardHostedChannel =>
       // Can happen if we have sent a margin resize earlier, but then lost channel data and restored from their
+      // Margin only applies to Fiat channels, not standard Hosted Channels
       val isLocalSigOk: Boolean = margin.verifyClientSig(hc.remoteInfo.nodeSpecificPubKey)
       if (isLocalSigOk) StoreBecomeSend(hc.copy(marginProposal = margin.asSome), state)
       else localSuspend(hc, ERR_HOSTED_INVALID_MARGIN)
