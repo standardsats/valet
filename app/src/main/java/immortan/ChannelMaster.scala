@@ -211,6 +211,16 @@ class ChannelMaster(val payBag: PaymentBag, val chanBag: ChannelBag, val dataBag
 
   def hostedByTicker(ticker: Ticker): Map[ByteVector32, (Channel, HostedCommits)] = allHosted.filter { case (_, (_, commits)) => commits.lastCrossSignedState.initHostedChannel.ticker == ticker }
 
+  // Standard Hosted Channels (SAT ticker) - satoshi denominated, no fiat conversion
+  def standardHostedChannels: Map[ByteVector32, (Channel, HostedCommits)] = hostedByTicker(Ticker.SAT_TICKER)
+
+  // Fiat Channels - USD, EUR, or other fiat-denominated channels
+  def fiatChannels: Map[ByteVector32, (Channel, HostedCommits)] = allHosted.filter { case (_, (_, commits)) => Ticker.isFiat(commits.lastCrossSignedState.initHostedChannel.ticker) }
+
+  // All hosted channel commits (both standard HC and Fiat channels)
+  def allStandardHostedCommits: Iterable[HostedCommits] = standardHostedChannels.values.map(_._2)
+  def allFiatCommits: Iterable[HostedCommits] = fiatChannels.values.map(_._2)
+
   def allFromNode(nodeId: PublicKey): Iterable[ChanAndCommits] = all.values.flatMap(Channel.chanAndCommitsOpt).filter(_.commits.remoteInfo.nodeId == nodeId)
 
   def hostedFromNode(nodeId: PublicKey): Option[ChannelHosted] = allFromNode(nodeId).collectFirst { case ChanAndCommits(chan: ChannelHosted, _) => chan }
