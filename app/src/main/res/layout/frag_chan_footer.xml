@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    style="@style/StandardXYMarginLinearLayout">
+
+    <TextView
+        style="@style/FillingView"
+        android:id="@+id/footerTitle"
+        android:textColor="@color/colorAccent"
+        android:textSize="@dimen/header_size"/>
+
+    <!-- Scan Node QR - primary action -->
+    <com.ornach.nobobutton.NoboButton
+        app:nb_text="@string/chan_open_scan"
+        android:id="@+id/btnScanNodeQr"
+        android:layout_marginTop="15dp"
+        style="@style/GreenButton"/>
+
+    <!-- LNBIG (mainnet only) -->
+    <com.ornach.nobobutton.NoboButton
+        app:nb_text="@string/chan_open_lnbig"
+        android:id="@+id/btnLnbig"
+        android:layout_marginTop="10dp"
+        android:visibility="gone"
+        style="@style/GrayButton"/>
+
+    <!-- Bitrefill (mainnet only) -->
+    <com.ornach.nobobutton.NoboButton
+        app:nb_text="@string/chan_open_bitrefill"
+        android:id="@+id/btnBitrefill"
+        android:layout_marginTop="10dp"
+        android:visibility="gone"
+        style="@style/GrayButton"/>
+
+    <!-- Fiat Channel USD (mainnet only, when no hosted channels) -->
+    <com.ornach.nobobutton.NoboButton
+        app:nb_text="@string/rpa_request_hc_usd"
+        android:id="@+id/btnFiatChannelUsd"
+        android:layout_marginTop="10dp"
+        android:visibility="gone"
+        style="@style/GrayButton"/>
+
+    <!-- LN Graph Resync -->
+    <com.ornach.nobobutton.NoboButton
+        app:nb_text="@string/rpa_request_ln_resync"
+        android:id="@+id/btnLnResync"
+        android:layout_marginTop="10dp"
+        style="@style/GrayButton"/>
+
+</LinearLayout>
