@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout
+    style="@style/StandardLinearLayout"
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:background="?attr/selectableItemBackground"
+    android:paddingBottom="15dp"
+    android:paddingStart="15dp"
+    android:paddingTop="15dp"
+    android:paddingEnd="15dp"
+    android:focusable="true"
+    android:clickable="true">
+
+    <LinearLayout
+        style="@style/FillingView"
+        android:orientation="vertical"
+        android:layout_toStartOf="@id/nwcDeleteButton"
+        android:layout_centerVertical="true">
+
+        <TextView
+            style="@style/BoundedView"
+            android:id="@+id/nwcConnectionName"
+            android:textStyle="bold"
+            android:textSize="16sp"/>
+
+        <TextView
+            style="@style/BoundedView"
+            android:id="@+id/nwcConnectionStatus"
+            android:textColor="@color/colorAccent"
+            android:paddingTop="3dp"
+            android:textSize="14sp"/>
+
+        <TextView
+            style="@style/BoundedView"
+            android:id="@+id/nwcConnectionCreated"
+            android:textColor="@android:color/darker_gray"
+            android:paddingTop="3dp"
+            android:textSize="12sp"/>
+
+    </LinearLayout>
+
+    <ImageButton
+        android:id="@+id/nwcDeleteButton"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_alignParentEnd="true"
+        android:layout_centerVertical="true"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:src="@android:drawable/ic_menu_close_clear_cancel"
+        android:contentDescription="Delete"/>
+
+</RelativeLayout>

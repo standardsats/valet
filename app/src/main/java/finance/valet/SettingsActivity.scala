@@ -9,6 +9,7 @@ import finance.valet.BaseActivity.StringOps
 import finance.valet.BuildConfig.{VERSION_CODE, VERSION_NAME}
 import finance.valet.Colors._
 import finance.valet.R.string._
+import finance.valet.nwc.{NWCDatabase, NWCManager}
 import finance.valet.sheets.{BaseChoiceBottomSheet, PairingData}
 import finance.valet.utils.{LocalBackup, OnListItemClickListener}
 import com.google.android.material.snackbar.Snackbar
@@ -344,6 +345,29 @@ class SettingsActivity extends BaseCheckActivity with HasTypicalChainFee with Ch
     override def updateView: Unit = none
   }
 
+  lazy private[this] val nwcSettings = new SettingsHolder(me) {
+    setVis(isVisible = false, settingsCheck)
+    settingsTitle.setText(settings_nwc)
+
+    override def updateView: Unit = {
+      NWCDatabase.get match {
+        case Some(db) =>
+          val count = db.listConnections().size
+          if (count > 0) {
+            settingsInfo.setText(getString(settings_nwc_connections).format(count))
+          } else {
+            settingsInfo.setText(settings_nwc_info)
+          }
+        case None =>
+          settingsInfo.setText(settings_nwc_info)
+      }
+    }
+
+    view setOnClickListener onButtonTap {
+      me goTo classOf[NWCActivity]
+    }
+  }
+
   override def PROCEED(state: Bundle): Unit = {
     setContentView(R.layout.activity_settings)
 
@@ -374,8 +398,12 @@ class SettingsActivity extends BaseCheckActivity with HasTypicalChainFee with Ch
 
     settingsContainer.addView(useBiometric.view)
     settingsContainer.addView(enforceTor.view)
+    settingsContainer.addView(nwcSettings.view)
     settingsContainer.addView(viewCode.view)
     settingsContainer.addView(viewStat.view)
     settingsContainer.addView(links.view)
+
+    // Update NWC view
+    nwcSettings.updateView
   }
 }

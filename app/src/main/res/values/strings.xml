@@ -268,6 +268,31 @@
     <string name="settings_backup_location_too_old">Android version is too old to select directory</string>
     <string name="settings_choose_directory">Choose directory</string>
 
+    <!-- NWC Settings -->
+    <string name="settings_nwc">Nostr Wallet Connect</string>
+    <string name="settings_nwc_info">Connect apps like Stacker News</string>
+    <string name="settings_nwc_no_connections">No connections</string>
+    <string name="settings_nwc_connections">%1$d connection(s)</string>
+    <string name="nwc_title">App Connections</string>
+    <string name="nwc_add_connection">New Connection</string>
+    <string name="nwc_connection_name">Connection name</string>
+    <string name="nwc_connection_name_hint">e.g. Stacker News</string>
+    <string name="nwc_connection_created">Connection created</string>
+    <string name="nwc_connection_url">Connection URL</string>
+    <string name="nwc_copy_url">Copy URL</string>
+    <string name="nwc_show_qr">Show QR Code</string>
+    <string name="nwc_delete">Delete</string>
+    <string name="nwc_delete_confirm">Delete this connection?</string>
+    <string name="nwc_connected">Connected</string>
+    <string name="nwc_disconnected">Disconnected</string>
+    <string name="nwc_created_at">Created %1$s</string>
+    <string name="nwc_select_type">Select Connection Type</string>
+    <string name="nwc_type_send">Send (Full Access)</string>
+    <string name="nwc_type_receive">Receive Only</string>
+    <string name="nwc_type_send_short">Send</string>
+    <string name="nwc_type_receive_short">Receive</string>
+    <string name="nwc_error_empty_name">Please enter a connection name</string>
+
     <!-- /Settings activity -->
 
     <array name="parts_in_flight">
