@@ -346,6 +346,71 @@
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
+        <!-- Hosted Channel (SAT) card -->
+        <androidx.cardview.widget.CardView
+            card_view:cardCornerRadius="@dimen/corner_radius"
+            android:layout_marginStart="15dp"
+            android:layout_marginEnd="15dp"
+            android:layout_marginTop="5dp"
+            android:onClick="goToStatPage"
+            android:id="@+id/satCard"
+            style="@style/Card">
+
+            <LinearLayout
+                android:padding="15dp"
+                android:orientation="vertical"
+                android:background="@color/cardHostedSat"
+                style="@style/FillingView">
+
+                <!-- Text and balance -->
+
+                <RelativeLayout style="@style/FillingView">
+
+                    <TextView
+                        android:layout_marginEnd="3dp"
+                        android:textColor="@color/colorAccent"
+                        android:text="@string/hosted_wallet_sat"
+                        android:layout_centerVertical="true"
+                        style="@style/BoundedView"/>
+
+                    <TextView
+                        android:id="@+id/totalSatBalance"
+                        android:layout_alignParentEnd="true"
+                        android:layout_centerVertical="true"
+                        style="@style/Emphasized"/>
+
+                </RelativeLayout>
+
+                <!-- Indicators and payment state -->
+
+                <RelativeLayout
+                    style="@style/FillingView"
+                    android:id="@+id/channelStateIndicatorsSat">
+
+                    <com.indicator.ChannelIndicatorLine
+                        android:id="@+id/channelIndicatorSat"
+                        android:layout_centerVertical="true"
+                        style="@style/BoundedView"/>
+
+                    <LinearLayout
+                        android:layout_marginTop="6dp"
+                        android:layout_centerVertical="true"
+                        android:layout_alignParentEnd="true"
+                        android:orientation="horizontal"
+                        style="@style/BoundedView">
+                    </LinearLayout>
+
+                    <TextView
+                        android:layout_marginTop="6dp"
+                        android:layout_centerVertical="true"
+                        android:layout_alignParentEnd="true"
+                        android:id="@+id/lnBalanceSat"
+                        style="@style/BoundedView"/>
+
+                </RelativeLayout>
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
         <!-- Recovery phrase warning -->
 
         <TextView

@@ -50,12 +50,25 @@ case class HostedCommits(remoteInfo: RemoteNodeInfo, localSpec: CommitmentSpec, 
 
   lazy val availableForReceive: MilliSatoshi = nextLocalSpec.toRemote
 
-  // Calculation from constant equation s1 / f1 = s2 / f2
-  lazy val availableForSend: MilliSatoshi = MilliSatoshi(math round currentHostRate.toLong.toDouble / lastCrossSignedState.rate.toLong.toDouble * reserveSats.toLong.toDouble)
-
   lazy val reserveSats: MilliSatoshi = nextLocalSpec.toLocal
 
-  lazy val fiatValue: Double = reserveSats.toLong.toDouble / lastCrossSignedState.rate.toLong.toDouble
+  // For standard Hosted Channels (SAT ticker), no rate conversion is needed
+  lazy val isStandardHostedChannel: Boolean = Ticker.isHostedChannel(lastCrossSignedState.initHostedChannel.ticker)
+
+  // Calculation from constant equation s1 / f1 = s2 / f2
+  // For standard HC (SAT ticker), return the raw satoshi balance without rate conversion
+  lazy val availableForSend: MilliSatoshi = if (isStandardHostedChannel) {
+    reserveSats
+  } else {
+    MilliSatoshi(math round currentHostRate.toLong.toDouble / lastCrossSignedState.rate.toLong.toDouble * reserveSats.toLong.toDouble)
+  }
+
+  // For standard HC, fiatValue equals the satoshi value (rate = 1)
+  lazy val fiatValue: Double = if (isStandardHostedChannel) {
+    reserveSats.toLong.toDouble
+  } else {
+    reserveSats.toLong.toDouble / lastCrossSignedState.rate.toLong.toDouble
+  }
 
   lazy val capacity: MilliSatoshi = lastCrossSignedState.initHostedChannel.channelCapacityMsat
 
@@ -88,7 +101,10 @@ case class HostedCommits(remoteInfo: RemoteNodeInfo, localSpec: CommitmentSpec, 
   }
 
   def nextMarginResize(newRate: MilliSatoshi) : Option[HC_CMD_MARGIN] = {
-    if (currentHostRate.toLong > 0) {
+    // Standard Hosted Channels (SAT ticker) don't use margin adjustments
+    if (isStandardHostedChannel) {
+      None
+    } else if (currentHostRate.toLong > 0) {
       val newMargin = nextFiatMargin(newRate)
       if (newMargin > reserveSats) {
         val newCapacity = if (newMargin > capacity) {
