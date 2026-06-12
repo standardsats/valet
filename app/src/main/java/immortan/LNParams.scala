@@ -299,6 +299,15 @@ class SignetSyncParams extends SyncParams {
   override val acceptThreshold = 0
 }
 
+class RegtestSyncParams extends SyncParams {
+  override val syncNodes: Set[RemoteNodeInfo] = Set.empty
+  override val phcSyncNodes: Set[RemoteNodeInfo] = Set.empty
+  override val minCapacity: MilliSatoshi = MilliSatoshi(1000L)
+  override val minNormalChansForPHC = 1
+  override val maxNodesToSyncFrom = 1
+  override val acceptThreshold = 0
+}
+
 // Important: LNParams.secret must be defined
 case class RemoteNodeInfo(nodeId: PublicKey, address: NodeAddress, alias: String) {
   lazy val nodeSpecificExtendedKey: DeterministicWallet.ExtendedPrivateKey = LNParams.secret.keys.ourFakeNodeIdKey(nodeId)

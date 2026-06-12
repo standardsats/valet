@@ -205,5 +205,22 @@ android.applicationVariants.all { variant ->
         }
     }
 
-    variant.assembleProvider.configure { finalizedBy(signTask) }
+    def pgpSignTask = tasks.create("pgpSign${variantName}Apk", Exec) {
+        dependsOn signTask
+        onlyIf { System.getenv("SIGNING_KEY_ALIAS") != null &&
+                System.getenv("PGP_SIGNING_KEY_ID") != null }
+        doFirst {
+            commandLine 'gpg',
+                    '--batch', '--yes',
+                    '--local-user', System.getenv("PGP_SIGNING_KEY_ID"),
+                    '--passphrase', System.getenv("PGP_SIGNING_PASSWORD") ?: '',
+                    '--pinentry-mode', 'loopback',
+                    '--armor',
+                    '--detach-sign',
+                    '--output', "${apkProvider().absolutePath}.asc",
+                    apkProvider().absolutePath
+        }
+    }
+
+    variant.assembleProvider.configure { finalizedBy(signTask, pgpSignTask) }
 }
