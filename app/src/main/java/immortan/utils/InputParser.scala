@@ -38,7 +38,7 @@ object InputParser {
 
   val lnPayReq: UnanchoredRegex = s"(?im).*?($prefixes)([0-9]{1,}[a-z0-9]+){1}".r.unanchored
 
-  val identifier: Regex = "^([a-zA-Z0-9][a-zA-Z0-9\\-_.]*)?[a-zA-Z0-9]@([a-zA-Z0-9][a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9]\\.)+[a-zA-Z0-9][a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9]$".r
+  val identifier: Regex = "(?i)^[a-z0-9]+[a-z0-9._%+-]*[a-z0-9]@[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$|^[a-z0-9]@[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$".r
 
   val lightning: String = "lightning:"
 
@@ -46,7 +46,7 @@ object InputParser {
 
   def recordValue(raw: String): Unit = value = parse(raw)
 
-  def parse(rawInput: String): Any = rawInput take 2880 match {
+  private def parseUnsafe(rawInput: String): Any = rawInput take 2880 match {
     case lnUrl(prefix, data) => LNUrl.fromBech32(s"$prefix$data")
     case nodeLink(key, host, port) => RemoteNodeInfo(PublicKey.fromBin(ByteVector fromValidHex key), NodeAddress.fromParts(host, port.toInt), host)
     case shortNodeLink(key, host) => RemoteNodeInfo(PublicKey.fromBin(ByteVector fromValidHex key), NodeAddress.fromParts(host, port = 9735), host)
@@ -61,6 +61,14 @@ object InputParser {
       else if (isLightningInvoice) PaymentRequestExt.fromUri(withoutSlashes.toLowerCase)
       else addressToAmount getOrElse BitcoinUri.fromRaw(s"$bitcoin$withoutSlashes")
   }
+
+  def parse(rawInput: String): Any = Try(parseUnsafe(rawInput)) recover {
+    case exc: Throwable =>
+      val hint = if (rawInput.toLowerCase.contains("lnurl")) "The Lightning URL (LNURL) address could not be resolved or is malformed."
+      else if (rawInput.toLowerCase.contains("lightning:") || rawInput.toLowerCase.contains("lnbc")) "The Lightning invoice appears to be invalid or corrupted."
+      else "The scanned data does not appear to be a valid Lightning address, Bitcoin address, or Lightning invoice."
+      throw new RuntimeException(hint)
+  } get
 }
 
 object PaymentRequestExt {

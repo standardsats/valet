@@ -87,6 +87,14 @@ object HubActivity {
   def itemsToTags: Map[Int, String] = Map(R.id.bitcoinPayments -> "bitcoinPayments", R.id.lightningPayments -> "lightningPayments", R.id.relayedPayments -> "relayedPayments", R.id.payMarketLinks -> "payMarketLinks")
   def incoming(amount: MilliSatoshi): String = WalletApp.denom.directedWithSign(incoming = amount, outgoing = 0L.msat, cardOut, cardIn, cardZero, isIncoming = true)
   def hasItems: Boolean = txInfos.nonEmpty || paymentInfos.nonEmpty || lnUrlPayLinks.nonEmpty || relayedPreimageInfos.nonEmpty
+
+  def shouldHideTxInfo: PartialFunction[TxInfo, Boolean] = {
+    case info if !WalletApp.hideZeroOutputs => false
+    case info => info.description match {
+      case desc: PlainTxDescription => desc.addresses.isEmpty
+      case _ => false
+    }
+  }
 }
 
 class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with ExternalDataChecker with ChoiceReceiver with ChannelListener with CanBeRepliedTo { me =>
@@ -132,9 +140,10 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
   }
 
   def updAllInfos: Unit = UITask {
-    val exceptRouted = List(txInfos, paymentInfos, lnUrlPayLinks)
+    val filteredTxs = txInfos.filterNot(shouldHideTxInfo)
+    val exceptRouted = List(filteredTxs, paymentInfos, lnUrlPayLinks)
     val dr = LNParams.cm.delayedRefunds.asSome.filter(_.totalAmount > 0L.msat)
-    val itemsToDisplayMap = Map(R.id.bitcoinPayments -> txInfos, R.id.lightningPayments -> paymentInfos, R.id.relayedPayments -> relayedPreimageInfos, R.id.payMarketLinks -> lnUrlPayLinks)
+    val itemsToDisplayMap = Map(R.id.bitcoinPayments -> filteredTxs, R.id.lightningPayments -> paymentInfos, R.id.relayedPayments -> relayedPreimageInfos, R.id.payMarketLinks -> lnUrlPayLinks)
     val allVisibleInfos = if (isSearchOn) exceptRouted else walletCards.toggleGroup.getCheckedButtonIds.asScala.map(_.toInt).map(itemsToDisplayMap)
     allInfos = SemanticOrder.makeSemanticOrder(allVisibleInfos.flatten ++ exceptRouted.flatMap(_ filter isImportantItem) ++ dr)
   }.run
@@ -1260,7 +1269,10 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
     }
 
     snack(contentWindow, getString(dialog_lnurl_processing).format(lnUrl.warnUri).html, dialog_cancel) foreach { snack =>
-      def onErrorFromVendor(error: Throwable): Unit = onFail(s"Error from vendor:<br><br><tt>${error.toString}</tt>")
+      def onErrorFromVendor(error: Throwable): Unit = error.getMessage match {
+        case msg if msg != null && msg.startsWith("Lightning address is invalid") => onFail(msg)
+        case _ => onFail(s"Error from vendor:<br><br><tt>${error.toString}</tt>")
+      }
       val level1Sub = lnUrl.level1DataResponse.doOnUnsubscribe(snack.dismiss).doOnTerminate(snack.dismiss)
       val level2Sub = level1Sub.subscribe(resolve, onErrorFromVendor)
       val listener = onButtonTap(level2Sub.unsubscribe)
