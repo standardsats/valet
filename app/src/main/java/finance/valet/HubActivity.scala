@@ -88,13 +88,11 @@ object HubActivity {
   def incoming(amount: MilliSatoshi): String = WalletApp.denom.directedWithSign(incoming = amount, outgoing = 0L.msat, cardOut, cardIn, cardZero, isIncoming = true)
   def hasItems: Boolean = txInfos.nonEmpty || paymentInfos.nonEmpty || lnUrlPayLinks.nonEmpty || relayedPreimageInfos.nonEmpty
 
-  def shouldHideTxInfo: PartialFunction[TxInfo, Boolean] = {
-    case info if !WalletApp.hideZeroOutputs => false
-    case info => info.description match {
+  def shouldHideTxInfo(info: TxInfo): Boolean =
+    WalletApp.hideZeroOutputs && (info.description match {
       case desc: PlainTxDescription => desc.addresses.isEmpty
       case _ => false
-    }
-  }
+    })
 }
 
 class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with ExternalDataChecker with ChoiceReceiver with ChannelListener with CanBeRepliedTo { me =>

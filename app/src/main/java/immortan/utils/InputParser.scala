@@ -38,7 +38,7 @@ object InputParser {
 
   val lnPayReq: UnanchoredRegex = s"(?im).*?($prefixes)([0-9]{1,}[a-z0-9]+){1}".r.unanchored
 
-  val identifier: Regex = "(?i)^[a-z0-9]+[a-z0-9._%+-]*[a-z0-9]@[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$|^[a-z0-9]@[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$".r
+  val identifier: Regex = "(?i)^[a-z0-9][a-z0-9._%+-]*@[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$".r
 
   val lightning: String = "lightning:"
 
