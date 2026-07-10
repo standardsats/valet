@@ -349,7 +349,7 @@ object ElectrumClient {
       header.hashPreviousBlock.reverse, header.hashMerkleRoot.reverse, header.time, header.bits, header.nonce)
 
     val RegtestGenesisHeader: Header = makeHeader(0, Block.RegtestGenesisBlock.header)
-    val TestnetGenesisHeader: Header = makeHeader(0, Block.TestnetGenesisBlock.header)
+    val TestnetGenesisHeader: Header = makeHeader(0, Block.Testnet3GenesisBlock.header)
     val LivenetGenesisHeader: Header = makeHeader(0, Block.LivenetGenesisBlock.header)
   }
 

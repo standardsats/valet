@@ -30,7 +30,8 @@ object LocalBackup { me =>
 
   def getNetwork(chainHash: ByteVector32): String = chainHash match {
     case Block.LivenetGenesisBlock.hash => "mainnet"
-    case Block.TestnetGenesisBlock.hash => "testnet"
+    case Block.Testnet3GenesisBlock.hash => "testnet"
+    case Block.Testnet4GenesisBlock.hash => "testnet"
     case _ => "unknown"
   }
 

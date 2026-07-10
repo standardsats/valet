@@ -66,9 +66,9 @@ class ElectrumChainSync(client: ActorRef, headerDb: HeaderDb, chainHash: ByteVec
       blockchain1Try match {
         case Success(blockchain1) =>
           val (blockchain2, chunks) = Blockchain.optimize(blockchain1)
-          headerDb.addHeaders(chunks.map(_.header), chunks.head.height)
-          log.info(s"Got new headers chunk at ${blockchain2.tip.height}, requesting next chunk")
           client ! ElectrumClient.GetHeaders(blockchain2.tip.height + 1, RETARGETING_PERIOD)
+          log.info(s"Got new headers chunk at ${blockchain2.tip.height}, requesting next chunk")
+          headerDb.addHeaders(chunks.map(_.header), chunks.head.height)
           goto(SYNCING) using blockchain2
 
         case Failure(error) =>

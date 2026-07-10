@@ -31,7 +31,7 @@ case class Blockchain(chainHash: ByteVector32,
 
   import Blockchain._
 
-  require(chainHash == Block.LivenetGenesisBlock.hash || chainHash == Block.TestnetGenesisBlock.hash || chainHash == Block.RegtestGenesisBlock.hash || chainHash == Block.Testnet4GenesisBlock.hash, s"invalid chain hash $chainHash")
+  require(chainHash == Block.LivenetGenesisBlock.hash || chainHash == Block.Testnet3GenesisBlock.hash || chainHash == Block.RegtestGenesisBlock.hash || chainHash == Block.Testnet4GenesisBlock.hash, s"invalid chain hash $chainHash")
 
   def tip = bestchain.last
 
@@ -83,6 +83,8 @@ case class Blockchain(chainHash: ByteVector32,
 object Blockchain {
   val RETARGETING_PERIOD = 2016 // on bitcoin, the difficulty re-targeting period is 2016 blocks
   val MAX_REORG = 72 // we assume that there won't be a reorg of more than 72 blocks
+
+  private val twoPow256: BigInt = BigInt(2).pow(256)
 
   /**
     *
@@ -165,7 +167,7 @@ object Blockchain {
         // on mainnet all blocks with a re-targeting window have the same difficulty target
         // on testnet it doesn't hold, there can be a drop in difficulty if there are no blocks for 20 minutes
         blockchain.chainHash match {
-          case Block.LivenetGenesisBlock | Block.RegtestGenesisBlock.hash => require(current.bits == previous.bits)
+          case Block.LivenetGenesisBlock.hash | Block.RegtestGenesisBlock.hash => require(current.bits == previous.bits)
           case _ => ()
         }
         current
@@ -291,7 +293,7 @@ object Blockchain {
     }
   }
 
-  def chainWork(target: BigInt): BigInt = BigInt(2).pow(256) / (target + BigInt(1))
+  def chainWork(target: BigInt): BigInt = twoPow256 / (target + BigInt(1))
 
   def chainWork(bits: Long): BigInt = {
     val (target, negative, overflow) = decodeCompact(bits)

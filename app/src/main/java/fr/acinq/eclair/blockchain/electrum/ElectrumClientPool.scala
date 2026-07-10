@@ -10,7 +10,7 @@ import fr.acinq.eclair.blockchain.CurrentBlockCount
 import fr.acinq.eclair.blockchain.electrum.ElectrumClient.SSL
 import fr.acinq.eclair.blockchain.electrum.ElectrumClientPool._
 import immortan.LNParams
-import org.json4s.JsonAST.{JObject, JString}
+import org.json4s.JsonAST.{JNothing, JObject, JString}
 import org.json4s.native.JsonMethods
 
 import scala.concurrent.ExecutionContext
@@ -161,7 +161,7 @@ object ElectrumClientPool {
 
   var loadFromChainHash: ByteVector32 => Set[ElectrumServerAddress] = {
     case Block.LivenetGenesisBlock.hash => readServerAddresses(classOf[ElectrumServerAddress] getResourceAsStream "/electrum/servers_mainnet.json")
-    case Block.TestnetGenesisBlock.hash => readServerAddresses(classOf[ElectrumServerAddress] getResourceAsStream "/electrum/servers_testnet.json")
+    case Block.Testnet3GenesisBlock.hash => readServerAddresses(classOf[ElectrumServerAddress] getResourceAsStream "/electrum/servers_testnet3.json")
     case Block.RegtestGenesisBlock.hash => readServerAddresses(classOf[ElectrumServerAddress] getResourceAsStream "/electrum/servers_regtest.json")
     case _ => throw new RuntimeException
   }
@@ -169,11 +169,11 @@ object ElectrumClientPool {
   def readServerAddresses(stream: InputStream): Set[ElectrumServerAddress] = try {
     val JObject(values) = JsonMethods.parse(stream)
 
-    for (Tuple2(name, fields) <- values.toSet) yield {
+    values.filter { case (_, fields) => (fields \ "s") != JNothing }.map { case (name, fields) =>
       val port = (fields \ "s").asInstanceOf[JString].s.toInt
       val address = InetSocketAddress.createUnresolved(name, port)
       ElectrumServerAddress(address, SSL.LOOSE)
-    }
+    }.toSet
 
   } finally {
     stream.close

@@ -6,17 +6,6 @@ task wrapper(type: Wrapper) {
 }
 
 android {
-    signingConfigs {
-        release {
-            if (System.getenv("SIGNING_KEY_ALIAS")) {
-                storeFile file(System.getenv("SIGNING_STORE_FILENAME"))
-                keyAlias System.getenv("SIGNING_KEY_ALIAS")
-                keyPassword System.getenv("SIGNING_KEY_PASSWORD")
-                storePassword System.getenv("SIGNING_STORE_PASSWORD")
-            }
-        }
-    }
-
     compileSdkVersion 33
     buildToolsVersion "30.0.3"
     ndkVersion '22.1.7171670'
@@ -29,11 +18,30 @@ android {
         minSdkVersion 21
 
         versionName '5.0.0'
-        versionCode 107 // even for testnets, odd for mainnet
-        if (System.getenv("SIGNING_KEY_ALIAS")) {
-            signingConfig signingConfigs.release
-        }
         vectorDrawables.generatedDensities = []
+    }
+
+    flavorDimensions "chain"
+    productFlavors {
+        mainnet {
+            dimension "chain"
+            versionCode 107 // odd for mainnet
+        }
+        tnet4 {
+            dimension "chain"
+            applicationIdSuffix '.testnet4'
+            versionCode 106 // even for testnets
+        }
+        tnet3 {
+            dimension "chain"
+            applicationIdSuffix '.testnet3'
+            versionCode 106
+        }
+        regtest {
+            dimension "chain"
+            applicationIdSuffix '.regtest'
+            versionCode 106
+        }
     }
 
     dexOptions {
@@ -60,7 +68,7 @@ android {
 
     applicationVariants.all { variant ->
         variant.outputs.all {
-            outputFileName = "finance.valet_${defaultConfig.versionCode}.apk"
+            outputFileName = "${variant.applicationId}_${variant.versionCode}.apk"
         }
     }
 
@@ -127,67 +135,92 @@ tasks.withType(Jar).configureEach {
 
 import java.util.zip.*
 
-task normalizeApkTimestamps {
-    doLast {
-        def sourceDateEpoch = System.getenv('SOURCE_DATE_EPOCH')?.toLong() ?: 0
-        def versionCode = android.defaultConfig.versionCode
-        def apkFile = file("${buildDir}/outputs/apk/release/finance.valet_${versionCode}.apk")
-        def tempFile = file("${apkFile}.tmp")
+android.applicationVariants.all { variant ->
+    if (variant.buildType.name != 'release') return
 
-        new ZipOutputStream(new FileOutputStream(tempFile)).withCloseable { zos ->
-            new ZipFile(apkFile).withCloseable { zip ->
-                zip.entries().each { srcEntry ->
-                    def newEntry = new ZipEntry(srcEntry.name)
-                    newEntry.time = sourceDateEpoch * 1000
-                    // Android R+ requires resources.arsc (and uncompressed .so when
-                    // extractNativeLibs=false) to stay STORED. Alignment is handled by zipalign.
-                    newEntry.method = srcEntry.method
-                    if (srcEntry.method == ZipEntry.STORED) {
-                        newEntry.size = srcEntry.size
-                        newEntry.compressedSize = srcEntry.compressedSize
-                        newEntry.crc = srcEntry.crc
+    def variantName = variant.name.capitalize()
+    def buildToolsDir = "${android.sdkDirectory}/build-tools/${android.buildToolsVersion}"
+    def apkProvider = { variant.outputs.first().outputFile }
+
+    def normalizeTask = tasks.create("normalize${variantName}ApkTimestamps") {
+        doLast {
+            def sourceDateEpoch = System.getenv('SOURCE_DATE_EPOCH')?.toLong() ?: 0
+            def apkFile = apkProvider()
+            def tempFile = file("${apkFile}.tmp")
+
+            new ZipOutputStream(new FileOutputStream(tempFile)).withCloseable { zos ->
+                new ZipFile(apkFile).withCloseable { zip ->
+                    zip.entries().each { srcEntry ->
+                        def newEntry = new ZipEntry(srcEntry.name)
+                        newEntry.time = sourceDateEpoch * 1000
+                        // Android R+ requires resources.arsc (and uncompressed .so when
+                        // extractNativeLibs=false) to stay STORED. Alignment is handled by zipalign.
+                        newEntry.method = srcEntry.method
+                        if (srcEntry.method == ZipEntry.STORED) {
+                            newEntry.size = srcEntry.size
+                            newEntry.compressedSize = srcEntry.compressedSize
+                            newEntry.crc = srcEntry.crc
+                        }
+                        zos.putNextEntry(newEntry)
+                        if (!srcEntry.isDirectory()) {
+                            zos.write(zip.getInputStream(srcEntry).bytes)
+                        }
+                        zos.closeEntry()
                     }
-                    zos.putNextEntry(newEntry)
-                    if (!srcEntry.isDirectory()) {
-                        zos.write(zip.getInputStream(srcEntry).bytes)
-                    }
-                    zos.closeEntry()
                 }
             }
+
+            apkFile.delete()
+            tempFile.renameTo(apkFile)
         }
-
-        apkFile.delete()
-        tempFile.renameTo(apkFile)
     }
-}
 
-task zipalignApk(type: Exec) {
-    dependsOn normalizeApkTimestamps
-    def versionCode = android.defaultConfig.versionCode
-    def buildToolsDir = "${android.sdkDirectory}/build-tools/${android.buildToolsVersion}"
-    def apkFile = file("${buildDir}/outputs/apk/release/finance.valet_${versionCode}.apk")
-    def alignedFile = file("${apkFile}.aligned")
-    commandLine "${buildToolsDir}/zipalign", '-f', '-p', '4', apkFile.absolutePath, alignedFile.absolutePath
-    doLast {
-        apkFile.delete()
-        alignedFile.renameTo(apkFile)
+    def zipalignTask = tasks.create("zipalign${variantName}Apk", Exec) {
+        dependsOn normalizeTask
+        doFirst {
+            def apkFile = apkProvider()
+            def alignedFile = file("${apkFile}.aligned")
+            commandLine "${buildToolsDir}/zipalign", '-f', '-p', '4', apkFile.absolutePath, alignedFile.absolutePath
+        }
+        doLast {
+            def apkFile = apkProvider()
+            def alignedFile = file("${apkFile}.aligned")
+            apkFile.delete()
+            alignedFile.renameTo(apkFile)
+        }
     }
-}
 
-task signApk(type: Exec) {
-    dependsOn zipalignApk
-    onlyIf { System.getenv("SIGNING_KEY_ALIAS") != null }
-    def versionCode = android.defaultConfig.versionCode
-    def buildToolsDir = "${android.sdkDirectory}/build-tools/${android.buildToolsVersion}"
-    def apkFile = file("${buildDir}/outputs/apk/release/finance.valet_${versionCode}.apk")
-    commandLine "${buildToolsDir}/apksigner", 'sign',
-            '--ks', System.getenv("SIGNING_STORE_FILENAME") ?: '',
-            '--ks-key-alias', System.getenv("SIGNING_KEY_ALIAS") ?: '',
-            '--ks-pass', "pass:${System.getenv('SIGNING_STORE_PASSWORD') ?: ''}",
-            '--key-pass', "pass:${System.getenv('SIGNING_KEY_PASSWORD') ?: ''}",
-            apkFile.absolutePath
-}
+    def signTask = tasks.create("sign${variantName}Apk", Exec) {
+        dependsOn zipalignTask
+        onlyIf { System.getenv("SIGNING_KEY_ALIAS") != null }
+        doFirst {
+            commandLine "${buildToolsDir}/apksigner", 'sign',
+                    '--ks', System.getenv("SIGNING_STORE_FILENAME") ?: '',
+                    '--ks-key-alias', System.getenv("SIGNING_KEY_ALIAS") ?: '',
+                    '--ks-pass', "pass:${System.getenv('SIGNING_STORE_PASSWORD') ?: ''}",
+                    '--key-pass', "pass:${System.getenv('SIGNING_STORE_PASSWORD') ?: ''}",
+                    '--v1-signing-enabled', 'true',
+                    '--v2-signing-enabled', 'true',
+                    apkProvider().absolutePath
+        }
+    }
 
-tasks.matching { it.name.startsWith("assembleRelease") }.configureEach {
-    finalizedBy(signApk)
+    def pgpSignTask = tasks.create("pgpSign${variantName}Apk", Exec) {
+        dependsOn signTask
+        onlyIf { System.getenv("SIGNING_KEY_ALIAS") != null &&
+                System.getenv("PGP_SIGNING_KEY_ID") != null }
+        doFirst {
+            commandLine 'gpg',
+                    '--batch', '--yes',
+                    '--local-user', System.getenv("PGP_SIGNING_KEY_ID"),
+                    '--passphrase', System.getenv("PGP_SIGNING_PASSWORD") ?: '',
+                    '--pinentry-mode', 'loopback',
+                    '--armor',
+                    '--detach-sign',
+                    '--output', "${apkProvider().absolutePath}.asc",
+                    apkProvider().absolutePath
+        }
+    }
+
+    variant.assembleProvider.configure { finalizedBy(signTask, pgpSignTask) }
 }

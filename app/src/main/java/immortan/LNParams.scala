@@ -231,6 +231,83 @@ class TestNet4SyncParams extends SyncParams {
   override val acceptThreshold = 0
 }
 
+class TestNet3SyncParams extends SyncParams {
+  val voltage: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"02cf71da3f277c2a30a348dfced77a9b7d81fb578c2b9117967100352051626b84"), NodeAddress.unresolved(20402, host = 54, 214, 32, 132), "Voltage")
+  val endurance: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"03933884aaf1d6b108397e5efe5c86bcf2d8ca8d2f700eda99db9214fc2712b134"), NodeAddress.unresolved(9735, host = 13, 248, 222, 197), "Endurance")
+
+  // nodes from Electrum repo
+  val node1: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"038863cf8ab91046230f561cd5b386cbff8309fa02e3f0c3ed161a3aeb64a643b9"), NodeAddress.unresolved(9735, host = 203, 132, 95, 10), "Node 1")
+  val node2: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"03236a685d30096b26692dce0cf0fa7c8528bdf61dbf5363a3ef6d5c92733a3016"), NodeAddress.unresolved(9734, host = 50, 116, 3, 223), "Node 2")
+  val node3: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"03d5e17a3c213fe490e1b0c389f8cfcfcea08a29717d50a9f453735e0ab2a7c003"), NodeAddress.unresolved(9735, host = 3, 16, 119, 191), "Node 3")
+  val node4: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"03933884aaf1d6b108397e5efe5c86bcf2d8ca8d2f700eda99db9214fc2712b134"), NodeAddress.unresolved(9735, host = 34, 250, 234, 192), "Node 4")
+  val node5: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"0260d9119979caedc570ada883ff614c6efb93f7f7382e25d73ecbeba0b62df2d7"), NodeAddress.unresolved(9735, host = 88, 99, 209, 230), "Node 5")
+  val node6: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"023ea0a53af875580899da0ab0a21455d9c19160c4ea1b7774c9d4be6810b02d2c"), NodeAddress.unresolved(9735, host = 160, 16, 233, 215), "Node 6")
+  val node7: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"0269a94e8b32c005e4336bfb743c08a6e9beb13d940d57c479d95c8e687ccbdb9f"), NodeAddress.unresolved(9735, host = 197, 155, 6, 173), "Node 7")
+  val node8: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"030f0bf260acdbd3edcad84d7588ec7c5df4711e87e6a23016f989b8d3a4147230"), NodeAddress.unresolved(9735, host = 163, 172, 94, 64), "Node 8")
+  val node9: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"02312627fdf07fbdd7e5ddb136611bdde9b00d26821d14d94891395452f67af248"), NodeAddress.unresolved(9735, host = 23, 237, 77, 12), "Node 9")
+  val node10: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"02ae2f22b02375e3e9b4b4a2db4f12e1b50752b4062dbefd6e01332acdaf680379"), NodeAddress.unresolved(9735, host = 197, 155, 6, 172), "Node 10")
+  val node11: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"034fe52e98a0e9d3c21b767e1b371881265d8c7578c21f5afd6d6438da10348b36"), NodeAddress.unresolved(9740, host = 23, 239, 23, 44), "Node 11")
+
+  // IPv6 nodes handled using fromParts
+  val node12: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"02889be42fc32093d2dcbfa59369df262e3577b333d8a45e5859dcdd6a4139839a"), NodeAddress.fromParts("2a09:8280:1::42:a6f3", 9735), "Node 12")
+  val node13: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"021713d5331898c206b57c4f7d40635079de9a97d97782646f31dac18a53f2d979"), NodeAddress.fromParts("2a09:8280:1::15:a57c", 9735), "Node 13")
+
+  override val localNode: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"022b2053758559dbfd4dee6b89067cd17d37ec7e26edb2f7b58baac501add4b72b"), NodeAddress.unresolved(9735, host = 192, 168, 2, 11), "localhost")
+
+  override val syncNodes: Set[RemoteNodeInfo] = Set(
+    endurance, localNode, voltage,
+    node1, node2, node3, node4, node5, node6,
+    node7, node8, node9, node10, node11, node12, node13, localNode
+  )
+
+  override val phcSyncNodes: Set[RemoteNodeInfo] = Set.empty
+  override val minCapacity: MilliSatoshi = MilliSatoshi(10000000L)
+  override val minNormalChansForPHC = 1
+  override val maxNodesToSyncFrom = 1
+  override val acceptThreshold = 0
+}
+
+class SignetSyncParams extends SyncParams {
+  // nodes from Electrum repo
+  val node1: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"02357a375a846279fc1e8413f5e182652a125e5f6a4f4653bffabebb8177a6d8aa"), NodeAddress.unresolved(9735, host = 34, 68, 95, 152), "Signet Node 1")
+  val node2: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"0305061295fa30847df41ae6ee809b560e78d65c2a7337a41c725ea3920b65e08a"), NodeAddress.unresolved(9735, host = 34, 124, 125, 201), "Signet Node 2")
+  val node3: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"027554f8d4d99a43cf1b49d274f698ee5045273cd377206eba62ea308b4386a4fa"), NodeAddress.unresolved(9735, host = 35, 247, 14, 99), "Signet Node 3")
+  val node4: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"0244bb7ba2392ab2d493ad04ad4afcd482ca44a2bfe5b42bcc830bfe00e5b08082"), NodeAddress.unresolved(9735, host = 34, 138, 100, 228), "Signet Node 4")
+  val node5: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"03adf6efe5346d455172c750a655b07fb85be4f50f5b555f9f91a853a6b448c3bf"), NodeAddress.unresolved(9735, host = 34, 74, 81, 232), "Signet Node 5")
+  val node6: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"03ea42c9408a73dabdcb5655e2923956d132fbb25cb71e7c00a29e10c73e937e64"), NodeAddress.unresolved(9735, host = 34, 138, 237, 159), "Signet Node 6")
+  val node7: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"024d899b60d5de58e8d66af042445323a48b6962d6c667c033802421dc49abc232"), NodeAddress.unresolved(9735, host = 34, 75, 211, 29), "Signet Node 7")
+  val node8: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"02e8430ba207ce87bd2d4ab36497b9eac10e6d5d86f9fda8aa270c48877e0a8259"), NodeAddress.unresolved(9735, host = 34, 73, 252, 102), "Signet Node 8")
+  val node9: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"0265ed138065b84d6b9448f9e0a2fd4ceb63fef08efe1dfc949a63d5d43110e4c0"), NodeAddress.unresolved(39735, host = 175, 45, 182, 145), "Signet Node 9")
+  val node10: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"0307238136c48cd35084c4efadc486143a7e8a7acd8ff8ac053fdab4efabc551c4"), NodeAddress.unresolved(9735, host = 104, 244, 73, 68), "Signet Node 10")
+  val node11: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"020ee56ff81d12d17d5d3eea5306a8982a5763522ca73e0e220ce282030543c90c"), NodeAddress.unresolved(44149, host = 84, 247, 50, 180), "Signet Node 11")
+
+  // Note: NodeAddress.unresolved(port, host = a,b,c,d) is strictly for IPv4. For domains, fromParts is typically used.
+  val signetEclair: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"0271cf3881e6eadad960f47125434342e57e65b98a78afa99f9b4191c02dd7ab3b"), NodeAddress.fromParts("signet-eclair.wakiyamap.dev", 9735), "Signet Eclair")
+
+  // Preserved exactly from your TestNet3SyncParams
+  override val localNode: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"022b2053758559dbfd4dee6b89067cd17d37ec7e26edb2f7b58baac501add4b72b"), NodeAddress.unresolved(9735, host = 192, 168, 2, 11), "localhost")
+
+  override val syncNodes: Set[RemoteNodeInfo] = Set(
+    node1, node2, node3, node4, node5, node6,
+    node7, node8, node9, node10, node11, signetEclair, localNode
+  )
+
+  override val phcSyncNodes: Set[RemoteNodeInfo] = Set.empty
+  override val minCapacity: MilliSatoshi = MilliSatoshi(10000000L)
+  override val minNormalChansForPHC = 1
+  override val maxNodesToSyncFrom = 1
+  override val acceptThreshold = 0
+}
+
+class RegtestSyncParams extends SyncParams {
+  override val syncNodes: Set[RemoteNodeInfo] = Set.empty
+  override val phcSyncNodes: Set[RemoteNodeInfo] = Set.empty
+  override val minCapacity: MilliSatoshi = MilliSatoshi(1000L)
+  override val minNormalChansForPHC = 1
+  override val maxNodesToSyncFrom = 1
+  override val acceptThreshold = 0
+}
+
 // Important: LNParams.secret must be defined
 case class RemoteNodeInfo(nodeId: PublicKey, address: NodeAddress, alias: String) {
   lazy val nodeSpecificExtendedKey: DeterministicWallet.ExtendedPrivateKey = LNParams.secret.keys.ourFakeNodeIdKey(nodeId)

@@ -69,6 +69,7 @@ class SettingsActivity extends BaseCheckActivity with HasTypicalChainFee with Ch
 
     useBiometric.updateView
     enforceTor.updateView
+    hideZeroOutputs.updateView
     super.onResume
   }
 
@@ -359,6 +360,19 @@ class SettingsActivity extends BaseCheckActivity with HasTypicalChainFee with Ch
     }
   }
 
+  lazy private[this] val hideZeroOutputs = new SettingsHolder(me) {
+    override def updateView: Unit = settingsCheck.setChecked(WalletApp.hideZeroOutputs)
+
+    settingsTitle.setText(settings_hide_zero_outputs)
+    setVis(isVisible = false, settingsInfo)
+
+    view setOnClickListener onButtonTap {
+      putBoolAndUpdateView(WalletApp.HIDE_ZERO_OUTPUTS, !WalletApp.hideZeroOutputs)
+      HubActivity.instance.updAllInfos
+      HubActivity.instance.paymentAdapterDataChanged.run
+    }
+  }
+
   lazy private[this] val viewCode = new SettingsHolder(me) {
     setVisMany(false -> settingsCheck, false -> settingsInfo)
     view setOnClickListener onButtonTap(viewRecoveryCode)
@@ -410,6 +424,7 @@ class SettingsActivity extends BaseCheckActivity with HasTypicalChainFee with Ch
 
     settingsContainer.addView(useBiometric.view)
     settingsContainer.addView(enforceTor.view)
+    settingsContainer.addView(hideZeroOutputs.view)
     settingsContainer.addView(viewCode.view)
     settingsContainer.addView(viewStat.view)
     settingsContainer.addView(links.view)

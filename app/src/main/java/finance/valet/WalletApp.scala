@@ -81,6 +81,7 @@ object WalletApp {
   final val SHOW_RATE_US = "showRateUs"
   final val GAP_LIMIT = "gapLimit"
   final val DEFAULT_GAP_LIMIT = 10
+  final val HIDE_ZERO_OUTPUTS = "hideZeroOutputs"
 
   def useAuth: Boolean = AppLock.isEnrolled(app)
   def fiatCode: String = app.prefs.getString(FIAT_CODE, "usd")
@@ -88,6 +89,7 @@ object WalletApp {
   def maximizedView: Boolean = app.prefs.getBoolean(MAXIMIZED_VIEW, true)
   def showRateUs: Boolean = app.prefs.getBoolean(SHOW_RATE_US, true)
   def gapLimit: Int = app.prefs.getInt(GAP_LIMIT, DEFAULT_GAP_LIMIT)
+  def hideZeroOutputs: Boolean = app.prefs.getBoolean(HIDE_ZERO_OUTPUTS, true)
 
   final val CHECKED_BUTTONS = "checkedButtons"
   def getCheckedButtons(default: Set[String] = Set.empty): mutable.Set[String] = app.prefs.getStringSet(CHECKED_BUTTONS, default.asJava).asScala
@@ -150,12 +152,21 @@ object WalletApp {
 
     // In case these are needed early
     LNParams.logBag = new SQLiteLog(miscInterface)
-    LNParams.chainHash = Block.LivenetGenesisBlock.hash
+
+    val (hash, params) = {
+      BuildConfig.FLAVOR match {
+        case "mainnet" => (Block.LivenetGenesisBlock.hash, new SyncParams)
+        case "tnet3" => (Block.Testnet3GenesisBlock.hash, new TestNet3SyncParams)
+        case "tnet4" => (Block.Testnet4GenesisBlock.hash, new TestNet4SyncParams)
+        case "regtest" => (Block.RegtestGenesisBlock.hash, new RegtestSyncParams)
+      }
+    }
+
+    LNParams.chainHash = hash
     LNParams.routerConf = RouterConf(initRouteMaxLength = 10, LNParams.maxCltvExpiryDelta)
     LNParams.connectionProvider = if (ensureTor) new TorConnectionProvider(app) else new ClearnetConnectionProvider
     LNParams.ourInit = LNParams.createInit
-    LNParams.syncParams = new SyncParams
-    LNParams.ourInit = LNParams.createInit
+    LNParams.syncParams = params
   }
 
   def makeOperational(secret: WalletSecret): Unit = {
@@ -194,15 +205,17 @@ object WalletApp {
     ElectrumClientPool.loadFromChainHash = {
       case _ if currentCustomElectrum.isSuccess => ElectrumServerAddress(currentCustomElectrum.get.socketAddress, SSL.DECIDE).asSome.toSet
       case Block.LivenetGenesisBlock.hash => ElectrumClientPool.readServerAddresses(app.getAssets open "servers_mainnet.json")
-      case Block.TestnetGenesisBlock.hash => ElectrumClientPool.readServerAddresses(app.getAssets open "servers_testnet.json")
+      case Block.Testnet3GenesisBlock.hash => ElectrumClientPool.readServerAddresses(app.getAssets open "servers_testnet3.json")
       case Block.Testnet4GenesisBlock.hash => ElectrumClientPool.readServerAddresses(app.getAssets open "servers_testnet4.json")
+      case Block.RegtestGenesisBlock.hash => ElectrumClientPool.readServerAddresses(app.getAssets open "servers_regtest.json")
       case _ => throw new RuntimeException
     }
 
     CheckPoint.loadFromChainHash = {
       case Block.LivenetGenesisBlock.hash => CheckPoint.load(app.getAssets open "checkpoints_mainnet.json")
-      case Block.TestnetGenesisBlock.hash => CheckPoint.load(app.getAssets open "checkpoints_testnet.json")
+      case Block.Testnet3GenesisBlock.hash => CheckPoint.load(app.getAssets open "checkpoints_testnet3.json")
       case Block.Testnet4GenesisBlock.hash => CheckPoint.load(app.getAssets open "checkpoints_testnet4.json")
+      case Block.RegtestGenesisBlock.hash => Vector.empty
       case _ => throw new RuntimeException
     }
 

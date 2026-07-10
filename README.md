@@ -25,25 +25,112 @@ Valet project [Roadmap](./ROADMAP.md).
 ```
 git clone https://github.com/standardsats/valet.git
 cd valet
-git checkout 4.4.4
 podman build -t valet .
 podman run -v $PWD:/app/valet:z valet
 ```
 
-### Signing with your self-signed certificate
+The container runs `./gradlew assembleRelease && ./gradlew bundleRelease`, producing
+an APK for every product flavor (`mainnet`, `tnet3`, `tnet4`, `regtest`) under
+`app/build/outputs/apk/release/`, named `<applicationId>_<versionCode>.apk`
+(e.g. `finance.valet_107.apk` for mainnet), plus `.aab` bundles under
+`app/build/outputs/bundle/release/`.
 
-Install Android SDK, create a `keystore.jks` using `keytool`.
+### Signing APKs with your self-signed certificate
+
+Gradle handles zipalign and APK signing automatically when the right environment
+variables are present at build time, so for APKs you usually don't need to run
+`zipalign`/`apksigner` yourself.
+
+1. Create a keystore (once):
+
+   ```
+   keytool -genkey -v -keystore release.keystore -alias release \
+       -keyalg RSA -keysize 2048 -validity 10000
+   ```
+
+2. Pass the signing credentials into the build container:
+
+   ```
+   podman run -v $PWD:/app/valet:z \
+       -e SIGNING_STORE_FILENAME=/app/valet/release.keystore \
+       -e SIGNING_KEY_ALIAS=release \
+       -e SIGNING_STORE_PASSWORD=<keystore/key password> \
+       valet
+   ```
+
+   With these variables set, every `assemble<Flavor>Release` task is finalized by a
+   `sign<Flavor>ReleaseApk` task that zipaligns and signs the APK in place
+   (`--v1-signing-enabled true --v2-signing-enabled true`). If `SIGNING_KEY_ALIAS`
+   is not set, the build still normalizes timestamps and zipaligns the APK, but
+   leaves it unsigned.
+
+#### Manually signing an unsigned APK
+
+If you ended up with an unsigned (but already zipaligned) APK, sign it directly with
+`apksigner`:
 
 ```
-$ <Android SDK dir>/build-tools/<version>/zipalign -v 4 app/build/outputs/apk/release/Valet-4.4.4.apk app/build/outputs/apk/release/Valet-4.4.4-aligned.apk
+$ <Android SDK dir>/build-tools/<version>/apksigner sign \
+    --ks release.keystore --ks-key-alias release \
+    --v1-signing-enabled true --v2-signing-enabled true \
+    app/build/outputs/apk/release/finance.valet_107.apk
+```
 
-$ <Android SDK dir>/build-tools/<version>/apksigner sign --ks <path to keystore.jks> --ks-key-alias <signing key alias> --v1-signing-enabled true --v2-signing-enabled true app/build/outputs/apk/release/Valet-4.4.4-aligned.apk
+If the APK isn't aligned yet, align it first:
+
+```
+$ <Android SDK dir>/build-tools/<version>/zipalign -v 4 \
+    app/build/outputs/apk/release/finance.valet_107.apk \
+    app/build/outputs/apk/release/finance.valet_107-aligned.apk
+```
+
+then sign the `-aligned.apk` file and rename it back if desired.
+
+### Signing App Bundles (`.aab`)
+
+`bundleRelease` is **not** covered by the Gradle signing task above, so any
+`app-release.aab` produced under `app/build/outputs/bundle/release/` is always
+unsigned. To sign one for personal use:
+
+```
+$ <Android SDK dir>/build-tools/<version>/zipalign -v 4 \
+    app/build/outputs/bundle/release/app-release.aab \
+    app/build/outputs/bundle/release/app-release-aligned.aab
+
+$ <Android SDK dir>/build-tools/<version>/apksigner sign \
+    --ks release.keystore --ks-key-alias release \
+    --v1-signing-enabled true --v2-signing-enabled true \
+    --min-sdk-version 30 \
+    app/build/outputs/bundle/release/app-release-aligned.aab
+```
+
+### Installing on a device
+
+```
+adb devices
+adb -d install -r app/build/outputs/apk/release/finance.valet_107.apk
+```
+
+(uninstall a previous build first with `adb -d uninstall finance.valet` if you hit a
+signature mismatch).
+
+### Optional: detached PGP signature for distribution
+
+If you plan to share a signed APK, you can additionally attach a detached PGP
+signature and checksum:
+
+```
+APK=app/build/outputs/apk/release/finance.valet_107.apk
+gpg --batch --yes --local-user <your GPG key id> --armor --detach-sign \
+    --output "${APK}.asc" "${APK}"
+sha256sum "${APK}" "${APK}.asc" > "${APK}.sha256"
+gpg --armor --export <your GPG key id> > pubkey.asc
 ```
 
 ## Verification with `apksigner`
 
 ```
-$ '<Android SDK dir>/build-tools/<version>/apksigner' verify --print-certs --verbose Valet-4.4.4.apk
+apksigner verify --print-certs --verbose finance.valet_107.apk
 ```
 
 Output should contain the following info:
@@ -66,20 +153,8 @@ Signer #1 public key MD5 digest: e4e1f847e0cb0a9703dc4f9323fd6d87
 
 ### Acknowledgements
 
-Original SBW Project couldn't be done without LNBig support
+Original SBW Project couldn't be done without [LNBig](https://x.com/lnbig_com) support
 and [A. Kumaigorodski](https://github.com/akumaigorodski) development efforts.
-
-<table>
-  <tbody>
-    <tr>
-      <td align="center" valign="middle">
-        <a href="https://lnbig.com/" target="_blank">
-          <img width="146px" src="https://i.imgur.com/W4A92Ym.png">
-        </a>
-      </td>
-    </tr>
-  </tbody>
-</table>
 
 ### Donate
 

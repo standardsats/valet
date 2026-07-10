@@ -31,7 +31,7 @@ object CheckPoint {
 
   var loadFromChainHash: ByteVector32 => Vector[CheckPoint] = {
     case Block.LivenetGenesisBlock.hash => load(classOf[CheckPoint].getResourceAsStream("/electrum/checkpoints_mainnet.json"))
-    case Block.TestnetGenesisBlock.hash => load(classOf[CheckPoint].getResourceAsStream("/electrum/checkpoints_testnet.json"))
+    case Block.Testnet3GenesisBlock.hash => load(classOf[CheckPoint].getResourceAsStream("/electrum/checkpoints_testnet3.json"))
     case Block.RegtestGenesisBlock.hash => Vector.empty[CheckPoint]
     case _ => throw new RuntimeException
   }

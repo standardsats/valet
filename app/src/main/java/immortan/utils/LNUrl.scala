@@ -19,7 +19,8 @@ import scala.util.Try
 
 object LNUrl {
   def fromIdentifier(identifier: String): LNUrl = {
-    val (user, domain) = identifier.splitAt(identifier indexOf '@')
+    val (user, domainWithAt) = identifier.toLowerCase.splitAt(identifier indexOf '@')
+    val domain = domainWithAt.drop(1)
     val isOnionDomain: Boolean = domain.endsWith(NodeAddress.onionSuffix)
     if (isOnionDomain) LNUrl(s"http://$domain/.well-known/lnurlp/$user")
     else LNUrl(s"https://$domain/.well-known/lnurlp/$user")
@@ -37,6 +38,8 @@ object LNUrl {
     require(isSSLPlain || isOnion, "URI is neither Plain/HTTPS nor Onion/HTTP request")
     uri
   }
+
+  def invalidAddress: Nothing = throw new Exception("Lightning address is invalid: server did not return a valid LNURL response")
 
   def guardResponse(raw: String): String = {
     val parseAttempt = Try(raw.parseJson.asJsObject.fields)
@@ -72,7 +75,15 @@ case class LNUrl(request: String) {
   }
 
   def level1DataResponse: Observable[LNUrlData] = Rx.ioQueue.map { _ =>
-    to[LNUrlData](LNParams.connectionProvider.get(uri.toString).string)
+    val raw = LNParams.connectionProvider.get(uri.toString).string
+    val parseAttempt = Try(raw.parseJson.asJsObject.fields)
+    val hasErrorDescription = parseAttempt.map(_ apply "reason").map(json2String)
+    val hasError = parseAttempt.map(_ apply "status").map(json2String).filter(_.toUpperCase == "ERROR")
+
+    if (hasErrorDescription.isSuccess) throw new Exception(s"Error from vendor: ${hasErrorDescription.get}")
+    else if (hasError.isSuccess) throw new Exception(s"Error from vendor: no description provided")
+    else if (parseAttempt.isFailure) LNUrl.invalidAddress
+    Try(to[LNUrlData](raw)).getOrElse(LNUrl.invalidAddress)
   }
 }
 

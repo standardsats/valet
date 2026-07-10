@@ -38,7 +38,7 @@
 
         <provider
             android:name="androidx.core.content.FileProvider"
-            android:authorities="finance.valet"
+            android:authorities="${applicationId}"
             android:grantUriPermissions="true"
             android:exported="false">
 

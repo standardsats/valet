@@ -138,7 +138,7 @@ object Block extends BtcSerializer[Block] {
     )
   }
 
-  val TestnetGenesisBlock = LivenetGenesisBlock.copy(header = LivenetGenesisBlock.header.copy(time = 1296688602, nonce = 414098458))
+  val Testnet3GenesisBlock = LivenetGenesisBlock.copy(header = LivenetGenesisBlock.header.copy(time = 1296688602, nonce = 414098458))
 
   val Testnet4GenesisBlock = LivenetGenesisBlock.copy(header = LivenetGenesisBlock.header.copy(hashMerkleRoot = ByteVector32(hex"4e7b2b9128fe0291db0693af2ae418b767e657cd407e80cb1434221eaea7a07a"), time = 1714777860, nonce = 393743547))
 
