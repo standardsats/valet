@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest
     xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
-    package="finance.valet">
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.VIBRATE"/>
     <uses-permission android:name="android.permission.CAMERA"/>
@@ -48,8 +48,15 @@
 
         </provider>
 
+        <!-- targetSdk 34+ rejects startForeground() from a service with no declared
+             type. "dataSync" is the closest standard fit for holding the Electrum /
+             peer connection open while an incoming payment is awaited. Note Android
+             15 caps dataSync at roughly 6h per day; if that proves too tight the
+             alternative is "specialUse", which needs a Play Console justification. -->
         <service
             android:stopWithTask="true"
+            android:exported="false"
+            android:foregroundServiceType="dataSync"
             android:name="finance.valet.utils.AwaitService"/>
 
         <activity

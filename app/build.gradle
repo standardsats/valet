@@ -1,51 +1,65 @@
-apply plugin: "com.android.application"
-apply plugin: "jp.leafytree.android-scala"
+import java.util.zip.ZipEntry
+import java.util.zip.ZipFile
+import java.util.zip.ZipOutputStream
+import org.gradle.api.tasks.scala.ScalaCompile
 
-task wrapper(type: Wrapper) {
-    gradleVersion = '5.4.1'
+plugins {
+    alias libs.plugins.androidApplication
+    alias libs.plugins.scalaAndroid
+}
+
+// The scala-android plugin adds `src/<sourceSet>/scala` to each source set's *java*
+// directories and points ScalaCompile at all of them, emptying the Java task. Our
+// .scala sources therefore keep living under src/main/java alongside the .java ones,
+// exactly as before -- no source tree move is needed.
+scala {
+    scalaVersion = libs.versions.scala.get()
 }
 
 android {
-    compileSdkVersion 33
-    buildToolsVersion "30.0.3"
-    ndkVersion '22.1.7171670'
+    namespace 'finance.valet'
+    compileSdk 36
+    buildToolsVersion '36.0.0'
 
     defaultConfig {
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
         applicationId 'finance.valet'
         multiDexEnabled true
-        targetSdkVersion 33
-        minSdkVersion 21
+        targetSdk 36
+        minSdk 21
 
         versionName '5.0.0'
         vectorDrawables.generatedDensities = []
     }
 
-    flavorDimensions "chain"
+    buildFeatures {
+        // AGP 8 stopped generating BuildConfig by default. WalletApp switches chain on
+        // BuildConfig.FLAVOR and SettingsActivity reads VERSION_CODE/VERSION_NAME, so
+        // this has to stay on.
+        buildConfig true
+    }
+
+    flavorDimensions = ['chain']
     productFlavors {
         mainnet {
-            dimension "chain"
+            dimension 'chain'
             versionCode 107 // odd for mainnet
         }
         tnet4 {
-            dimension "chain"
+            dimension 'chain'
             applicationIdSuffix '.testnet4'
             versionCode 106 // even for testnets
         }
         tnet3 {
-            dimension "chain"
+            dimension 'chain'
             applicationIdSuffix '.testnet3'
             versionCode 106
         }
         regtest {
-            dimension "chain"
+            dimension 'chain'
             applicationIdSuffix '.regtest'
             versionCode 106
         }
-    }
-
-    dexOptions {
-        javaMaxHeapSize '12g'
     }
 
     buildTypes {
@@ -62,6 +76,8 @@ android {
     }
 
     compileOptions {
+        // Scala 2.11.12 cannot emit bytecode above Java 8, so the Java side is pinned
+        // to match. See the ScalaCompile toolchain block below.
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
@@ -72,53 +88,64 @@ android {
         }
     }
 
-    packagingOptions {
-        exclude '**/META-INF/**'
-        exclude '**/meta-inf/**'
+    packaging {
+        resources {
+            excludes += ['**/META-INF/**', '**/meta-inf/**']
+        }
     }
+}
+
+// AGP 8.12 requires Gradle to run on JDK 17, but the Scala 2.11.12 compiler predates
+// the module system and does not run there. Fork ScalaCompile onto a JDK 11 toolchain;
+// the build therefore needs both JDKs visible to Gradle's toolchain detection.
+tasks.withType(ScalaCompile).configureEach {
+    javaLauncher = javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(11)
+    }
+    scalaCompileOptions.additionalParameters = ['-target:jvm-1.8']
 }
 
 dependencies {
     // Android-specific
-    implementation 'androidx.multidex:multidex:2.0.1'
-    implementation 'androidx.work:work-runtime:2.7.1'
-    implementation 'androidx.appcompat:appcompat:1.3.1'
-    implementation 'com.cottacush:CurrencyEditText:0.0.10'
-    implementation 'com.google.android.material:material:1.4.0'
-    implementation 'com.google.code.ndef-tools-for-android:ndeftools:1.2.4'
-    implementation 'com.guardanis:applock:3.0.2'
+    implementation libs.multidex
+    implementation libs.work.runtime
+    implementation libs.appcompat
+    implementation libs.currencyedittext
+    implementation libs.material
+    implementation libs.ndeftools
+    implementation libs.applock
 
-    implementation('com.journeyapps:zxing-android-embedded:4.2.0') {
+    implementation(libs.zxing.android.embedded) {
         // We use zxing sources with fixed List.sort which is not in API21
         exclude group: 'com.google.zxing', module: 'core'
     }
 
     // Immortan
-    implementation 'org.scala-lang:scala-library:2.11.12'
-    implementation 'fr.acinq.secp256k1:secp256k1-kmp-jni-android:0.5.2'
-    implementation 'org.scala-lang.modules:scala-parser-combinators_2.11:2.1.0'
-    implementation 'com.softwaremill.quicklens:quicklens_2.11:1.7.5'
-    implementation 'com.typesafe.akka:akka-actor_2.11:2.3.14'
-    implementation 'org.scodec:scodec-core_2.11:1.11.4'
-    implementation 'io.reactivex:rxscala_2.11:0.27.0'
+    implementation libs.scala.library
+    implementation libs.secp256k1.kmp.jni.android
+    implementation libs.scala.parser.combinators
+    implementation libs.quicklens
+    implementation libs.akka.actor
+    implementation libs.scodec.core
+    implementation libs.rxscala
 
-    implementation 'org.json4s:json4s-native_2.11:3.6.7'
-    implementation 'io.spray:spray-json_2.11:1.3.6'
+    implementation libs.json4s.native
+    implementation libs.spray.json
 
-    implementation 'org.bouncycastle:bcprov-jdk15to18:1.68'
-    implementation 'com.google.guava:guava:29.0-android'
-    implementation 'commons-codec:commons-codec:1.10'
-    implementation 'io.netty:netty-all:4.1.42.Final'
+    implementation libs.bcprov
+    implementation libs.guava
+    implementation libs.commons.codec
+    implementation libs.netty.all
 
     // Built-in Tor
-    implementation 'com.squareup.okhttp3:okhttp:4.9.0'
-    implementation 'info.guardianproject:tor-android:0.4.6.9'
-    implementation 'info.guardianproject:jtorctl:0.4.5.7'
+    implementation libs.okhttp
+    implementation libs.tor.android
+    implementation libs.jtorctl
 
     // Android tests
-    testImplementation 'junit:junit:4.12'
-    androidTestImplementation 'androidx.test.ext:junit:1.1.3'
-    androidTestImplementation 'androidx.test.espresso:espresso-core:3.4.0'
+    testImplementation libs.junit
+    androidTestImplementation libs.androidx.junit
+    androidTestImplementation libs.espresso.core
 }
 
 tasks.withType(Jar).configureEach {
@@ -132,8 +159,6 @@ tasks.withType(Jar).configureEach {
     outputs.upToDateWhen { false }
     from { files.sort() }
 }
-
-import java.util.zip.*
 
 android.applicationVariants.all { variant ->
     if (variant.buildType.name != 'release') return

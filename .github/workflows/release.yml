@@ -13,21 +13,22 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           lfs: true
 
-      - name: Set up JDK 11
-        uses: actions/setup-java@v3
+      # 17 runs Gradle/AGP and becomes JAVA_HOME (last listed wins); 11 is kept for the
+      # forked Scala 2.11 compiler and located via org.gradle.java.installations.fromEnv.
+      - name: Set up JDKs
+        uses: actions/setup-java@v4
         with:
-          java-version: '11'
+          java-version: |
+            11
+            17
           distribution: 'temurin'
 
-      - name: Set up NDK
-        run: echo "y" | ${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager "ndk;22.1.7171670" || true
-
       - name: Setup Gradle
-        uses: gradle/gradle-build-action@v2
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Decode keystore
         run: echo "${{ secrets.SIGNING_KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
@@ -38,13 +39,22 @@ jobs:
           SIGNING_STORE_FILENAME: ${{ github.workspace }}/keystore.jks
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
-        run: ./gradlew assembleRelease
+        run: ./gradlew assembleRelease -Porg.gradle.java.installations.fromEnv=JAVA_HOME_11_X64
 
-      - name: Rename APK
-        run: mv app/build/outputs/apk/release/finance.valet_105.apk app/build/outputs/apk/release/valet-testnet-${{ github.ref_name }}.apk
+      # Every flavour's release APK, under the name build.gradle already gives it
+      # (<applicationId>_<versionCode>.apk), so nothing here has to track versionCode
+      # bumps or the flavour list. Fails loudly rather than publishing an empty release.
+      - name: Collect APKs
+        run: |
+          mkdir -p out
+          find app/build/outputs/apk -path '*/release/*.apk' -exec cp {} out/ \;
+          count=$(ls -1 out/*.apk 2>/dev/null | wc -l)
+          echo "collected $count apk(s):"
+          ls -1 out/
+          test "$count" -gt 0
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: app/build/outputs/apk/release/valet-testnet-${{ github.ref_name }}.apk
+          files: out/*.apk
           generate_release_notes: true

@@ -1,27 +1,8 @@
-buildscript {
-    repositories {
-        mavenCentral()
-        google()
-        maven {
-            url 'https://jitpack.io'
-            content {
-                includeGroupByRegex "com\\.github.*"
-            }
-        }
-    }
-    dependencies {
-        classpath 'com.android.tools.build:gradle:3.5.4'
-        classpath 'com.github.AllBus:gradle-android-scala-plugin:3.5.1'
-    }
+plugins {
+    alias libs.plugins.androidApplication apply false
+    alias libs.plugins.scalaAndroid apply false
 }
 
-allprojects {
-    repositories {
-        mavenCentral()
-        google()
-    }
-}
-
-task clean(type: Delete) {
-    delete rootProject.buildDir
+tasks.register('clean', Delete) {
+    delete rootProject.layout.buildDirectory
 }
