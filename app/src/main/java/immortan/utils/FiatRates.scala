@@ -26,10 +26,9 @@ class FiatRates(bag: DataBag) extends CanBeShutDown {
 
   def reloadData: Tools.Fiat2Btc = focused.map(_.toLowerCase) match {
     case Some("sos") => to[Bitpay](LNParams.connectionProvider.get("https://bitpay.com/rates").string).data.map { case BitpayItem(code, rate) => code.toLowerCase -> rate }.toMap
-    case _ => fr.acinq.eclair.secureRandom nextInt 3 match {
+    case _ => fr.acinq.eclair.secureRandom nextInt 2 match {
       case 0 => to[CoinGecko](LNParams.connectionProvider.get("https://api.coingecko.com/api/v3/exchange_rates").string).rates.map { case (code, item) => code.toLowerCase -> item.value }
-      case 1 => to[FiatRates.BlockchainInfoItemMap](LNParams.connectionProvider.get("https://blockchain.info/ticker").string).map { case (code, item) => code.toLowerCase -> item.last }
-      case _ => to[Bitpay](LNParams.connectionProvider.get("https://bitpay.com/rates").string).data.map { case BitpayItem(code, rate) => code.toLowerCase -> rate }.toMap
+      case _ => to[FiatRates.BlockchainInfoItemMap](LNParams.connectionProvider.get("https://blockchain.info/ticker").string).map { case (code, item) => code.toLowerCase -> item.last }
     }
   }
 
