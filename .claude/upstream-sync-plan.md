@@ -3,9 +3,13 @@
 **Goal:** Recover non-conflicting bugfixes and improvements from the `parent` remote
 without importing its LN-removal or its pivot to a USDT/Drivechain trading app.
 
-**Status:** in-progress. Phase 0 shipped 2026-07-30 on branch `upstream-sync-phase0`
-(electrum sync bugfix, Bitpay narrowed out of the fiat rotation, Ukrainian
-translation). Phase 1 not started — blocked on a working toolchain.
+**Status:** in-progress.
+
+- **Phase 0 — shipped** 2026-07-30 on branch `upstream-sync-phase0` (electrum sync
+  bugfix, Bitpay narrowed out of the fiat rotation, Ukrainian translation).
+- **Phase 1 — implemented 2026-07-30, uncommitted, never compiled.** Working tree on
+  the same branch. See the risk list below before trusting it.
+- **Phase 2 — not started.**
 
 ---
 
@@ -60,24 +64,74 @@ dev artifacts, and those ride along in otherwise-good commits.
 
 ---
 
-## Phase 1 — build modernization (do before Phase 2)
+## Phase 1 — build modernization — IMPLEMENTED 2026-07-30 (uncommitted, uncompiled)
 
-Valet is on Gradle **5.4.1** / AGP **3.5.4** / compileSdk **33**. Play requires
-targetSdk 35+ for updates. Parent proves the escape route keeps Scala 2.11.12:
-Gradle 8.13, AGP 8.12.3, compileSdk 36, JDK 17, via `com.soundcorset.scala-android`
-(replacing the abandoned `gradle-android-scala-plugin`) + a version catalog.
+Was: Gradle **5.4.1** / AGP **3.5.4** / compileSdk **33**. Now: Gradle **8.13** /
+AGP **8.12.3** / compileSdk + targetSdk **36**, Scala still 2.11.12, via
+`com.soundcorset.scala-android` + `gradle/libs.versions.toml`.
 
-**Blocker:** no JDK and no Android SDK on the dev box as of 2026-07-30 — nothing in
-Phase 0 was compiled, only statically checked. Sort this out first.
+Files touched: `settings.gradle`, `build.gradle`, `app/build.gradle`,
+`gradle/libs.versions.toml` (new), `gradle/wrapper/gradle-wrapper.properties`,
+`gradle.properties`, `app/src/main/AndroidManifest.xml`, `Containerfile`,
+`.github/workflows/{always,release}.yml`.
 
-Do **not** cherry-pick `a8f43f8b`. Rewrite `app/build.gradle` → `build.gradle.kts`
-using parent HEAD's file as a template, preserving:
-- the four flavors (mainnet / tnet3 / tnet4 / regtest) and their versionCode parity rule
-- the deterministic-build jar manifest attributes
-- PGP signing + zipalign tasks
-- the full LN dependency set (akka, scodec, quicklens, json4s, netty, tor-android)
+### Four corrections to what this section originally assumed
 
-Also bump `secp256k1-kmp-jni-android` 0.5.2 → 0.19.0, `guava` 29 → 33.
+1. **No source-tree move is needed.** The plugin adds `src/<set>/scala` to the *java*
+   source directories and sets `ScalaCompile`'s source to all of them while emptying
+   the Java task (`ScalaAndroidPlugin.java` lines 55 and 116). `.scala` files under
+   `src/main/java` compile as-is, so **the Phase 2 patch recipe above stays valid**.
+2. **Plugin version was wrong here.** `26.0124.2208` targets AGP 9.0+; AGP 8.4–8.13
+   needs **`25.0417.2204`**. Parent runs the mismatched pairing, so parent's build is
+   *not* evidence that this configuration works.
+3. **`buildFeatures { buildConfig true }` is mandatory.** AGP 8 stopped generating
+   BuildConfig by default and `WalletApp` selects the chain on `BuildConfig.FLAVOR`.
+   Without it the build fails in a way unrelated to anything else here.
+4. **JDK 17 and Scala 2.11.12 conflict.** AGP 8.12 requires 17; scalac 2.11.12 will
+   not run there. `app/build.gradle` forks `ScalaCompile` onto a JDK 11 toolchain —
+   the same JVM that compiles Valet today — so both JDKs must be visible to Gradle.
+   Containerfile installs both; CI passes
+   `-Porg.gradle.java.installations.fromEnv=JAVA_HOME_11_X64`.
+
+### Deliberate deviations
+
+- **Stayed on Groovy DSL**, did not convert to `.kts`. The reproducible-build chain
+  (normalize timestamps → zipalign → apksigner → PGP) depends on the legacy
+  `applicationVariants` API, which has no `androidComponents` equivalent for output
+  filenames; Kotlin would require casting to `BaseVariantOutputImpl` internals.
+  Nothing about Play compliance needs `.kts`.
+- **Only bumped `secp256k1-kmp-jni-android` 0.5.2 → 0.19.0 and `guava` 29 → 33**, as
+  specified. `getSecpk256k1` — Valet's single call site in `Crypto.scala` — verified
+  present in 0.19.0. appcompat / material / work-runtime left alone: bumping those has
+  runtime theming consequences that need a device, not a build file.
+- **minSdk stays 21.** The plugin claims support from API 26. Raising it drops real
+  users and is a product decision.
+
+### Verified offline / NOT verified
+
+Verified: every catalog accessor resolves, all 27 libraries referenced, no dangling
+`version.ref`, manifest XML + TOML parse, every dependency coordinate and
+`build-tools;36.0.0` resolves against the real repositories.
+
+**Nothing was compiled** — still no JDK or Android SDK on the dev box. Open risks,
+most likely to bite first:
+
+1. **Whether Gradle 8.13's Scala toolchain supports 2.11.12 at all.** It resolves
+   `scalaVersion` through the new `scalaToolchainRuntimeClasspath`; Zinc's floor for
+   Scala 2.11 is unconfirmed. This is the one that could sink the migration.
+2. `javaLauncher` on `ScalaCompile` — property name/availability not confirmed.
+3. `applicationVariants` under AGP 8.12 — deprecated, expected to work with warnings,
+   removed in AGP 9.
+4. `foregroundServiceType="dataSync"` on `AwaitService` (added because targetSdk 34+
+   rejects `startForeground()` with no declared type). Android 15 caps dataSync near
+   6h/day; `specialUse` is the alternative but needs Play Console justification.
+   **Product decision, currently made by default.**
+
+### Follow-up not done here
+
+`gradlew` and `gradle-wrapper.jar` are still 5.4.1. They should bootstrap 8.13, but
+regenerate them properly with `./gradlew wrapper --gradle-version 8.13` rather than
+dropping in a downloaded binary — this repo ships PGP-signed reproducible builds.
 
 ## Phase 2 — Electrum/chain stack (dependent stack, replay in order)
 
@@ -159,5 +213,7 @@ Found 2026-07-30 while doing Phase 0. Not caused by the parent; unrelated to the
 
 ## Next
 
-Get a JDK 17 + Android SDK onto the dev box, confirm Phase 0 compiles, then start
-Phase 1.
+Get JDK 17 + JDK 11 + an Android SDK onto the dev box (or just run the Containerfile),
+then `./gradlew assembleMainnetDebug`. Risk 1 above — Scala 2.11.12 on Gradle 8.13's
+Scala toolchain — is what that first build actually tests; everything else in Phase 1
+is mechanical. Once it compiles, regenerate the wrapper, commit, and start Phase 2.
