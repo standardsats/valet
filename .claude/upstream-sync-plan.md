@@ -3,7 +3,9 @@
 **Goal:** Recover non-conflicting bugfixes and improvements from the `parent` remote
 without importing its LN-removal or its pivot to a USDT/Drivechain trading app.
 
-**Status:** in-progress — Phase 0 started 2026-07-30
+**Status:** in-progress. Phase 0 shipped 2026-07-30 on branch `upstream-sync-phase0`
+(electrum sync bugfix, Bitpay narrowed out of the fiat rotation, Ukrainian
+translation). Phase 1 not started — blocked on a working toolchain.
 
 ---
 
@@ -52,51 +54,11 @@ git format-patch -1 --stdout <sha> \
                      --exclude='app/src/androidTest/*'
 ```
 
+Always inspect the `build.gradle` hunk before discarding it — upstream repeatedly
+committed accidental SDK downgrades and livenet/testnet genesis-block flips as local
+dev artifacts, and those ride along in otherwise-good commits.
+
 ---
-
-## Phase 0 — free wins (no conflict risk) — DONE 2026-07-30
-
-- [x] `6002ebfe` Electrum sync bugfix — `ElectrumWallet.scala:78` overwrote
-      `pendingHistoryRequests` (script hashes, maintained at lines 90/133) with a set
-      of **txids**. Two consequences: the dedup guard on line 69 never fired, and
-      `reset` (line 377) does `status -- pendingHistoryRequests`, so on reconnect the
-      genuinely-pending script hashes never got their status cleared and never
-      re-synced. One-token fix.
-- [~] `66f24003` Electrum server list — **already in Valet**. `2ed41130` (2024-11-09)
-      landed a byte-identical list independently. No-op.
-- [x] `860a8319` Bitpay fiat provider — taken **narrowly**. Valet added a
-      `case Some("sos")` branch routing Somali Shilling exclusively through Bitpay;
-      neither CoinGecko `exchange_rates` nor blockchain.info `ticker` carries SOS, so
-      the parent's wholesale removal would silently break it. Dropped Bitpay from the
-      random rotation (`nextInt 3` → `nextInt 2`), kept the SOS route.
-      Did **not** take the bundled `rub` removal — that is `3cbd5f44` politics.
-- [~] `e2aa063c` fiat loading glitch — **skipped**. Valet never had
-      `onAttemptGetRates`, so the fix is a no-op here; the commit also flips
-      `LivenetGenesisBlock` → `TestnetGenesisBlock` (dev artifact the parent reverts
-      later) and shortens the poll to 3 min, which risks CoinGecko rate-limiting.
-- [x] `893bfb11` / `ff35aa77` Ukrainian translation — 83 keys upstream, 75 shared with
-      Valet. Dropped the 8 orphans (post-2023 parent features Valet lacks), kept
-      `app_name` as "Valet" not "SBW". All 75 verified for format-specifier parity
-      against `values/strings.xml`. Excluded the commit's `build.gradle` hunk — another
-      accidental SDK downgrade (33 → 30).
-
-### Open bug found while doing Phase 0 (not from parent) — needs a decision
-
-Valet polls fiat rates **twice**, on two independent schedules:
-
-- `FiatRates.scala:77` — internal `subscription`, 30 min, calls the private
-  `updateRates`, which **applies `enrichFiats`**.
-- `WalletApp.scala:328-332` — a second `Rx.retry`/`Rx.repeat` chain, also 30 min,
-  calls the public `updateInfo`, which **does not apply `enrichFiats`**.
-
-Whichever fires last wins, so the derived currencies (`cym`, `lvl`, `dm`, `frf`,
-`esd`, `svc`, `sps`, `eip`) are intermittently wiped from `info.rates`. Also doubles
-outbound requests to both providers.
-
-Recommended fix: delete the `WalletApp` block and let `FiatRates` own its schedule,
-since only its path enriches. Caveat: `FiatRates.becomeShutDown` clears `listeners`
-but never unsubscribes `subscription`, so that path currently leaks across shutdown
-and would need `subscription.unsubscribe` added. Deferred — not mechanical.
 
 ## Phase 1 — build modernization (do before Phase 2)
 
@@ -104,6 +66,9 @@ Valet is on Gradle **5.4.1** / AGP **3.5.4** / compileSdk **33**. Play requires
 targetSdk 35+ for updates. Parent proves the escape route keeps Scala 2.11.12:
 Gradle 8.13, AGP 8.12.3, compileSdk 36, JDK 17, via `com.soundcorset.scala-android`
 (replacing the abandoned `gradle-android-scala-plugin`) + a version catalog.
+
+**Blocker:** no JDK and no Android SDK on the dev box as of 2026-07-30 — nothing in
+Phase 0 was compiled, only statically checked. Sort this out first.
 
 Do **not** cherry-pick `a8f43f8b`. Rewrite `app/build.gradle` → `build.gradle.kts`
 using parent HEAD's file as a template, preserving:
@@ -147,15 +112,52 @@ LN↔chain wiring in `WalletApp.scala` / `LNParams`. Not yet assessed.
 - `e1858331` custom Electrum server on setup
 - `7c561f8d` MultiDex
 
+---
+
+## Backlog — Valet-native, not upstream ports
+
+### Fiat rates are polled twice, on inconsistent code paths
+
+Two independent 30-minute schedules update the same `info` field:
+
+- `FiatRates.scala:77` — internal `subscription`, calls the private `updateRates`,
+  which **applies `enrichFiats`**.
+- `WalletApp.scala:328-332` — a second `Rx.retry`/`Rx.repeat` chain, calls the public
+  `updateInfo`, which **does not apply `enrichFiats`**.
+
+Whichever fires last wins, so the derived currencies (`cym`, `lvl`, `dm`, `frf`,
+`esd`, `svc`, `sps`, `eip`) are intermittently wiped from `info.rates`. It also
+doubles outbound requests to CoinGecko and blockchain.info.
+
+Recommended fix: delete the `WalletApp` block and let `FiatRates` own its schedule,
+since only its path enriches.
+
+Caveat that makes this non-mechanical: `FiatRates.becomeShutDown` clears `listeners`
+but never unsubscribes `subscription`, so that path currently leaks across shutdown.
+Removing the `WalletApp` poller makes the leaked one the only one, so
+`subscription.unsubscribe` has to be added to `becomeShutDown` in the same change.
+
+Found 2026-07-30 while doing Phase 0. Not caused by the parent; unrelated to the sync.
+
+---
+
 ## Do not take
 
-Every `Remove LN filth` / `Remove LNURL` / `Drop Tor` / `Drop HW` /
-`Remove coin control` commit. All of Phase C. `f96b905c` (removes foreground
-notifications — Valet needs them for LN channel monitoring).
-`3cbd5f44` (removes the Russian translation) is a product decision, not a technical one.
+- Every `Remove LN filth` / `Remove LNURL` / `Drop Tor` / `Drop HW` /
+  `Remove coin control` commit. All of Phase C.
+- `f96b905c` — removes foreground notifications; Valet needs them for LN channel
+  monitoring.
+- `3cbd5f44` — removes the Russian translation. Product decision, not technical.
+- `66f24003` Electrum server list — **already in Valet**. `2ed41130` (2024-11-09)
+  landed a byte-identical list independently. Checked 2026-07-30; no-op.
+- `e2aa063c` fiat loading glitch — no-op here, Valet never had `onAttemptGetRates`.
+  The commit also flips `LivenetGenesisBlock` → `TestnetGenesisBlock` (dev artifact
+  the parent reverts later) and drops the fiat poll to 3 min, which risks CoinGecko
+  rate-limiting. Checked 2026-07-30.
 
 ---
 
 ## Next
 
-Finish Phase 0, then scope Phase 1.
+Get a JDK 17 + Android SDK onto the dev box, confirm Phase 0 compiles, then start
+Phase 1.
