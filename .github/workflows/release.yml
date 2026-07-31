@@ -31,16 +31,48 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      # A silently-empty keystore surfaces as an unreadable ASN.1 error inside apksigner
+      # ("Tag number over 30 is not supported"), so validate here where the message can
+      # say what actually went wrong.
       - name: Decode keystore
-        run: echo "${{ secrets.SIGNING_KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${KEYSTORE_BASE64}" ]; then
+            echo "::error::secret SIGNING_KEYSTORE_BASE64 is empty or not set"
+            exit 1
+          fi
+          # tr strips any line wrapping or CRLF the secret picked up when it was pasted.
+          printf '%s' "$KEYSTORE_BASE64" | tr -d '[:space:]' | base64 -d > keystore.jks
+          bytes=$(stat -c%s keystore.jks)
+          echo "decoded keystore: $bytes bytes"
+          if [ "$bytes" -lt 100 ]; then
+            echo "::error::decoded keystore is $bytes bytes -- the secret is not valid base64 of a keystore"
+            exit 1
+          fi
+          keytool -list -keystore keystore.jks -storepass "$SIGNING_STORE_PASSWORD" >/dev/null
+          echo "keystore loads OK"
 
+      # This job publishes the APK that F-Droid diffs its own rebuild against, so the
+      # epoch has to be derived exactly the way fdroidserver derives it -- from the
+      # commit timestamp. Without this, normalizeReleaseApkTimestamps falls back to 0
+      # and the published APK can never reproduce. See REPRODUCIBLE_BUILDS.md.
       - name: Build release APK
+        shell: bash
         env:
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIGNING_STORE_FILENAME: ${{ github.workspace }}/keystore.jks
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
-        run: ./gradlew assembleRelease -Porg.gradle.java.installations.fromEnv=JAVA_HOME_11_X64
+          TZ: UTC
+        run: |
+          set -euo pipefail
+          export SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct)
+          echo "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH ($(date -u -d "@$SOURCE_DATE_EPOCH"))"
+          ./gradlew assembleRelease -Porg.gradle.java.installations.fromEnv=JAVA_HOME_11_X64
 
       # Every flavour's release APK, under the name build.gradle already gives it
       # (<applicationId>_<versionCode>.apk), so nothing here has to track versionCode

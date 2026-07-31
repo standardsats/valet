@@ -228,7 +228,9 @@ android.applicationVariants.all { variant ->
                     '--ks', System.getenv("SIGNING_STORE_FILENAME") ?: '',
                     '--ks-key-alias', System.getenv("SIGNING_KEY_ALIAS") ?: '',
                     '--ks-pass', "pass:${System.getenv('SIGNING_STORE_PASSWORD') ?: ''}",
-                    '--key-pass', "pass:${System.getenv('SIGNING_STORE_PASSWORD') ?: ''}",
+                    // Falls back to the store password, which is the common case and what
+                    // the README documents; SIGNING_KEY_PASSWORD covers a differing key password.
+                    '--key-pass', "pass:${System.getenv('SIGNING_KEY_PASSWORD') ?: System.getenv('SIGNING_STORE_PASSWORD') ?: ''}",
                     '--v1-signing-enabled', 'true',
                     '--v2-signing-enabled', 'true',
                     apkProvider().absolutePath
