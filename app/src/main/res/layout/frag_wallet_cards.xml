@@ -27,14 +27,14 @@
                 android:clickable="true"
                 android:focusable="true"
                 style="@style/ChipTextGray"
-                android:onClick="bringRateDialog"
+                android:onClick="bringCommunityLink"
                 android:textSize="@dimen/text_size_12"
-                android:background="@drawable/border_green"
+                android:background="@drawable/border_blue"
                 android:layout_toStartOf="@id/offlineIndicator"
                 android:layout_centerVertical="true"
                 android:layout_marginEnd="6dp"
-                android:text="&#9825; RATE US"
-                android:id="@+id/rateTeaser"
+                android:text="&#9993; COMMUNITY"
+                android:id="@+id/communityTeaser"
                 android:visibility="gone"/>
 
             <TextView

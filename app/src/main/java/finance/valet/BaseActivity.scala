@@ -61,6 +61,8 @@ import scala.util.{Failure, Success, Try}
 
 
 object BaseActivity {
+  final val COMMUNITY_URL = "https://t.me/StandardSatsCommunity"
+
   implicit class StringOps(source: String) {
     def html: Spanned = android.text.Html.fromHtml(source, 0)
     def humanFour: String = source.grouped(4).mkString(s"\u0020")
@@ -173,10 +175,11 @@ trait BaseActivity extends AppCompatActivity { me =>
   def chainWalletNotice(wallet: ElectrumEclairWallet): Option[Int] = if (wallet.hasFingerprint) Some(hardware_wallet) else if (!wallet.isSigning) Some(watching_wallet) else None
   def browse(maybeUri: String): Unit = try me startActivity new Intent(Intent.ACTION_VIEW, Uri parse maybeUri) catch { case exception: Throwable => me onFail exception }
 
-  def bringRateDialog(view: View): Unit = {
-    val marketUri = Uri.parse(s"market://details?id=$getPackageName")
-    WalletApp.app.prefs.edit.putBoolean(WalletApp.SHOW_RATE_US, false).commit
-    me startActivity new Intent(Intent.ACTION_VIEW, marketUri)
+  // Referenced by name from frag_wallet_cards.xml via android:onClick, so keep the
+  // signature as-is. Passing null is fine and means "nothing to hide afterwards".
+  def bringCommunityLink(view: View): Unit = {
+    WalletApp.app.prefs.edit.putBoolean(WalletApp.SHOW_COMMUNITY, false).commit
+    me browse BaseActivity.COMMUNITY_URL
     if (null != view) view.setVisibility(View.GONE)
   }
 
