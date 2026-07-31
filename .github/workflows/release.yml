@@ -2,7 +2,10 @@ name: Build Release APK
 
 on:
   workflow_dispatch:
-
+  push:
+    tags:
+      - '*.*.*'
+      
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
