@@ -1,7 +1,7 @@
 package finance.valet
 
 import android.os.Bundle
-import android.view.Gravity
+import android.view.{Gravity, ViewGroup}
 import android.widget.{LinearLayout, TextView}
 import com.google.android.material.button.{MaterialButton, MaterialButtonToggleGroup}
 import com.ornach.nobobutton.NoboButton
@@ -45,7 +45,7 @@ class DiceEntropyActivity extends BaseActivity { me =>
         }
     })
     buildPad()
-    findViewById(id.diceEntropyClear).setOnClickListener(onButtonTap(clearRolls()))
+    findViewById(id.diceEntropyClear).asInstanceOf[NoboButton].setOnClickListener(onButtonTap(clearRolls()))
     create.setOnClickListener(onButtonTap(createWallet()))
     updateView()
   }
@@ -67,9 +67,9 @@ class DiceEntropyActivity extends BaseActivity { me =>
             updateView()
           }
         })
-        row.addView(button, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        row.addView(button, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
       }
-      pad.addView(row, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+      pad.addView(row, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
     }
   }
 
