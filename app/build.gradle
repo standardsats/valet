@@ -93,6 +93,10 @@ android {
             excludes += ['**/META-INF/**', '**/meta-inf/**']
         }
     }
+
+    lint {
+        baseline = file("lint-baseline.xml")
+    }
 }
 
 // AGP 8.12 requires Gradle to run on JDK 17, but the Scala 2.11.12 compiler predates
