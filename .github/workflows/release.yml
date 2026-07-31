@@ -1,9 +1,7 @@
-name: Release APK
+name: Build Release APK
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
 
 jobs:
   build-and-release:
