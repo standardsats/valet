@@ -18,14 +18,16 @@ jobs:
         with:
           lfs: true
 
-      # 17 runs Gradle/AGP and becomes JAVA_HOME (last listed wins); 11 is kept for the
+      # 21 runs Gradle/AGP and becomes JAVA_HOME (last listed wins); 11 is kept for the
       # forked Scala 2.11 compiler and located via org.gradle.java.installations.fromEnv.
+      # 21 rather than 17 to match F-Droid's trixie builder, which has no openjdk-17 --
+      # a JDK split between the two sides changes deflate output. See REPRODUCIBLE_BUILDS.md.
       - name: Set up JDKs
         uses: actions/setup-java@v4
         with:
           java-version: |
             11
-            17
+            21
           distribution: 'temurin'
 
       - name: Setup Gradle
