@@ -78,7 +78,7 @@ object WalletApp {
   final val LAST_NORMAL_GOSSIP_SYNC = "lastNormalGossipSync"
   final val CUSTOM_ELECTRUM_ADDRESS = "customElectrumAddress"
   final val CUSTOM_BACKUP_LOCATION = "customBackupLocation"
-  final val SHOW_RATE_US = "showRateUs"
+  final val SHOW_COMMUNITY = "showCommunity"
   final val GAP_LIMIT = "gapLimit"
   final val DEFAULT_GAP_LIMIT = 10
   final val HIDE_ZERO_OUTPUTS = "hideZeroOutputs"
@@ -87,7 +87,7 @@ object WalletApp {
   def fiatCode: String = app.prefs.getString(FIAT_CODE, "usd")
   def ensureTor: Boolean = app.prefs.getBoolean(ENSURE_TOR, false)
   def maximizedView: Boolean = app.prefs.getBoolean(MAXIMIZED_VIEW, true)
-  def showRateUs: Boolean = app.prefs.getBoolean(SHOW_RATE_US, true)
+  def showCommunity: Boolean = app.prefs.getBoolean(SHOW_COMMUNITY, true)
   def gapLimit: Int = app.prefs.getInt(GAP_LIMIT, DEFAULT_GAP_LIMIT)
   def hideZeroOutputs: Boolean = app.prefs.getBoolean(HIDE_ZERO_OUTPUTS, true)
 

@@ -8,12 +8,15 @@ import android.widget.{ArrayAdapter, LinearLayout}
 import androidx.appcompat.app.AlertDialog
 import androidx.documentfile.provider.DocumentFile
 import androidx.transition.TransitionManager
+import finance.valet.BaseActivity.StringOps
 import finance.valet.R.string._
 import finance.valet.utils.LocalBackup
 import com.google.common.io.ByteStreams
 import com.ornach.nobobutton.NoboButton
 import fr.acinq.bitcoin.MnemonicCode
-import immortan.crypto.Tools.{SEPARATOR, none}
+import fr.acinq.eclair.wire.CommonCodecs.nodeaddress
+import fr.acinq.eclair.wire.{Domain, NodeAddress}
+import immortan.crypto.Tools.{SEPARATOR, none, runAnd, ~}
 import immortan.wire.ExtCodecs
 import immortan.{LNParams, LightningNodeKeys, WalletSecret}
 import scodec.bits.{BitVector, ByteVector}
@@ -59,10 +62,50 @@ class SetupActivity extends BaseActivity { me =>
     }
   }
 
+  lazy private[this] val electrum: SettingsHolder = new SettingsHolder(me) {
+    setVis(isVisible = false, settingsCheck)
+
+    override def updateView: Unit = WalletApp.customElectrumAddress match {
+      case Success(nodeAddress) => setTexts(settings_custom_electrum_enabled, nodeAddress.toString)
+      case _ => setTexts(settings_custom_electrum_disabled, me getString settings_custom_electrum_disabled_tip)
+    }
+
+    view setOnClickListener onButtonTap {
+      val (container, extraInputLayout, extraInput) = singleInputPopup
+      val builder = titleBodyAsViewBuilder(getString(settings_custom_electrum_disabled).asDefView, container)
+      mkCheckForm(alert => runAnd(alert.dismiss)(proceed), none, builder, dialog_ok, dialog_cancel)
+      extraInputLayout.setHint(settings_custom_electrum_host_port)
+      showKeys(extraInput)
+
+      def proceed: Unit = {
+        val input = extraInput.getText.toString.trim
+        def saveAddress(address: String) = WalletApp.app.prefs.edit.putString(WalletApp.CUSTOM_ELECTRUM_ADDRESS, address)
+        // Unlike the same setting in SettingsActivity there is no restart notice here: the
+        // address is read by WalletApp.makeOperational, which only runs once setup finishes,
+        // so a node chosen now is already in place for the very first connection.
+        if (input.nonEmpty) runInFutureProcessOnUI(saveUnsafeElectrumAddress, onFail)(_ => updateView)
+        else runAnd(saveAddress(new String).commit)(updateView)
+
+        def saveUnsafeElectrumAddress: Unit = {
+          val hostOrIP ~ port = input.splitAt(input lastIndexOf ':')
+          val nodeAddress = NodeAddress.fromParts(hostOrIP, port.tail.toInt, Domain)
+          saveAddress(nodeaddress.encode(nodeAddress).require.toHex).commit
+        }
+      }
+    }
+
+    def setTexts(titleRes: Int, info: String): Unit = {
+      settingsTitle.setText(titleRes)
+      settingsInfo.setText(info)
+    }
+  }
+
   override def START(s: Bundle): Unit = {
     setContentView(R.layout.activity_setup)
     activitySetupMain.addView(enforceTor.view, 0)
+    activitySetupMain.addView(electrum.view, 1)
     enforceTor.updateView
+    electrum.updateView
   }
 
   private[this] lazy val englishWordList = {

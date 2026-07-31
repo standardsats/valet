@@ -5,6 +5,7 @@
     <string name="sources">View source code</string>
     <string name="twitter">Follow us on Twitter</string>
     <string name="manual">Read manual</string>
+    <string name="community">Community support</string>
 
     <string name="choose_wallet">Choose a wallet</string>
     <string name="hardware_wallet">Hardware wallet</string>
