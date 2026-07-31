@@ -366,6 +366,35 @@ boundaries are unusable. Full analysis in the Phase 2 section above.
 Demoted from this list: per-input signing dispatch from `d4ae9018` — checked, Valet does
 not have the bug it fixes. Hardening only, see Phase 2.
 
+### What survives of Phase 3
+
+Assessed 2026-07-31. Custom Electrum on setup is done; MultiDex was already present;
+address search is structurally dead. These two remain. Full reasoning in the Phase 3
+section above.
+
+1. **BIP322 message signing** — real feature, non-trivial, **wants its own phase.**
+   Splits cleanly, which is what makes it viable at all:
+   - `da9a5800` is ~10,370 lines of vendored `com/sparrowwallet/drongo/` with no coupling
+     to anything. Portable as-is.
+   - The integration (`f45fe29d`, `59cb0728`, `d41b2b70`) is **not** portable —
+     `d41b2b70` keys its UI off `chainWalletNotice(wallet: WalletSpec)`, one of the dead
+     structures. Must be written Valet-native.
+   - `46752959` / `169b1f0f` are follow-up fixes that only become relevant once an
+     integration exists. Do not evaluate them on their own.
+
+   Open question before starting: whether Valet wants proof-of-ownership signing at all,
+   and whether it should cover the LN node key as well as chain addresses — upstream only
+   had chain addresses to sign with.
+
+2. **`30c346cd` RBF/CPFP from hardware wallets** — **judge on product value, not
+   portability.** Not structurally dead, but 308 of its 325 changed lines land in
+   `HubActivity` and `BaseActivity`, which are 1456 and 288 lines diverged. The upstream
+   diff is close to useless as a guide, so this is a rewrite against Valet's own UI
+   whatever its merit. Only worth it if hardware-wallet fee bumping is actually wanted.
+
+Dropped, not backlogged: `94f623aa` + `b9f41a0a` address search, which genuinely depend
+on `ElectrumWallet.specs` and `spec.data.keys.ewt`.
+
 ---
 
 ## Do not take
