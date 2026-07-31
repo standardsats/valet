@@ -152,6 +152,8 @@ class SetupActivity extends BaseActivity { me =>
     proceedWithMnemonics(mnemonic)
   }
 
+  def createWalletWithDice(view: View): Unit = me goTo ClassNames.diceEntropyActivityClass
+
   def showRestoreOptions(view: View): Unit = {
     TransitionManager.beginDelayedTransition(activitySetupMain)
     restoreOptionsButton.setVisibility(View.GONE)

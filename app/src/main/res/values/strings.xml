@@ -28,6 +28,7 @@
 
     <string name="setup_title">Wallet setup</string>
     <string name="setup_create_new">Create new wallet</string>
+    <string name="setup_create_dice">Create wallet with Dice</string>
     <string name="setup_restore_existing">Restore existing wallet</string>
     <string name="setup_recovery_phrase">Recovery phrase only</string>
     <string name="setup_backup_file">Backup + recovery phrase</string>
@@ -35,6 +36,15 @@
     <string name="delayed_refunding">Delayed channel refunding</string>
     <string name="delayed_refunding_ext">Do not erase wallet data until all delayed refunds are cleared!</string>
     <string name="setup_create_new_hint">A completely fresh Bitcoin wallet with a new recovery phrase will be generated from scratch.</string>
+    <string name="dice_entropy_title">Create wallet with dice</string>
+    <string name="dice_entropy_counter">Entered dice: %1$d / %2$d</string>
+    <string name="dice_entropy_128">128 bits</string>
+    <string name="dice_entropy_256">256 bits</string>
+    <string name="dice_entropy_hint">Roll a physical six-sided die and enter every result below. Keep the recovery phrase safe after the wallet is created.</string>
+    <string name="dice_entropy_clear">Clear dice</string>
+    <string name="dice_entropy_create">Create wallet</string>
+    <string name="dice_face">Die face %1$d</string>
+    <string name="dice_entropy_incomplete">Enter all required dice rolls first.</string>
     <!-- DO NOT TRANSLATE --> <string name="share_ln_payment">Signed invoice\n%1$s\n\nPayment hash\n%2$s\n\nPayment description\n%3$s\n\nReceiver Node ID\n%4$s\n\nProof of payment\n%5$s\n\nDebug info\n%6$s</string>
     <!-- DO NOT TRANSLATE --> <string name="share_chain_tx">Bitcoin transaction hex\n\n%1$s</string>
 

@@ -26,6 +26,7 @@ object ClassNames {
   val remotePeerActivityClass: Class[RemotePeerActivity] = classOf[RemotePeerActivity]
   val mainActivityClass: Class[MainActivity] = classOf[MainActivity]
   val hubActivityClass: Class[HubActivity] = classOf[HubActivity]
+  val diceEntropyActivityClass: Class[DiceEntropyActivity] = classOf[DiceEntropyActivity]
 }
 
 class MainActivity extends BaseActivity { me =>

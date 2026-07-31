@@ -20,6 +20,12 @@
                 android:onClick="createNewWallet"
                 style="@style/GreenButton"/>
 
+            <com.ornach.nobobutton.NoboButton
+                app:nb_text="@string/setup_create_dice"
+                android:onClick="createWalletWithDice"
+                android:layout_marginTop="@dimen/large_button_margin"
+                style="@style/GreenButton"/>
+
             <TextView
                 android:layout_marginTop="@dimen/chip_default_padding_edge"
                 android:text="@string/setup_create_new_hint"
