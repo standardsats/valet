@@ -211,11 +211,46 @@ commit boundaries are not usable; the ideas are.
    recomputed on every `ScriptHashSubscriptionResponse`. Separable from `WalletSpec`.
    Perf only, but a real and unambiguous win. `params.gapLimit` collides with
    `MAX_RECEIVE_ADDRESSES` here. **Best remaining candidate.**
-2. **`computeTxDelta` across wallets** (from `e76f4409`, 71 chain / 2 LN lines). Parent
-   widened it from one `ElectrumData` to a list, so a transaction touching two of the
-   user's wallets is accounted once rather than per-wallet. Valet has multiple wallets,
-   so this plausibly affects displayed sent/received amounts — **needs confirming
-   against Valet before it is worth doing.** Valet's dust filter must survive the rework.
+2. **Cross-wallet tx accounting — confirmed live bug, but do NOT port `e76f4409`.**
+
+   Checked 2026-07-31. Two separate conclusions:
+
+   **(a) Porting `e76f4409` buys nothing.** It widens the signature from one
+   `ElectrumData` to `Seq[ElectrumData]`, but all three of its own call sites still pass
+   `List(data)` — a single wallet. It is preparatory refactoring; the behaviour only
+   changes once callers pass several wallets, which happens later via `specs`, in the
+   part of the stack Valet cannot adopt. Porting it is churn with no user-visible effect.
+
+   **(b) Valet nevertheless has the underlying bug, and it is user-visible.** For a
+   transaction between two of the user's own wallets (A spends, B receives):
+
+   - A's actor: `isMine(txIn)` true → `sent` = A's inputs, `received` = A's change,
+     `feeOpt` = Some(fee).
+   - B's actor: `isMine(txIn)` false → `ourInputs` empty → `sent` = 0,
+     `received` = B's outputs, `feeOpt` = None.
+
+   Both actors publish `TransactionReceived` on the shared `eventStream`. Both reach
+   `WalletApp.onTransactionReceived` → `txDataBag.addTx`, whose SQL is
+   `INSERT OR IGNORE` against `txid TEXT NOT NULL UNIQUE` (`TxTable`). **First writer
+   wins; the other is silently dropped, and which one wins is a race between actors.**
+
+   - A first → recorded outgoing, correct amount and fee.
+   - B first → recorded `isIncoming = 1` for B's amount, fee 0; the spend from A never
+     appears at all.
+
+   So the same transaction is recorded one of two contradictory ways non-deterministically.
+   It also corrupts totals, since `TxTable.selectSummarySql` sums `received`/`sent` over
+   the table, and feeds `balanceSnapshot`.
+
+   Not a funds-loss bug — bookkeeping and display only.
+
+   **Fixing it is Valet-specific work, not a port.** The upstream answer (centralise all
+   wallets in `ElectrumWallet.specs` so one call sees every `ElectrumData`) is exactly
+   the restructuring that is unavailable here. The contained alternative is to make
+   `addTx` merge rather than ignore: on a second report for a known txid, add the
+   incoming `received`/`sent` into the existing row instead of discarding it. Needs care
+   around `isIncoming`, `feeOpt` (only the spending wallet knows the fee) and idempotency
+   on rescan.
 3. `8cc2b19c` PaymentInfo fix — small, mostly LN-side, evaluate on its own.
 4. **Per-input signing dispatch** (from `d4ae9018`). Replaces per-wallet
    `signTransaction(usableUtxos, tx)` with `signInput(utxo, tx, input, index)`.
