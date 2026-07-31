@@ -2,9 +2,9 @@ name: Build Release APK
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - '*.*.*'
+  #push:
+  #  tags:
+  #    - '*.*.*'
       
 jobs:
   build-and-release:
