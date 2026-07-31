@@ -43,22 +43,22 @@ android {
     productFlavors {
         mainnet {
             dimension 'chain'
-            versionCode 107 // odd for mainnet
+            versionCode 109 // odd for mainnet
         }
         tnet4 {
             dimension 'chain'
             applicationIdSuffix '.testnet4'
-            versionCode 106 // even for testnets
+            versionCode 108 // even for testnets
         }
         tnet3 {
             dimension 'chain'
             applicationIdSuffix '.testnet3'
-            versionCode 106
+            versionCode 108
         }
         regtest {
             dimension 'chain'
             applicationIdSuffix '.regtest'
-            versionCode 106
+            versionCode 108
         }
     }
 
@@ -224,6 +224,7 @@ android.applicationVariants.all { variant ->
         onlyIf { System.getenv("SIGNING_KEY_ALIAS") != null }
         doFirst {
             commandLine "${buildToolsDir}/apksigner", 'sign',
+                    '--alignment-preserved', 'true',
                     '--ks', System.getenv("SIGNING_STORE_FILENAME") ?: '',
                     '--ks-key-alias', System.getenv("SIGNING_KEY_ALIAS") ?: '',
                     '--ks-pass', "pass:${System.getenv('SIGNING_STORE_PASSWORD') ?: ''}",

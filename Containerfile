@@ -26,5 +26,5 @@ FROM BUILD
 
 WORKDIR /app/valet/
 
-# add --stacktrace --info for debugging
-CMD export SOURCE_DATE_EPOCH=$(date +%s) && ./gradlew assembleRelease && ./gradlew bundleRelease
+# Matching to FDROID
+CMD export SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct) && ./gradlew assembleRelease && ./gradlew bundleRelease
