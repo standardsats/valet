@@ -119,7 +119,8 @@ object Crypto {
     def isValid: Boolean = isPubKeyValidStrict(this.value)
 
     def add(that: PublicKey): PublicKey = nativeSecp256k1.map { h =>
-      PublicKey.fromBin(ByteVector.view(h.pubKeyAdd(value.toArray, that.value.toArray)))
+      // secp256k1-kmp 0.6 replaced pubKeyAdd(a, b) with pubKeyCombine(byte[][]).
+      PublicKey.fromBin(ByteVector.view(h.pubKeyCombine(Array(value.toArray, that.value.toArray))))
     } getOrElse {
       PublicKey(ecpoint.add(that.ecpoint).normalize())
     }
@@ -131,7 +132,7 @@ object Crypto {
     }
 
     def subtract(that: PublicKey): PublicKey = nativeSecp256k1.map { h =>
-      PublicKey.fromBin(ByteVector.view(h.pubKeyAdd(value.toArray, h.pubKeyNegate(that.value.toArray))))
+      PublicKey.fromBin(ByteVector.view(h.pubKeyCombine(Array(value.toArray, h.pubKeyNegate(that.value.toArray)))))
     } getOrElse {
       PublicKey(ecpoint.subtract(that.ecpoint).normalize())
     }
