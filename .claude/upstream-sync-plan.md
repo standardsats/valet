@@ -206,20 +206,25 @@ not have the problem.
 Take these as **reimplementations against Valet's own tree**, not cherry-picks. Parent's
 commit boundaries are not usable; the ideas are.
 
-1. **Per-input signing dispatch** (from `d4ae9018`, 306 chain lines, verified **zero**
-   references to `WalletSpec`/`specs`/`.keys.`). Replaces per-wallet
-   `signTransaction(usableUtxos, tx)` with `signInput(utxo, tx, input, index)`. The old
-   form matches inputs with `collectFirst { case Utxo(..) if ewt.xPub == xPub }`, so a
-   transaction spending from more than one wallet only gets one wallet's inputs signed.
-   Valet has multiple wallets and is very likely to carry this bug. **Highest value.**
-   Changes the `ElectrumWalletType` trait signature — audit Valet's call sites,
-   including the LN funding path, before touching it.
-2. **`computeTxDelta` across wallets** (from `e76f4409`, 71 chain / 2 LN lines).
-   Valet's dust filter must survive the rework.
-3. **`MemoizedKeys`** (the idea from `50fce17d`). Pure refactor of how `ElectrumData`
-   stores account/change keys behind lazily-computed scripthash maps. Separable from
-   `WalletSpec`. Perf only. `params.gapLimit` collides with `MAX_RECEIVE_ADDRESSES` here.
-4. `8cc2b19c` PaymentInfo fix — small, mostly LN-side, evaluate on its own.
+1. **`MemoizedKeys`** (the idea from `50fce17d`). Pure refactor of how `ElectrumData`
+   stores account/change keys behind lazily-computed scripthash maps, so they stop being
+   recomputed on every `ScriptHashSubscriptionResponse`. Separable from `WalletSpec`.
+   Perf only, but a real and unambiguous win. `params.gapLimit` collides with
+   `MAX_RECEIVE_ADDRESSES` here. **Best remaining candidate.**
+2. **`computeTxDelta` across wallets** (from `e76f4409`, 71 chain / 2 LN lines). Parent
+   widened it from one `ElectrumData` to a list, so a transaction touching two of the
+   user's wallets is accounted once rather than per-wallet. Valet has multiple wallets,
+   so this plausibly affects displayed sent/received amounts — **needs confirming
+   against Valet before it is worth doing.** Valet's dust filter must survive the rework.
+3. `8cc2b19c` PaymentInfo fix — small, mostly LN-side, evaluate on its own.
+4. **Per-input signing dispatch** (from `d4ae9018`). Replaces per-wallet
+   `signTransaction(usableUtxos, tx)` with `signInput(utxo, tx, input, index)`.
+   **Checked 2026-07-31: Valet does not currently have the bug this fixes.** Both call
+   sites are inside a single `ElectrumWallet` actor signing its own utxos with its own
+   `ewt`, so cross-wallet mis-signing is unreachable; and the utxo set passed at
+   `ElectrumWallet.scala:493` is a superset of the tx's inputs, so Valet's
+   `find`-in-for-comprehension never silently drops one. Worth doing only as hardening
+   if Valet later gains multiwallet sends at the ElectrumWallet level. Low priority.
 
 ### Do not take from this range
 
