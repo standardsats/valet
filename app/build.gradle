@@ -72,6 +72,9 @@ android {
             shrinkResources false
             minifyEnabled false
             proguardFiles 'proguard-rules.pro'
+            vcsInfo {
+                include false
+            }
         }
     }
 
