@@ -267,15 +267,49 @@ commit boundaries are not usable; the ideas are.
 BIP39-attach, HW-signing and multiwallet-send rework, all predicated on the deleted
 `EclairWallet` abstraction.
 
-## Phase 3 — optional, mutually independent
+## Phase 3 — assessed 2026-07-31
 
-- `94f623aa` + `b9f41a0a` address search (`b9f41a0a` touches `PaymentInfo` address
-  formatting — check against Valet's LN payment display)
-- `da9a5800` + `f45fe29d` + `59cb0728` + `d41b2b70` + `46752959`/`169b1f0f`
-  BIP322 message signing (pulls in the Sparrow drongo library)
-- `30c346cd` RBF/CPFP from hardware wallets
-- `e1858331` custom Electrum server on setup
-- `7c561f8d` MultiDex
+Same test as Phase 2: does it depend on the dead `WalletSpec` / `specs` /
+`.keys.ewt` structures, and how much lands in the high-drift files.
+
+| item | structurally dead? | outcome |
+|---|---|---|
+| `e1858331` custom Electrum on setup | no — only the `LNParams`→`WalletParams` rename | **DONE**, reimplemented |
+| `7c561f8d` MultiDex | no | already in Valet (`multiDexEnabled true` + `libs.multidex`) |
+| `94f623aa` + `b9f41a0a` address search | **yes** — `ElectrumWallet.specs`, `spec.data.keys.ewt` | drop |
+| `30c346cd` RBF/CPFP from hardware wallets | no — rename only | see below |
+| BIP322 signing (`da9a5800` …) | library no, integration yes | see below |
+
+Note the crude "does it mention `WalletParams`" test over-reports: for `30c346cd` and
+`e1858331` every hit was just the rename, plus the recurring
+`chainHash = Block.TestnetGenesisBlock.hash` dev artifact that must never be taken.
+
+### Done — custom Electrum server during setup
+
+Valet already had the whole mechanism (`WalletApp.CUSTOM_ELECTRUM_ADDRESS`,
+`customElectrumAddress`, the `electrum` holder in `SettingsActivity`) and had already
+made `SettingsHolder` top-level, which is most of what `e1858331` does upstream. The
+only gap was that setup did not offer it.
+
+Added an `electrum` holder to `SetupActivity` beside the existing Tor one. It
+deliberately drops the restart notice the Settings version shows: `makeOperational`
+reads the address at `WalletApp.scala:176` and only runs once setup finishes, so a node
+chosen during onboarding is in place for the *first* connection. That is the point —
+otherwise the wallet queries random public servers with the user's addresses before the
+setting can be reached.
+
+### Not done, with reasons
+
+- **`30c346cd` RBF/CPFP from hardware wallets.** Not structurally dead, but 308 of its
+  325 changed lines land in `HubActivity` and `BaseActivity`, which are 1456 and 288
+  lines diverged. Feasible only as a rewrite against Valet's UI; the upstream diff is
+  close to useless as a guide. Judge on product value, not on portability.
+- **BIP322 message signing.** Splits cleanly: `da9a5800` is ~10,370 lines of vendored
+  `com/sparrowwallet/drongo/` with no coupling to anything, and is portable as-is. The
+  integration commits (`f45fe29d`, `59cb0728`, `d41b2b70`) are not — `d41b2b70` keys its
+  UI off `chainWalletNotice(wallet: WalletSpec)`. `46752959`/`169b1f0f` are follow-up
+  fixes that only matter once integration exists. So: vendor the library, write the
+  integration Valet-native. Real feature, non-trivial job, worth its own phase.
 
 ---
 
