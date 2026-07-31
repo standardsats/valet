@@ -23,4 +23,7 @@
     <!-- inverted progress bar -->
 
     <dimen name="text_size_12">12sp</dimen>
+
+    <dimen name="dice_button_size">72dp</dimen>
+    <dimen name="dice_button_margin">6dp</dimen>
 </resources>

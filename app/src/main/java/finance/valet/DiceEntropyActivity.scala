@@ -52,12 +52,18 @@ class DiceEntropyActivity extends BaseActivity { me =>
 
   private def buildPad(): Unit = {
     pad.removeAllViews()
+    val buttonSize = getResources.getDimensionPixelSize(R.dimen.dice_button_size)
+    val buttonMargin = getResources.getDimensionPixelSize(R.dimen.dice_button_margin)
     (1 to 6).grouped(3).foreach { rowRolls =>
       val row = new LinearLayout(me)
       row.setGravity(Gravity.CENTER)
       row.setOrientation(LinearLayout.HORIZONTAL)
       rowRolls.foreach { roll =>
         val button = new MaterialButton(me)
+        button.setInsetTop(0)
+        button.setInsetBottom(0)
+        button.setInsetLeft(0)
+        button.setInsetRight(0)
         button.setText(Array('⚀', '⚁', '⚂', '⚃', '⚄', '⚅')(roll - 1).toString)
         button.setTextSize(28)
         button.setContentDescription(getString(string.dice_face).format(roll))
@@ -67,7 +73,9 @@ class DiceEntropyActivity extends BaseActivity { me =>
             updateView()
           }
         })
-        row.addView(button, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        val buttonParams = new LinearLayout.LayoutParams(buttonSize, buttonSize)
+        buttonParams.setMargins(buttonMargin, buttonMargin, buttonMargin, buttonMargin)
+        row.addView(button, buttonParams)
       }
       pad.addView(row, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
     }
