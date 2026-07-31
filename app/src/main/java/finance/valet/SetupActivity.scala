@@ -87,7 +87,9 @@ class SetupActivity extends BaseActivity { me =>
         else runAnd(saveAddress(new String).commit)(updateView)
 
         def saveUnsafeElectrumAddress: Unit = {
-          val hostOrIP ~ port = input.splitAt(input lastIndexOf ':')
+          val idx = input.lastIndexOf(':')
+          require(idx > 0 && idx < input.length - 1, "Expected <host>:<port>")
+          val hostOrIP ~ port = input.splitAt(idx)
           val nodeAddress = NodeAddress.fromParts(hostOrIP, port.tail.toInt, Domain)
           saveAddress(nodeaddress.encode(nodeAddress).require.toHex).commit
         }
