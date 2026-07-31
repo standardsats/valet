@@ -54,7 +54,7 @@ class DiceEntropyActivity extends BaseActivity { me =>
     pad.removeAllViews()
     val buttonSize = getResources.getDimensionPixelSize(R.dimen.dice_button_size)
     val buttonMargin = getResources.getDimensionPixelSize(R.dimen.dice_button_margin)
-    (1 to 6).grouped(3).foreach { rowRolls =>
+    (1 to 6).grouped(2).foreach { rowRolls =>
       val row = new LinearLayout(me)
       row.setGravity(Gravity.CENTER)
       row.setOrientation(LinearLayout.HORIZONTAL)
@@ -62,10 +62,8 @@ class DiceEntropyActivity extends BaseActivity { me =>
         val button = new MaterialButton(me)
         button.setInsetTop(0)
         button.setInsetBottom(0)
-        button.setInsetLeft(0)
-        button.setInsetRight(0)
         button.setText(Array('⚀', '⚁', '⚂', '⚃', '⚄', '⚅')(roll - 1).toString)
-        button.setTextSize(28)
+        button.setTextSize(36)
         button.setContentDescription(getString(string.dice_face).format(roll))
         button.setOnClickListener(onButtonTap {
           if (rolls.size < requiredRolls) {
