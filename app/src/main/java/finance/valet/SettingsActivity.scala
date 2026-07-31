@@ -398,7 +398,7 @@ class SettingsActivity extends BaseCheckActivity with HasTypicalChainFee with Ch
       addFlowChip(links.flow, getString(manual), R.drawable.border_green, _ => me browse "https://valet.finance/posts/How_To_Use_Valet.md")
       addFlowChip(links.flow, getString(sources), R.drawable.border_green, _ => me browse "https://github.com/standardsats/wallet")
       addFlowChip(links.flow, getString(twitter), R.drawable.border_blue, _ => me browse "https://twitter.com/standard_sats")
-      addFlowChip(links.flow, "&#9825; Rate us", R.drawable.border_green, _ => me bringRateDialog null)
+      addFlowChip(links.flow, getString(community), R.drawable.border_blue, _ => me bringCommunityLink null)
 
     for (count <- LNParams.logBag.count if count > 0) {
       def exportLog: Unit = me share LNParams.logBag.recent.map(_.asString).mkString("\n\n")

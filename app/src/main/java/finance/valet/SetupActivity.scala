@@ -8,12 +8,15 @@ import android.widget.{ArrayAdapter, LinearLayout}
 import androidx.appcompat.app.AlertDialog
 import androidx.documentfile.provider.DocumentFile
 import androidx.transition.TransitionManager
+import finance.valet.BaseActivity.StringOps
 import finance.valet.R.string._
 import finance.valet.utils.LocalBackup
 import com.google.common.io.ByteStreams
 import com.ornach.nobobutton.NoboButton
 import fr.acinq.bitcoin.MnemonicCode
-import immortan.crypto.Tools.{SEPARATOR, none}
+import fr.acinq.eclair.wire.CommonCodecs.nodeaddress
+import fr.acinq.eclair.wire.{Domain, NodeAddress}
+import immortan.crypto.Tools.{SEPARATOR, none, runAnd, ~}
 import immortan.wire.ExtCodecs
 import immortan.{LNParams, LightningNodeKeys, WalletSecret}
 import scodec.bits.{BitVector, ByteVector}
@@ -59,10 +62,52 @@ class SetupActivity extends BaseActivity { me =>
     }
   }
 
+  lazy private[this] val electrum: SettingsHolder = new SettingsHolder(me) {
+    setVis(isVisible = false, settingsCheck)
+
+    override def updateView: Unit = WalletApp.customElectrumAddress match {
+      case Success(nodeAddress) => setTexts(settings_custom_electrum_enabled, nodeAddress.toString)
+      case _ => setTexts(settings_custom_electrum_disabled, me getString settings_custom_electrum_disabled_tip)
+    }
+
+    view setOnClickListener onButtonTap {
+      val (container, extraInputLayout, extraInput) = singleInputPopup
+      val builder = titleBodyAsViewBuilder(getString(settings_custom_electrum_disabled).asDefView, container)
+      mkCheckForm(alert => runAnd(alert.dismiss)(proceed), none, builder, dialog_ok, dialog_cancel)
+      extraInputLayout.setHint(settings_custom_electrum_host_port)
+      showKeys(extraInput)
+
+      def proceed: Unit = {
+        val input = extraInput.getText.toString.trim
+        def saveAddress(address: String) = WalletApp.app.prefs.edit.putString(WalletApp.CUSTOM_ELECTRUM_ADDRESS, address)
+        // Unlike the same setting in SettingsActivity there is no restart notice here: the
+        // address is read by WalletApp.makeOperational, which only runs once setup finishes,
+        // so a node chosen now is already in place for the very first connection.
+        if (input.nonEmpty) runInFutureProcessOnUI(saveUnsafeElectrumAddress, onFail)(_ => updateView)
+        else runAnd(saveAddress(new String).commit)(updateView)
+
+        def saveUnsafeElectrumAddress: Unit = {
+          val idx = input.lastIndexOf(':')
+          require(idx > 0 && idx < input.length - 1, "Expected <host>:<port>")
+          val hostOrIP ~ port = input.splitAt(idx)
+          val nodeAddress = NodeAddress.fromParts(hostOrIP, port.tail.toInt, Domain)
+          saveAddress(nodeaddress.encode(nodeAddress).require.toHex).commit
+        }
+      }
+    }
+
+    def setTexts(titleRes: Int, info: String): Unit = {
+      settingsTitle.setText(titleRes)
+      settingsInfo.setText(info)
+    }
+  }
+
   override def START(s: Bundle): Unit = {
     setContentView(R.layout.activity_setup)
     activitySetupMain.addView(enforceTor.view, 0)
+    activitySetupMain.addView(electrum.view, 1)
     enforceTor.updateView
+    electrum.updateView
   }
 
   private[this] lazy val englishWordList = {
@@ -124,7 +169,10 @@ class SetupActivity extends BaseActivity { me =>
     recoveryPhrase.addChipTerminator(',', com.hootsuite.nachos.terminator.ChipTerminatorHandler.BEHAVIOR_CHIPIFY_TO_TERMINATOR)
     recoveryPhrase.addChipTerminator('\n', com.hootsuite.nachos.terminator.ChipTerminatorHandler.BEHAVIOR_CHIPIFY_TO_TERMINATOR)
     recoveryPhrase setAdapter new ArrayAdapter(me, android.R.layout.simple_list_item_1, englishWordList)
-    recoveryPhrase setDropDownBackgroundResource R.color.button_material_dark
+    // appcompat's own resource (#ff5a595b). It used to resolve through the app's R class
+    // because library resources were merged into it; AGP 8 turns that off, so it has to
+    // be addressed in appcompat's namespace. The framework's copy is private, not public.
+    recoveryPhrase setDropDownBackgroundResource androidx.appcompat.R.color.button_material_dark
 
     def getMnemonicList: List[String] = {
       val mnemonic = recoveryPhrase.getText.toString.toLowerCase.trim

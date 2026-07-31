@@ -1,10 +1,11 @@
-name: Release APK
+name: Build Release APK
 
 on:
-  push:
-    tags:
-      - 'v*'
-
+  workflow_dispatch:
+  #push:
+  #  tags:
+  #    - '*.*.*'
+      
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
@@ -13,38 +14,80 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           lfs: true
 
-      - name: Set up JDK 11
-        uses: actions/setup-java@v3
+      # 17 runs Gradle/AGP and becomes JAVA_HOME (last listed wins); 11 is kept for the
+      # forked Scala 2.11 compiler and located via org.gradle.java.installations.fromEnv.
+      - name: Set up JDKs
+        uses: actions/setup-java@v4
         with:
-          java-version: '11'
+          java-version: |
+            11
+            17
           distribution: 'temurin'
 
-      - name: Set up NDK
-        run: echo "y" | ${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager "ndk;22.1.7171670" || true
-
       - name: Setup Gradle
-        uses: gradle/gradle-build-action@v2
+        uses: gradle/actions/setup-gradle@v4
 
+      # A silently-empty keystore surfaces as an unreadable ASN.1 error inside apksigner
+      # ("Tag number over 30 is not supported"), so validate here where the message can
+      # say what actually went wrong.
       - name: Decode keystore
-        run: echo "${{ secrets.SIGNING_KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${KEYSTORE_BASE64}" ]; then
+            echo "::error::secret SIGNING_KEYSTORE_BASE64 is empty or not set"
+            exit 1
+          fi
+          # tr strips any line wrapping or CRLF the secret picked up when it was pasted.
+          printf '%s' "$KEYSTORE_BASE64" | tr -d '[:space:]' | base64 -d > keystore.jks
+          bytes=$(stat -c%s keystore.jks)
+          echo "decoded keystore: $bytes bytes"
+          if [ "$bytes" -lt 100 ]; then
+            echo "::error::decoded keystore is $bytes bytes -- the secret is not valid base64 of a keystore"
+            exit 1
+          fi
+          keytool -list -keystore keystore.jks -storepass "$SIGNING_STORE_PASSWORD" >/dev/null
+          echo "keystore loads OK"
 
+      # This job publishes the APK that F-Droid diffs its own rebuild against, so the
+      # epoch has to be derived exactly the way fdroidserver derives it -- from the
+      # commit timestamp. Without this, normalizeReleaseApkTimestamps falls back to 0
+      # and the published APK can never reproduce. See REPRODUCIBLE_BUILDS.md.
       - name: Build release APK
+        shell: bash
         env:
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIGNING_STORE_FILENAME: ${{ github.workspace }}/keystore.jks
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
-        run: ./gradlew assembleRelease
+          TZ: UTC
+        run: |
+          set -euo pipefail
+          export SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct)
+          echo "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH ($(date -u -d "@$SOURCE_DATE_EPOCH"))"
+          ./gradlew assembleRelease -Porg.gradle.java.installations.fromEnv=JAVA_HOME_11_X64
 
-      - name: Rename APK
-        run: mv app/build/outputs/apk/release/finance.valet_105.apk app/build/outputs/apk/release/valet-testnet-${{ github.ref_name }}.apk
+      # Every flavour's release APK, under the name build.gradle already gives it
+      # (<applicationId>_<versionCode>.apk), so nothing here has to track versionCode
+      # bumps or the flavour list. Fails loudly rather than publishing an empty release.
+      - name: Collect APKs
+        run: |
+          mkdir -p out
+          find app/build/outputs/apk -path '*/release/*.apk' -exec cp {} out/ \;
+          count=$(ls -1 out/*.apk 2>/dev/null | wc -l)
+          echo "collected $count apk(s):"
+          ls -1 out/
+          test "$count" -gt 0
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: app/build/outputs/apk/release/valet-testnet-${{ github.ref_name }}.apk
+          files: out/*.apk
           generate_release_notes: true
