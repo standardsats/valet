@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView
+    style="@style/StandardLinearLayout"
+    xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <LinearLayout
+        style="@style/StandardXYMarginLinearLayout"
+        android:id="@+id/diceEntropyMain">
+
+        <TextView
+            style="@style/XMarginFillingView"
+            android:text="@string/dice_entropy_title"
+            android:textSize="@dimen/header_size"/>
+
+        <TextView
+            android:id="@+id/diceEntropyCounter"
+            style="@style/XMarginFillingView"
+            android:layout_marginTop="@dimen/chip_default_padding_edge"
+            android:text="@string/dice_entropy_counter"
+            android:textStyle="bold"/>
+
+        <com.google.android.material.button.MaterialButtonToggleGroup
+            android:id="@+id/diceEntropyBits"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/chip_default_padding_edge"
+            app:singleSelection="true"
+            xmlns:app="http://schemas.android.com/apk/res-auto">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/diceEntropy128"
+                style="@style/ToggleButton"
+                android:text="@string/dice_entropy_128"/>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/diceEntropy256"
+                style="@style/ToggleButton"
+                android:text="@string/dice_entropy_256"/>
+        </com.google.android.material.button.MaterialButtonToggleGroup>
+
+        <TextView
+            style="@style/BoundedView"
+            android:layout_marginTop="@dimen/chip_default_padding_edge"
+            android:text="@string/dice_entropy_hint"/>
+
+        <LinearLayout
+            android:id="@+id/dicePad"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/chip_default_padding_edge"
+            android:gravity="center"
+            android:orientation="vertical"/>
+
+        <com.ornach.nobobutton.NoboButton
+            android:id="@+id/diceEntropyClear"
+            app:nb_text="@string/dice_entropy_clear"
+            style="@style/GrayButton"
+            xmlns:app="http://schemas.android.com/apk/res-auto"/>
+
+        <com.ornach.nobobutton.NoboButton
+            android:id="@+id/diceEntropyCreate"
+            app:nb_text="@string/dice_entropy_create"
+            android:layout_marginTop="@dimen/large_button_margin"
+            style="@style/GreenButton"
+            xmlns:app="http://schemas.android.com/apk/res-auto"/>
+    </LinearLayout>
+</ScrollView>
