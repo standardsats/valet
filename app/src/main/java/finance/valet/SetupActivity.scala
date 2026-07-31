@@ -124,9 +124,10 @@ class SetupActivity extends BaseActivity { me =>
     recoveryPhrase.addChipTerminator(',', com.hootsuite.nachos.terminator.ChipTerminatorHandler.BEHAVIOR_CHIPIFY_TO_TERMINATOR)
     recoveryPhrase.addChipTerminator('\n', com.hootsuite.nachos.terminator.ChipTerminatorHandler.BEHAVIOR_CHIPIFY_TO_TERMINATOR)
     recoveryPhrase setAdapter new ArrayAdapter(me, android.R.layout.simple_list_item_1, englishWordList)
-    // Framework resource, public since API 21. It used to resolve through the app's own
-    // R class because library resources were merged into it; AGP 8 turns that off.
-    recoveryPhrase setDropDownBackgroundResource android.R.color.button_material_dark
+    // appcompat's own resource (#ff5a595b). It used to resolve through the app's R class
+    // because library resources were merged into it; AGP 8 turns that off, so it has to
+    // be addressed in appcompat's namespace. The framework's copy is private, not public.
+    recoveryPhrase setDropDownBackgroundResource androidx.appcompat.R.color.button_material_dark
 
     def getMnemonicList: List[String] = {
       val mnemonic = recoveryPhrase.getText.toString.toLowerCase.trim
