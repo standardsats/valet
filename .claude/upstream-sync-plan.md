@@ -304,6 +304,34 @@ Removing the `WalletApp` poller makes the leaked one the only one, so
 
 Found 2026-07-30 while doing Phase 0. Not caused by the parent; unrelated to the sync.
 
+### What survives of Phase 2
+
+Everything left from the upstream chain-layer stack, after the replan on 2026-07-31.
+These are **reimplementations against Valet's tree**, not cherry-picks — parent's commit
+boundaries are unusable. Full analysis in the Phase 2 section above.
+
+1. **`MemoizedKeys`** — real perf win, clean. Idea from `50fce17d`. Puts the
+   account/change keys behind lazily-computed scripthash maps in `ElectrumData` so they
+   stop being recomputed on every `ScriptHashSubscriptionResponse`. Separable from the
+   dead `WalletSpec` restructuring. Only collision is `params.gapLimit` vs
+   `MAX_RECEIVE_ADDRESSES`. **Lowest risk of the three; best next candidate.**
+
+2. **Cross-wallet tx accounting** — real, needs a Valet-specific fix and a decision on
+   the merge semantics. A transaction between two of the user's own wallets is recorded
+   from one wallet's perspective only, chosen by a race between actors, because
+   `addTx` is `INSERT OR IGNORE` on a `UNIQUE` txid. Can surface as a phantom incoming
+   payment with the spend invisible, and skews `selectSummarySql` totals. Bookkeeping
+   only, no funds at risk. **Do not port `e76f4409` for this — it changes no behaviour.**
+   Open decisions: which view wins `isIncoming` once both are known, where `feeOpt`
+   comes from (only the spending wallet knows it), and idempotency on rescan, since a
+   rescan replays these events and a naive `received = received + ?` double-counts.
+
+3. **`8cc2b19c`** — small, mostly LN-side (9 chain / 31 LN lines). Evaluate on its own
+   merits; not yet examined in detail.
+
+Demoted from this list: per-input signing dispatch from `d4ae9018` — checked, Valet does
+not have the bug it fixes. Hardening only, see Phase 2.
+
 ---
 
 ## Do not take
