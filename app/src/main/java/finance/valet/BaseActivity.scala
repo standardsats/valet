@@ -188,17 +188,21 @@ trait BaseActivity extends AppCompatActivity { me =>
     shareAction.setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
   }
 
-  def viewRecoveryCode: Unit = {
-    val content = new TitleView(me getString settings_view_revocery_phrase_ext)
-    getWindow.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
-    new AlertDialog.Builder(me).setView(content.asDefView).show setOnDismissListener new DialogInterface.OnDismissListener {
-      override def onDismiss(dialog: DialogInterface): Unit = getWindow.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
-    }
+  def viewRecoveryCode: Unit = WalletApp.extDataBag.tryGetSecret match {
+    case Failure(error) => me onFail error
 
-    for (mnemonicWord ~ mnemonicIndex <- LNParams.secret.mnemonic.zipWithIndex) {
-      val item = s"<font color=$cardZero>${mnemonicIndex + 1}</font> $mnemonicWord"
-      addFlowChip(content.flow, item, R.drawable.border_green)
-    }
+    case Success(secret) =>
+      val content = new TitleView(me getString settings_view_revocery_phrase_ext)
+      getWindow.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
+      new AlertDialog.Builder(me).setView(content.asDefView).show setOnDismissListener new DialogInterface.OnDismissListener {
+        override def onDismiss(dialog: DialogInterface): Unit = getWindow.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+      }
+
+      // Seed words are display-only here and must never end up in the clipboard
+      for (mnemonicWord ~ mnemonicIndex <- secret.mnemonic.zipWithIndex) {
+        val item = s"<font color=$cardZero>${mnemonicIndex + 1}</font> $mnemonicWord"
+        addFlowChip(content.flow, item, R.drawable.border_green, _ => ())
+      }
   }
 
   // Snackbar

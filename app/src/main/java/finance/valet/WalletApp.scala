@@ -174,7 +174,9 @@ object WalletApp {
     val essentialInterface = new DBInterfaceSQLiteAndroidEssential(app, dbFileNameEssential)
     val graphInterface = new DBInterfaceSQLiteAndroidGraph(app, dbFileNameGraph)
     val currentCustomElectrum: Try[NodeAddress] = customElectrumAddress
-    LNParams.secret = secret
+    // The mnemonic must not linger in process memory for the whole app lifetime: it stays
+    // in the (encrypted) database and is re-loaded on demand when the user views it
+    LNParams.secret = secret.copy(mnemonic = List.empty)
 
     val normalBag = new SQLiteNetwork(graphInterface, NormalChannelUpdateTable, NormalChannelAnnouncementTable, NormalExcludedChannelTable)
     val hostedBag = new SQLiteNetwork(graphInterface, HostedChannelUpdateTable, HostedChannelAnnouncementTable, HostedExcludedChannelTable)
