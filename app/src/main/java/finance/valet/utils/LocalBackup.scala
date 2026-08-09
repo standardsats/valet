@@ -3,15 +3,11 @@ package finance.valet.utils
 import android.os.Environment._
 import fr.acinq.bitcoin.{Block, ByteVector32, Crypto}
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.{ContextCompat, FileProvider}
-import android.content.pm.PackageManager
-import androidx.core.app.ActivityCompat
 import fr.acinq.eclair.randomBytes
 import com.google.common.io.{ByteStreams, Files}
-import android.content.{ContentResolver, ContentValues, Context}
+import android.content.{Context, Intent}
 import android.net.Uri
-import android.os.{Build, Environment}
-import android.provider.{DocumentsContract, MediaStore}
+import android.provider.DocumentsContract
 import androidx.documentfile.provider.DocumentFile
 import finance.valet.WalletApp
 import finance.valet.WalletApp.customBackupLocation
@@ -20,6 +16,7 @@ import immortan.crypto.Tools
 import immortan.wire.ExtCodecs
 import scodec.Attempt.{Failure, Successful}
 
+import scala.collection.JavaConverters._
 import scala.util.Try
 import java.io.{BufferedInputStream, File, FileInputStream}
 object LocalBackup { me =>
@@ -40,31 +37,31 @@ object LocalBackup { me =>
     new File(downloadsDir(context), s"$BACKUP_NAME-$specifics$BACKUP_EXTENSION")
   }
 
-  final val LOCAL_BACKUP_REQUEST_NUMBER = 105
-  def askPermission(activity: AppCompatActivity): Unit = ActivityCompat.requestPermissions(activity, Array(android.Manifest.permission.WRITE_EXTERNAL_STORAGE, android.Manifest.permission.READ_EXTERNAL_STORAGE), LOCAL_BACKUP_REQUEST_NUMBER)
-  def isAllowed(context: Context): Boolean = {
-    (ContextCompat.checkSelfPermission(context, android.Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED &&
-      ContextCompat.checkSelfPermission(context, android.Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) || customBackupLocation.nonEmpty
+  // Backups are published exclusively through SAF (ACTION_OPEN_DOCUMENT_TREE): runtime
+  // storage permissions are never granted on modern Android, so the user picks a directory
+  // once and we hold a persistable write permission on it.
+  def askBackupDirectory(activity: AppCompatActivity, requestCode: Int): Unit = {
+    val intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
+    intent.addCategory(Intent.CATEGORY_DEFAULT)
+    intent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+    intent.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+    activity.startActivityForResult(Intent.createChooser(intent, activity getString finance.valet.R.string.settings_choose_directory), requestCode)
+  }
+
+  def saveChosenDirectory(context: Context, uri: Uri): Unit = {
+    for (oldUri <- customBackupLocation) {
+      Try(context.getContentResolver.releasePersistableUriPermission(oldUri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION))
+    }
+    Try(context.getContentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION))
+    WalletApp.app.prefs.edit.putString(WalletApp.CUSTOM_BACKUP_LOCATION, uri.toString).commit
+  }
+
+  def isAllowed(context: Context): Boolean = customBackupLocation.exists { uri =>
+    context.getContentResolver.getPersistedUriPermissions.asScala.exists(perm => perm.getUri == uri && perm.isWritePermission)
   }
 
   // Note that the function returns directory in the internal storage, then we copy backups to external dir
   def downloadsDir(context: Context): File = context.getExternalFilesDir(DIRECTORY_DOWNLOADS)
-
-  // This is directory in external storage
-  private val DOWNLOAD_DIR = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-  private def downloadDirFileUri(context: Context, fileName: String): Uri = {
-    val file = new File(DOWNLOAD_DIR.getAbsolutePath + "/" + fileName)
-    FileProvider.getUriForFile(context, s"${context.getPackageName}", file)
-  }
-
-  // A way to get direct access to file inside download dir
-  def findFileDirectlyInDownloads(context: Context, fileName: String): Option[Uri] = {
-    val downloadDir = new File(DOWNLOAD_DIR.getAbsolutePath)
-    val files = downloadDir.listFiles()
-    val authority = s"${context.getPackageName}"
-    println(files.mkString("\n"))
-    files.find(_.getName == fileName).map(FileProvider.getUriForFile(context, authority, _))
-  }
 
   // Helper to print exception to logs if any
   def printExceptions[T](body: => T): T = {
@@ -79,97 +76,22 @@ object LocalBackup { me =>
     result.get
   }
 
-  // Depending on the Android version choose the best place to locate backup in the external storage.
-  // Takes into account:
-  // * directory - is custom directory selected by user to store backup at
-  // * version - older versions will use direct File API, newer will prefer SAF if possible.
-  // * existing of old backup - older one will be overwritten
-  def selectDestinationUri(context: Context, resolver: ContentResolver, directory: Option[Uri], downloadedFile: File): Uri = {
-    val fileName = downloadedFile.getName
-    directory match {
-      case None => {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-          val existedFile = findFileDirectlyInDownloads(context, fileName)
-          existedFile match {
-            case Some(uri) => {
-              println("LocalBackup: found the backup file at " + uri.toString)
-              val contentValues = new ContentValues()
-              contentValues.put(MediaStore.MediaColumns.IS_PENDING, true)
-              contentValues.put(MediaStore.MediaColumns.SIZE, String.valueOf(downloadedFile.length()))
-              contentValues.put(MediaStore.MediaColumns.MIME_TYPE, resolver.getType(android.net.Uri.fromFile(downloadedFile)))
-              resolver.update(uri, contentValues, null, null)
-              uri
-            }
-            case _ => {
-              println("LocalBackup: no backup file at downloads")
-              downloadDirFileUri(context, fileName)
-            }
-          }
-        } else {
-          val authority = s"${context.getPackageName}"
-          val destinyFile = new File(directory.map(uri => new File(uri.getPath)).getOrElse(DOWNLOAD_DIR), fileName)
-          FileProvider.getUriForFile(context, authority, destinyFile)
-        }
-      }
-      case Some(uri) => {
-        println("LocalBackup: Got custom directory " + uri)
-        val dirFile: DocumentFile = DocumentFile.fromTreeUri(context, uri)
-        println("LocalBackup: Can create files in directory: " ++ dirFile.canWrite.toString)
-        dirFile.listFiles.find(_.getName.equals(fileName)) match {
-          case Some(existingFile) =>
-            println("LocalBackup: We found file to rewrite: " ++ existingFile.getUri.toString)
-            existingFile.getUri
-
-          case None =>
-            println("LocalBackup: Creating new file")
-            DocumentsContract.createDocument(resolver, dirFile.getUri, "application/valet", fileName)
-        }
-      }
-    }
-  }
-
-  def copyFileToDirectory(context: Context, directory: Option[Uri], downloadedFile: File): Uri = printExceptions {
+  // Copies the staged backup file into the user-selected SAF directory, overwriting an
+  // older backup with the same name when present.
+  def copyFileToDirectory(context: Context, directory: Uri, downloadedFile: File): Uri = printExceptions {
     val resolver = context.getContentResolver
     val fileName = downloadedFile.getName
-    val downloadedUri: Uri = directory match {
-      case None => {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-          val existedFile = findFileDirectlyInDownloads(context, fileName)
-          existedFile match {
-            case Some(uri) => {
-              println("LocalBackup: found the backup file at " + uri.toString)
-              val contentValues = new ContentValues()
-              contentValues.put(MediaStore.MediaColumns.IS_PENDING, true)
-              contentValues.put(MediaStore.MediaColumns.SIZE, String.valueOf(downloadedFile.length()))
-              contentValues.put(MediaStore.MediaColumns.MIME_TYPE, resolver.getType(android.net.Uri.fromFile(downloadedFile)))
-              resolver.update(uri, contentValues, null, null)
-              uri
-            }
-            case _ => {
-              println("LocalBackup: no backup file at downloads")
-              downloadDirFileUri(context, fileName)
-            }
-          }
-        } else {
-          val authority = s"${context.getPackageName}"
-          val destinyFile = new File(directory.map(uri => new File(uri.getPath)).getOrElse(DOWNLOAD_DIR), fileName)
-          FileProvider.getUriForFile(context, authority, destinyFile)
-        }
-      }
-      case Some(uri) => {
-        println("LocalBackup: Got custom directory " + uri)
-        val dirFile: DocumentFile = DocumentFile.fromTreeUri(context, uri)
-        println("LocalBackup: Can create files in directory: " ++ dirFile.canWrite.toString)
-        dirFile.listFiles.find(_.getName.equals(fileName)) match {
-          case Some(existingFile) =>
-            println("LocalBackup: We found file to rewrite: " ++ existingFile.getUri.toString)
-            existingFile.getUri
+    println("LocalBackup: Got custom directory " + directory)
+    val dirFile: DocumentFile = DocumentFile.fromTreeUri(context, directory)
+    println("LocalBackup: Can create files in directory: " ++ dirFile.canWrite.toString)
+    val downloadedUri: Uri = dirFile.listFiles.find(_.getName.equals(fileName)) match {
+      case Some(existingFile) =>
+        println("LocalBackup: We found file to rewrite: " ++ existingFile.getUri.toString)
+        existingFile.getUri
 
-          case None =>
-            println("LocalBackup: Creating new file")
-            DocumentsContract.createDocument(resolver, dirFile.getUri, "application/valet", fileName)
-        }
-      }
+      case None =>
+        println("LocalBackup: Creating new file")
+        DocumentsContract.createDocument(resolver, dirFile.getUri, "application/valet", fileName)
     }
     println("LocalBackup: Will write backup to: " ++ downloadedUri.toString)
 
@@ -198,7 +120,7 @@ object LocalBackup { me =>
     val cipherBytes = encryptBackup(ByteVector.view(Files toByteArray dataBaseFile), seed)
     val backupFile = getBackupFileUnsafe(context, chainHash, seed)
     atomicWrite(backupFile, cipherBytes)
-    copyFileToDirectory(context, WalletApp.customBackupLocation, backupFile)
+    WalletApp.customBackupLocation.foreach(copyFileToDirectory(context, _, backupFile))
   }
 
   // It is assumed that we try to decrypt a backup before running this and only proceed on success

@@ -2,6 +2,8 @@ package finance.valet
 
 import java.net.InetSocketAddress
 import java.util.TimerTask
+import android.app.Activity
+import android.content.{DialogInterface, Intent}
 import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
 import android.graphics.{Bitmap, BitmapFactory}
@@ -96,6 +98,7 @@ object HubActivity {
 }
 
 class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with ExternalDataChecker with ChoiceReceiver with ChannelListener with CanBeRepliedTo { me =>
+  private[this] final val BACKUP_DIRECTORY_REQUEST_CODE = 114
   private[this] lazy val expiresInBlocks = getResources.getStringArray(R.array.expires_in_blocks)
   private[this] lazy val partsInFlight = getResources.getStringArray(R.array.parts_in_flight)
   private[this] lazy val pctCollected = getResources.getStringArray(R.array.pct_collected)
@@ -1130,6 +1133,13 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
     if (reqCode == scannerRequestCode && results.nonEmpty && results.head == PackageManager.PERMISSION_GRANTED) bringScanner(null)
   }
 
+  override def onActivityResult(requestCode: Int, resultCode: Int, resultData: Intent): Unit = {
+    if (requestCode == BACKUP_DIRECTORY_REQUEST_CODE && resultCode == Activity.RESULT_OK && resultData != null) {
+      LocalBackup.saveChosenDirectory(me, resultData.getData)
+      WalletApp.backupSaveWorker.replaceWork(true)
+    } else super.onActivityResult(requestCode, resultCode, resultData)
+  }
+
   override def checkExternalData(whenNone: Runnable): Unit = InputParser.checkAndMaybeErase {
     case bitcoinUri: BitcoinUri if Try(LNParams addressToPubKeyScript bitcoinUri.address).isSuccess =>
 
@@ -1396,7 +1406,13 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
 
     timer.scheduleAtFixedRate(paymentAdapterDataChanged, 30000, 30000)
     val backupAllowed = LocalBackup.isAllowed(context = WalletApp.app)
-    if (!backupAllowed) LocalBackup.askPermission(activity = me)
+    if (!backupAllowed) {
+      val listener = new DialogInterface.OnClickListener {
+        override def onClick(dialog: DialogInterface, which: Int): Unit = LocalBackup.askBackupDirectory(me, BACKUP_DIRECTORY_REQUEST_CODE)
+      }
+      new AlertDialog.Builder(me).setTitle(settings_backup_disabled).setMessage(settings_backup_info)
+        .setPositiveButton(settings_choose_directory, listener).setNegativeButton(dialog_cancel, null).show
+    }
   }
 
   // VIEW HANDLERS

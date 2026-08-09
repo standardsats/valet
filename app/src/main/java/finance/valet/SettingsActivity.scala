@@ -104,11 +104,7 @@ class SettingsActivity extends BaseCheckActivity with HasTypicalChainFee with Ch
       settingsInfo.setText(info)
     }
 
-    view setOnClickListener onButtonTap {
-      val intent = (new Intent).setAction(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-      val intent1 = intent setData android.net.Uri.fromParts("package", getPackageName, null)
-      startActivity(intent1)
-    }
+    view setOnClickListener onButtonTap(LocalBackup.askBackupDirectory(me, DIRECTORY_REQUEST_CODE))
   }
 
   lazy private[this] val backupLocation = new SettingsHolder(me) {
@@ -128,27 +124,15 @@ class SettingsActivity extends BaseCheckActivity with HasTypicalChainFee with Ch
 
     view setOnClickListener onButtonTap {
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-        val i = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
-        i.addCategory(Intent.CATEGORY_DEFAULT)
-        i.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-        i.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
-        startActivityForResult(Intent.createChooser(i, me getString settings_choose_directory), DIRECTORY_REQUEST_CODE)
+        LocalBackup.askBackupDirectory(me, DIRECTORY_REQUEST_CODE)
       }
     }
   }
 
   override def onActivityResult(requestCode: Int, resultCode: Int, resultData: Intent): Unit =
     if (requestCode == DIRECTORY_REQUEST_CODE && resultCode == Activity.RESULT_OK && resultData != null) {
-      def saveDirectory(directory: String) = WalletApp.app.prefs.edit.putString(WalletApp.CUSTOM_BACKUP_LOCATION, directory)
-      WalletApp.customBackupLocation match {
-        case Some(uri) => {
-            getContentResolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-        }
-        case _ => ()
-      }
-      val uri = resultData.getData
-      Try(getContentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION))
-      saveDirectory(uri.toString).commit
+      LocalBackup.saveChosenDirectory(me, resultData.getData)
+      storeLocalBackup.updateView
       backupLocation.updateView
       WalletApp.backupSaveWorker.replaceWork(true)
     }

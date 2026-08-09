@@ -233,8 +233,8 @@
 
     <string name="settings_backup_disabled">Habilitar backup do canal</string>
     <string name="settings_backup_enabled">Backup do canal está habilitado</string>
-    <string name="settings_backup_info">Configurar a permissão do sistema</string>
-    <string name="settings_backup_where">Por defeito, na pasta Download</string>
+    <string name="settings_backup_info">Escolha uma pasta para as cópias de segurança encriptadas</string>
+    <string name="settings_backup_where">Nenhuma pasta selecionada</string>
     <string name="settings_backup_how">Permissões do app -> Armazenar</string>
 
     <string name="settings_hardware_add">Add hardware wallet</string>
