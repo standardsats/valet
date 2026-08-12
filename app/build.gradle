@@ -99,14 +99,25 @@ android {
     }
 }
 
-// AGP 8.12 requires Gradle to run on JDK 17, but the Scala 2.11.12 compiler predates
-// the module system and does not run there. Fork ScalaCompile onto a JDK 11 toolchain;
-// the build therefore needs both JDKs visible to Gradle's toolchain detection.
+// AGP 8.12 requires Gradle to run on a JDK >= 17, but the Scala 2.11.12 compiler
+// predates the module system and does not run there. Fork ScalaCompile onto a JDK 11
+// toolchain; the build therefore needs both JDKs visible to Gradle's toolchain detection.
 tasks.withType(ScalaCompile).configureEach {
     javaLauncher = javaToolchains.launcherFor {
         languageVersion = JavaLanguageVersion.of(11)
     }
-    scalaCompileOptions.additionalParameters = ['-target:jvm-1.8']
+    // -encoding: FiatRates.scala and friends contain raw non-ASCII string literals,
+    // and a JDK 11 compiler JVM derives its default charset from the locale, which is
+    // not the same on every build machine. Pin it.
+    scalaCompileOptions.additionalParameters = ['-target:jvm-1.8', '-encoding', 'UTF-8']
+    // scalac numbers macro-generated symbols (quicklens' fresh$macro$N) in the order
+    // compilation units reach it, and a file tree's iteration order follows the
+    // filesystem -- so identical sources produced a different classes3.dex on
+    // F-Droid's builder than on the release machine (109 failure). Sort the sources
+    // to pin the numbering. The closure keeps resolution lazy: source.files at
+    // configuration time would miss generated sources such as BuildConfig.
+    def originalSource = source
+    source = { originalSource.files.sort { it.path } }
 }
 
 dependencies {
