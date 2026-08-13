@@ -28,7 +28,7 @@ android {
         targetSdk 36
         minSdk 21
 
-        versionName '5.0.0'
+        versionName '5.1.2'
         vectorDrawables.generatedDensities = []
     }
 
@@ -43,22 +43,22 @@ android {
     productFlavors {
         mainnet {
             dimension 'chain'
-            versionCode 109 // odd for mainnet
+            versionCode 111 // odd for mainnet
         }
         tnet4 {
             dimension 'chain'
             applicationIdSuffix '.testnet4'
-            versionCode 108 // even for testnets
+            versionCode 110 // even for testnets
         }
         tnet3 {
             dimension 'chain'
             applicationIdSuffix '.testnet3'
-            versionCode 108
+            versionCode 110
         }
         regtest {
             dimension 'chain'
             applicationIdSuffix '.regtest'
-            versionCode 108
+            versionCode 110
         }
     }
 
