@@ -259,7 +259,9 @@ object TxTable extends Table {
 
   // Selecting
 
-  val selectRecentSql = s"SELECT * FROM $table ORDER BY $id DESC LIMIT ?"
+  // Electrum may rediscover history in a different order after recovery, so
+  // display transactions by their confirmed timestamp, not insertion order.
+  val selectRecentSql = s"SELECT * FROM $table ORDER BY $seenAt DESC, $id DESC LIMIT ?"
 
   val selectSummarySql = s"SELECT SUM($feeSat), SUM($receivedSat), SUM($sentSat), COUNT($id) FROM $table WHERE $doubleSpent = 0"
 

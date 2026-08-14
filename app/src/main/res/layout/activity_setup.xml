@@ -65,5 +65,14 @@
 
             </LinearLayout>
         </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/networkSetup"
+            style="@style/StandardXYMarginLinearLayout">
+
+            <TextView
+                android:text="@string/network_setup_title"
+                style="@style/Emphasized"/>
+        </LinearLayout>
     </LinearLayout>
 </ScrollView>
