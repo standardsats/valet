@@ -39,7 +39,7 @@ object SyncMaster {
                          encoding: EncodingType,
                          shortIds: Seq[Long],
                          chunkSize: Int): Iterator[QueryShortChannelIds] =
-    shortIds.grouped(chunkSize).iterator.map { ids =>
+    shortIds.grouped(chunkSize).map { ids =>
       QueryShortChannelIds(chainHash, shortChannelIds = EncodedShortChannelIds(encoding, ids.toList))
     }
 }
