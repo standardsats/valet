@@ -270,8 +270,9 @@ case class ReplyChannelRange(chainHash: ByteVector32, firstBlockNum: Long,
                              numberOfBlocks: Long, syncComplete: Byte, shortChannelIds: EncodedShortChannelIds,
                              tlvStream: TlvStream[ReplyChannelRangeTlv] = TlvStream.empty) extends LightningMessage {
 
-  val timestamps: ReplyChannelRangeTlv.EncodedTimestamps = tlvStream.get[ReplyChannelRangeTlv.EncodedTimestamps].get
-  val checksums: ReplyChannelRangeTlv.EncodedChecksums = tlvStream.get[ReplyChannelRangeTlv.EncodedChecksums].get
+  // These TLVs are supplied by gossip_queries_ex only. Basic gossip_queries replies legitimately omit both.
+  val timestamps: Option[ReplyChannelRangeTlv.EncodedTimestamps] = tlvStream.get[ReplyChannelRangeTlv.EncodedTimestamps]
+  val checksums: Option[ReplyChannelRangeTlv.EncodedChecksums] = tlvStream.get[ReplyChannelRangeTlv.EncodedChecksums]
 }
 
 case class GossipTimestampFilter(chainHash: ByteVector32, firstTimestamp: Long, timestampRange: Long) extends LightningMessage

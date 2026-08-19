@@ -372,6 +372,10 @@
     <string name="chan_can_receive">Can receive</string>
     <string name="chan_in_flight">Value in-flight</string>
     <string name="chan_refundable">Refundable</string>
+    <string name="chan_gossip_extended">Gossip sync: extended</string>
+    <string name="chan_gossip_basic">Gossip sync: basic</string>
+    <string name="chan_gossip_unsupported">Gossip sync: unavailable</string>
+    <string name="chan_gossip_unknown">Gossip sync: unknown</string>
 
     <string name="chan_nothing"><![CDATA[<i>nothing</i>]]></string>
 

@@ -105,6 +105,12 @@
 
                 </RelativeLayout>
 
+                <TextView
+                    android:id="@+id/gossipQueriesSupport"
+                    android:layout_marginBottom="10dp"
+                    android:contentDescription="@string/chan_gossip_unknown"
+                    style="@style/ChipTextGrayMargin"/>
+
                 <!-- Progress bars -->
 
                 <FrameLayout

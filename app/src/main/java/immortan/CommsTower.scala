@@ -6,6 +6,7 @@ import java.util.concurrent.{ConcurrentHashMap, Executors}
 import fr.acinq.bitcoin.ByteVector32
 import fr.acinq.bitcoin.Crypto.PublicKey
 import fr.acinq.eclair._
+import fr.acinq.eclair.Features.{ChannelRangeQueries, ChannelRangeQueriesExtended}
 import fr.acinq.eclair.wire.LightningMessageCodecs.lightningMessageCodecWithFallback
 import fr.acinq.eclair.wire._
 import immortan.crypto.Noise.KeyPair
@@ -21,10 +22,26 @@ import scala.concurrent.duration._
 
 case class KeyPairAndPubKey(keyPair: KeyPair, them: PublicKey)
 
+sealed trait GossipQueriesSupport
+case object ExtendedGossipQueries extends GossipQueriesSupport
+case object BasicGossipQueries extends GossipQueriesSupport
+case object NoGossipQueries extends GossipQueriesSupport
+
+object GossipQueriesSupport {
+  def from(init: Init): GossipQueriesSupport =
+    if (init.features.hasFeature(ChannelRangeQueriesExtended)) ExtendedGossipQueries
+    else if (init.features.hasFeature(ChannelRangeQueries)) BasicGossipQueries
+    else NoGossipQueries
+}
+
 object CommsTower {
   type Listeners = Set[ConnectionListener]
   val workers: mutable.Map[KeyPairAndPubKey, Worker] = new ConcurrentHashMap[KeyPairAndPubKey, Worker].asScala
   val listeners: mutable.Map[KeyPairAndPubKey, Listeners] = new ConcurrentHashMap[KeyPairAndPubKey, Listeners].asScala withDefaultValue Set.empty
+  private[this] val peerGossipQueries: mutable.Map[PublicKey, GossipQueriesSupport] = new ConcurrentHashMap[PublicKey, GossipQueriesSupport].asScala
+
+  /** Last capability advertised by a compatible peer. It is intentionally in-memory: peers may change software between reconnects. */
+  def gossipQueriesSupport(nodeId: PublicKey): Option[GossipQueriesSupport] = peerGossipQueries.get(nodeId)
 
   def listen(listeners1: Set[ConnectionListener], pair: KeyPairAndPubKey, info: RemoteNodeInfo): Unit = synchronized {
     // Update and either insert a new worker or fire onOperational on NEW listeners if worker currently exists and online
@@ -132,7 +149,10 @@ object CommsTower {
 
       if (!thread.isCompleted) {
         val areFeaturesOK = Features.areCompatible(LNParams.ourInit.features, remoteInit.features)
-        if (areFeaturesOK) for (lst <- listeners1) lst.onOperational(me, remoteInit)
+        if (areFeaturesOK) {
+          peerGossipQueries.update(info.nodeId, GossipQueriesSupport.from(remoteInit))
+          for (lst <- listeners1) lst.onOperational(me, remoteInit)
+        }
         else disconnect
       }
     }
