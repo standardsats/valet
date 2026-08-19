@@ -78,7 +78,7 @@ object HubActivity {
   def requestHostedChannel(ticker: Ticker): Unit = {
     val localParams = LNParams.makeChannelParams(isFunder = false, LNParams.minChanDustLimit)
     def implant(cs: Commitments, channel: ChannelHosted): Unit = RemotePeerActivity.implantNewChannel(cs, channel)
-    new HCOpenHandler(LNParams.syncParams.satm, randomBytes32, localParams.defaultFinalScriptPubKey, ticker, LNParams.cm) {
+    new HCOpenHandler(LNParams.syncParams.sts, randomBytes32, localParams.defaultFinalScriptPubKey, ticker, LNParams.cm) {
       // Stop automatic HC opening attempts on getting any kind of local/remote error, this won't be triggered on disconnect
       def onEstablished(cs: Commitments, channel: ChannelHosted): Unit = implant(cs, channel)
       def onFailure(reason: Throwable): Unit = none

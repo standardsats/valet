@@ -195,7 +195,7 @@ case class WalletExt(wallets: List[ElectrumEclairWallet], catcher: ActorRef, syn
 
 class SyncParams {
   // val satm: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"02cd1b7bc418fac2dc99f0ba350d60fa6c45fde5ab6017ee14df6425df485fb1dd"), NodeAddress.unresolved(80, host = 134, 209, 228, 207), "SATM")
-  // val sts: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"02208879ee204651619a51f6e48e159da645f1acbf417b3b399358ea7784df066f"), NodeAddress.unresolved(9735, host = 157, 230, 113, 217), "StS")
+  val sts: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"02208879ee204651619a51f6e48e159da645f1acbf417b3b399358ea7784df066f"), NodeAddress.unresolved(9735, host = 157, 230, 113, 217), "StS")
 
   val bCashIsTrash: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"0298f6074a454a1f5345cb2a7c6f9fce206cd0bf675d177cdbf0ca7508dd28852f"), NodeAddress.unresolved(9735, host = 73, 119, 255, 56), "bCashIsTrash")
   val silentBob: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"02e9046555a9665145b0dbd7f135744598418df7d61d3660659641886ef1274844"), NodeAddress.unresolved(9735, host = 31, 16, 52, 37), "SilentBob")
