@@ -10,7 +10,7 @@ import fr.acinq.eclair.Features.{ChannelRangeQueries, ChannelRangeQueriesExtende
 import fr.acinq.eclair.wire.LightningMessageCodecs.lightningMessageCodecWithFallback
 import fr.acinq.eclair.wire._
 import immortan.crypto.Noise.KeyPair
-import immortan.crypto.Tools.{Bytes, none}
+import immortan.crypto.Tools.{Bytes, ThrowableOps, none}
 import rx.lang.scala.{Observable, Subscription}
 import scodec.bits.ByteVector
 
@@ -131,8 +131,9 @@ object CommsTower {
       }
     }
 
-    thread onComplete { _ =>
+    thread onComplete { result =>
       // Will also run after forget
+      result.failed.foreach(err => LNParams.logBag.put(s"comms-tower-disconnect ${info.nodeId}", err.stackTraceAsString))
       try pinging.unsubscribe catch none
       listeners(pair).foreach(_ onDisconnect me)
       // Once disconnected, worker gets removed

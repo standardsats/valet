@@ -115,7 +115,9 @@ case class SyncWorker(master: CanBeRepliedTo, keyPair: KeyPair, remoteInfo: Remo
 
   def gossipQueriesSupport(init: Init): GossipQueriesSupport = GossipQueriesSupport.from(init)
 
-  def process(changeMessage: Any): Unit = scala.concurrent.Future(me doProcess changeMessage)
+  def process(changeMessage: Any): Unit = scala.concurrent.Future(me doProcess changeMessage).failed.foreach { err =>
+    LNParams.logBag.put("sync-worker-error", err.stackTraceAsString)
+  }
 
   val listener: ConnectionListener = new ConnectionListener {
     override def onOperational(worker: CommsTower.Worker, init: Init): Unit = gossipQueriesSupport(init) match {
@@ -133,6 +135,8 @@ case class SyncWorker(master: CanBeRepliedTo, keyPair: KeyPair, remoteInfo: Remo
 
     override def onDisconnect(worker: CommsTower.Worker): Unit = {
       val hasBasicQueriesSupport = worker.theirInit.forall(init => gossipQueriesSupport(init) != NoGossipQueries)
+      val supportDescription: String = worker.theirInit.map(init => gossipQueriesSupport(init).toString).getOrElse("no init received, connection likely never completed")
+      LNParams.logBag.put("graph-sync-peer-disconnect", s"${remoteInfo.alias} ${remoteInfo.nodeId} support=$supportDescription removePeer=${!hasBasicQueriesSupport}")
       master process SyncDisconnected(me, removePeer = !hasBasicQueriesSupport)
       CommsTower.listeners(worker.pair) -= listener
     }
@@ -277,11 +281,13 @@ abstract class SyncMaster(excluded: ShortChanIdSet, requestNodeAnnounce: ShortCh
   def provenAndNotExcluded(shortId: Long): Boolean = provenShortIds.contains(shortId) && !excluded.contains(shortId)
 
   implicit val context: ExecutionContextExecutor = ExecutionContext fromExecutor Executors.newSingleThreadExecutor
-  def process(changeMessage: Any): Unit = scala.concurrent.Future(me doProcess changeMessage)
+  def process(changeMessage: Any): Unit = scala.concurrent.Future(me doProcess changeMessage).failed.foreach { err =>
+    LNParams.logBag.put("sync-master-error", err.stackTraceAsString)
+  }
   become(null, SHORT_ID_SYNC)
 
   def doProcess(change: Any): Unit = (change, data, state) match {
-    case (setupData: SyncMasterShortIdData, null, SHORT_ID_SYNC) if setupData.baseInfos.nonEmpty =>
+    case (setupData: SyncMasterShortIdData, null, SHORT_ID_SYNC) if (setupData.baseInfos ++ setupData.extInfos).nonEmpty =>
       List.fill(maxConnections)(CMDAddSync).foreach(process)
       become(setupData, SHORT_ID_SYNC)
 
@@ -435,7 +441,9 @@ case class SyncMasterPHCData(baseInfos: Set[RemoteNodeInfo], extInfos: Set[Remot
 
 abstract class PHCSyncMaster(routerData: Data) extends StateMachine[SyncMasterData] with CanBeRepliedTo { me =>
   implicit val context: ExecutionContextExecutor = ExecutionContext fromExecutor Executors.newSingleThreadExecutor
-  def process(changeMessage: Any): Unit = scala.concurrent.Future(me doProcess changeMessage)
+  def process(changeMessage: Any): Unit = scala.concurrent.Future(me doProcess changeMessage).failed.foreach { err =>
+    LNParams.logBag.put("phc-sync-master-error", err.stackTraceAsString)
+  }
   become(null, PHC_SYNC)
 
   // These checks require graph

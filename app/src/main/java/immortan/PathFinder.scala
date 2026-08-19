@@ -56,7 +56,9 @@ abstract class PathFinder(val normalBag: NetworkBag, val hostedBag: NetworkBag) 
   var syncMaster: Option[SyncMaster] = None
 
   implicit val context: ExecutionContextExecutor = ExecutionContext fromExecutor Executors.newSingleThreadExecutor
-  def process(changeMessage: Any): Unit = scala.concurrent.Future(me doProcess changeMessage)
+  def process(changeMessage: Any): Unit = scala.concurrent.Future(me doProcess changeMessage).failed.foreach { err =>
+    LNParams.logBag.put("path-finder-error", err.stackTraceAsString)
+  }
 
   private val RESYNC_PERIOD: Long = 1000L * 3600 * 24 * 4
   // We don't load routing data on every startup but when user (or system) actually needs it
@@ -143,6 +145,7 @@ abstract class PathFinder(val normalBag: NetworkBag, val hostedBag: NetworkBag) 
       val ghostIds = normalShortIdToPubChan.keySet.diff(sync.provenShortIds)
       val normalShortIdToPubChan1 = normalShortIdToPubChan -- ghostIds -- oneSideShortIds
       val searchGraph = DirectedGraph.makeGraph(normalShortIdToPubChan1 ++ data.hostedChannels).addEdges(extraEdges.values)
+      LNParams.logBag.put("graph-sync-complete", s"provenShortIds=${sync.provenShortIds.size} channelsKept=${normalShortIdToPubChan1.size} ghostsRemoved=${ghostIds.size}")
       become(Data(normalShortIdToPubChan1, data.hostedChannels, searchGraph), OPERATIONAL)
       // Update normal checkpoint, if PHC sync fails this time we'll jump to it next time
       updateLastNormalResyncStamp(System.currentTimeMillis)
@@ -243,6 +246,7 @@ abstract class PathFinder(val normalBag: NetworkBag, val hostedBag: NetworkBag) 
 
   def attemptNormalSync(): Unit = {
     val setupData = SyncMasterShortIdData(LNParams.syncParams.syncNodes, getExtraNodes, Set.empty, Map.empty)
+    LNParams.logBag.put("graph-sync-start", s"baseInfos=${setupData.baseInfos.size} extInfos=${setupData.extInfos.size} maxNodesToSyncFrom=${LNParams.syncParams.maxNodesToSyncFrom}")
 
     val requestNodeAnnounceForChan = for {
       info <- getExtraNodes ++ getPHCExtraNodes
