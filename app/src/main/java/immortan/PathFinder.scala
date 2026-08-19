@@ -96,6 +96,11 @@ abstract class PathFinder(val normalBag: NetworkBag, val hostedBag: NetworkBag) 
       me process CMDLoadGraph
       me process CMDResync
 
+    case (CMDForceResync, WAITING) =>
+      // Same as above: a forced resync also needs a loaded graph first
+      me process CMDLoadGraph
+      me process CMDForceResync
+
     case (CMDLoadGraph, WAITING) =>
       val normalShortIdToPubChan = normalBag.getRoutingData
       val hostedShortIdToPubChan = hostedBag.getRoutingData
