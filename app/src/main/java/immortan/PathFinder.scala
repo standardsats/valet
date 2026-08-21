@@ -110,10 +110,13 @@ abstract class PathFinder(val normalBag: NetworkBag, val hostedBag: NetworkBag) 
       become(Data(normalShortIdToPubChan, hostedShortIdToPubChan, searchGraph1), OPERATIONAL)
 
     case (CMDForceResync, OPERATIONAL) =>
-      attemptNormalSync
+      // A sync already in progress has its own state (which peers were already tried
+      // and found unusable, e.g. hosted-channel peers without gossip_queries support);
+      // starting a fresh one here would discard that and retry those same bad peers
+      if (syncMaster.isEmpty) attemptNormalSync
       attemptPHCSync
 
-    case (CMDResync, OPERATIONAL) if System.currentTimeMillis - getLastNormalResyncStamp > RESYNC_PERIOD =>
+    case (CMDResync, OPERATIONAL) if syncMaster.isEmpty && System.currentTimeMillis - getLastNormalResyncStamp > RESYNC_PERIOD =>
       attemptNormalSync
 
     case (CMDResync, OPERATIONAL) if System.currentTimeMillis - getLastTotalResyncStamp > RESYNC_PERIOD =>

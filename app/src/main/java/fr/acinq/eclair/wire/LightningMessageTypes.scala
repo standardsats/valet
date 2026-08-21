@@ -219,7 +219,7 @@ case class Domain(domain: String, port: Int) extends NodeAddress {
 case class NodeAnnouncement(signature: ByteVector64, features: Features[FeatureScope], timestamp: Long, nodeId: PublicKey, rgbColor: Color,
                             alias: String, addresses: List[NodeAddress], unknownFields: ByteVector = ByteVector.empty) extends LightningMessage {
 
-  def toRemoteInfo: RemoteNodeInfo = RemoteNodeInfo(nodeId, addresses.minBy { case _: IPv4 => 1 case _: IPv6 => 2 case _ => 3 }, alias)
+  def toRemoteInfo: Option[RemoteNodeInfo] = addresses.sortBy { case _: IPv4 => 1 case _: IPv6 => 2 case _ => 3 }.headOption.map(RemoteNodeInfo(nodeId, _, alias))
 }
 
 object ChannelUpdate {

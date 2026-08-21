@@ -1120,7 +1120,7 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
   // Getting graph sync status and our peer announcements
 
   override def process(reply: Any): Unit = reply match {
-    case na: NodeAnnouncement => LNParams.cm.all.values.foreach(_ process na.toRemoteInfo)
+    case na: NodeAnnouncement => for (info <- na.toRemoteInfo) LNParams.cm.all.values.foreach(_ process info)
     case PathFinder.CMDResync => walletCards.updateLnSyncProgress(total = 1000, left = 1000)
     case prd: PureRoutingData => walletCards.updateLnSyncProgress(prd.queriesTotal, prd.queriesLeft)
     case _: SyncMaster => UITask(walletCards.lnSyncIndicator setVisibility View.GONE).run
