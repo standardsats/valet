@@ -11,22 +11,11 @@
     "t": "51001",
     "version": "1.4.2"
   },
-  "testnet.hsmiths.com": {
-    "pruning": "-",
-    "s": "53012",
-    "version": "1.4.2"
-  },
   "testnet.qtornado.com": {
     "pruning": "-",
     "s": "51002",
     "t": "51001",
     "version": "1.5"
-  },
-  "tn.not.fyi": {
-    "pruning": "-",
-    "s": "55002",
-    "t": "55001",
-    "version": "1.4"
   },
   "blackie.c3-soft.com": {
     "pruning": "-",
