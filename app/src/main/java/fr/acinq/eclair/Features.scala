@@ -218,6 +218,11 @@ object Features {
     val mandatory = 50
   }
 
+  case object Splicing extends Feature with InitFeature with NodeFeature {
+    val rfcName = "Splicing"
+    val mandatory = 62
+  }
+
   case object ChainSwap extends Feature with InitFeature with NodeFeature {
     val rfcName = "Chain swaps"
     val mandatory = 32770
@@ -251,6 +256,7 @@ object Features {
     ScidAlias,
     PaymentMetadata,
     TrampolinePayment,
+    Splicing,
     ChainSwap,
     HostedChannels,
     ResizeableHostedChannels

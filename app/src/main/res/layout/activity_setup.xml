@@ -10,6 +10,7 @@
 
         <TextView
             style="@style/XMarginFillingView"
+            android:layout_marginTop="15dp"
             android:text="@string/setup_title"
             android:textSize="@dimen/header_size"/>
 
@@ -68,11 +69,12 @@
 
         <LinearLayout
             android:id="@+id/networkSetup"
-            style="@style/StandardXYMarginLinearLayout">
+            style="@style/StandardLinearLayout">
 
             <TextView
                 android:text="@string/network_setup_title"
-                style="@style/Emphasized"/>
+                style="@style/Emphasized"
+                android:layout_marginStart="15dp"/>
         </LinearLayout>
     </LinearLayout>
 </ScrollView>

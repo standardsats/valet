@@ -376,6 +376,12 @@
     <string name="chan_gossip_basic">Gossip sync: basic</string>
     <string name="chan_gossip_unsupported">Gossip sync: unavailable</string>
     <string name="chan_gossip_unknown">Gossip sync: unknown</string>
+    <string name="chan_commitment_zero_fee_anchors">Commitment: zero-fee anchors</string>
+    <string name="chan_commitment_anchors">Commitment: anchors</string>
+    <string name="chan_commitment_legacy">Commitment: legacy</string>
+    <string name="chan_scid_alias">SCID alias</string>
+    <string name="chan_zeroconf">Zeroconf</string>
+    <string name="chan_splicing">Splicing</string>
 
     <string name="chan_nothing"><![CDATA[<i>nothing</i>]]></string>
 

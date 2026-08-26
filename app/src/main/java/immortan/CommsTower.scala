@@ -39,9 +39,13 @@ object CommsTower {
   val workers: mutable.Map[KeyPairAndPubKey, Worker] = new ConcurrentHashMap[KeyPairAndPubKey, Worker].asScala
   val listeners: mutable.Map[KeyPairAndPubKey, Listeners] = new ConcurrentHashMap[KeyPairAndPubKey, Listeners].asScala withDefaultValue Set.empty
   private[this] val peerGossipQueries: mutable.Map[PublicKey, GossipQueriesSupport] = new ConcurrentHashMap[PublicKey, GossipQueriesSupport].asScala
+  private[this] val peerInitFeatures: mutable.Map[PublicKey, Features[InitFeature]] = new ConcurrentHashMap[PublicKey, Features[InitFeature]].asScala
 
   /** Last capability advertised by a compatible peer. It is intentionally in-memory: peers may change software between reconnects. */
   def gossipQueriesSupport(nodeId: PublicKey): Option[GossipQueriesSupport] = peerGossipQueries.get(nodeId)
+  def advertisesFeature(features: Features[InitFeature], mandatoryBit: Int): Boolean =
+    features.activated.keys.exists(_.mandatory == mandatoryBit) || features.unknown.exists(feature => feature.bitIndex == mandatoryBit || feature.bitIndex == mandatoryBit + 1)
+  def peerSupports(nodeId: PublicKey, mandatoryBit: Int): Boolean = peerInitFeatures.get(nodeId).exists(advertisesFeature(_, mandatoryBit))
 
   def listen(listeners1: Set[ConnectionListener], pair: KeyPairAndPubKey, info: RemoteNodeInfo): Unit = synchronized {
     // Update and either insert a new worker or fire onOperational on NEW listeners if worker currently exists and online
@@ -152,6 +156,7 @@ object CommsTower {
         val areFeaturesOK = Features.areCompatible(LNParams.ourInit.features, remoteInit.features)
         if (areFeaturesOK) {
           peerGossipQueries.update(info.nodeId, GossipQueriesSupport.from(remoteInit))
+          peerInitFeatures.update(info.nodeId, remoteInit.features)
           for (lst <- listeners1) lst.onOperational(me, remoteInit)
         }
         else disconnect
