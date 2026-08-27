@@ -2,6 +2,8 @@ package finance.valet
 
 import java.net.InetSocketAddress
 import java.util.TimerTask
+import android.app.Activity
+import android.content.{DialogInterface, Intent}
 import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
 import android.graphics.{Bitmap, BitmapFactory}
@@ -76,7 +78,7 @@ object HubActivity {
   def requestHostedChannel(ticker: Ticker): Unit = {
     val localParams = LNParams.makeChannelParams(isFunder = false, LNParams.minChanDustLimit)
     def implant(cs: Commitments, channel: ChannelHosted): Unit = RemotePeerActivity.implantNewChannel(cs, channel)
-    new HCOpenHandler(LNParams.syncParams.satm, randomBytes32, localParams.defaultFinalScriptPubKey, ticker, LNParams.cm) {
+    new HCOpenHandler(LNParams.syncParams.sts, randomBytes32, localParams.defaultFinalScriptPubKey, ticker, LNParams.cm) {
       // Stop automatic HC opening attempts on getting any kind of local/remote error, this won't be triggered on disconnect
       def onEstablished(cs: Commitments, channel: ChannelHosted): Unit = implant(cs, channel)
       def onFailure(reason: Throwable): Unit = none
@@ -96,6 +98,7 @@ object HubActivity {
 }
 
 class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with ExternalDataChecker with ChoiceReceiver with ChannelListener with CanBeRepliedTo { me =>
+  private[this] final val BACKUP_DIRECTORY_REQUEST_CODE = 114
   private[this] lazy val expiresInBlocks = getResources.getStringArray(R.array.expires_in_blocks)
   private[this] lazy val partsInFlight = getResources.getStringArray(R.array.parts_in_flight)
   private[this] lazy val pctCollected = getResources.getStringArray(R.array.pct_collected)
@@ -1117,7 +1120,7 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
   // Getting graph sync status and our peer announcements
 
   override def process(reply: Any): Unit = reply match {
-    case na: NodeAnnouncement => LNParams.cm.all.values.foreach(_ process na.toRemoteInfo)
+    case na: NodeAnnouncement => for (info <- na.toRemoteInfo) LNParams.cm.all.values.foreach(_ process info)
     case PathFinder.CMDResync => walletCards.updateLnSyncProgress(total = 1000, left = 1000)
     case prd: PureRoutingData => walletCards.updateLnSyncProgress(prd.queriesTotal, prd.queriesLeft)
     case _: SyncMaster => UITask(walletCards.lnSyncIndicator setVisibility View.GONE).run
@@ -1128,6 +1131,13 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
 
   override def onRequestPermissionsResult(reqCode: Int, permissions: Array[String], results: GrantResults): Unit = {
     if (reqCode == scannerRequestCode && results.nonEmpty && results.head == PackageManager.PERMISSION_GRANTED) bringScanner(null)
+  }
+
+  override def onActivityResult(requestCode: Int, resultCode: Int, resultData: Intent): Unit = {
+    if (requestCode == BACKUP_DIRECTORY_REQUEST_CODE && resultCode == Activity.RESULT_OK && resultData != null) {
+      LocalBackup.saveChosenDirectory(me, resultData.getData)
+      WalletApp.backupSaveWorker.replaceWork(true)
+    } else super.onActivityResult(requestCode, resultCode, resultData)
   }
 
   override def checkExternalData(whenNone: Runnable): Unit = InputParser.checkAndMaybeErase {
@@ -1396,7 +1406,13 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
 
     timer.scheduleAtFixedRate(paymentAdapterDataChanged, 30000, 30000)
     val backupAllowed = LocalBackup.isAllowed(context = WalletApp.app)
-    if (!backupAllowed) LocalBackup.askPermission(activity = me)
+    if (!backupAllowed) {
+      val listener = new DialogInterface.OnClickListener {
+        override def onClick(dialog: DialogInterface, which: Int): Unit = LocalBackup.askBackupDirectory(me, BACKUP_DIRECTORY_REQUEST_CODE)
+      }
+      new AlertDialog.Builder(me).setTitle(settings_backup_disabled).setMessage(settings_backup_info)
+        .setPositiveButton(settings_choose_directory, listener).setNegativeButton(dialog_cancel, null).show
+    }
   }
 
   // VIEW HANDLERS

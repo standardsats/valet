@@ -1,10 +1,4 @@
 {
-  "testnet4-bitraamx.wakiyamap.dev": {
-    "pruning": "-",
-    "s": "51002",
-    "t": "51001",
-    "version": "1.4"
-  },
   "blackie.c3-soft.com": {
     "pruning": "-",
     "s": "57010",

@@ -2,7 +2,6 @@ package immortan
 
 import com.softwaremill.quicklens._
 import fr.acinq.bitcoin.Crypto.PublicKey
-import fr.acinq.eclair.Features.ChannelRangeQueriesExtended
 import fr.acinq.eclair.router.Router.Data
 import fr.acinq.eclair.router.{Announcements, Sync}
 import fr.acinq.eclair.wire.QueryShortChannelIdsTlv.QueryFlagType._
@@ -35,13 +34,30 @@ object SyncMaster {
   type PositionSet = Set[java.lang.Integer]
   type ConfirmedBySet = Set[PublicKey]
   type ShortChanIdSet = Set[Long]
+
+  def basicGossipQueries(chainHash: fr.acinq.bitcoin.ByteVector32,
+                         encoding: EncodingType,
+                         shortIds: Seq[Long],
+                         chunkSize: Int): Iterator[QueryShortChannelIds] =
+    shortIds.grouped(chunkSize).map { ids =>
+      QueryShortChannelIds(chainHash, shortChannelIds = EncodedShortChannelIds(encoding, ids.toList))
+    }
 }
 
 sealed trait SyncWorkerData
 
-case class SyncWorkerShortIdsData(ranges: List[ReplyChannelRange] = Nil, from: Int) extends SyncWorkerData {
+case class SyncWorkerShortIdsData(ranges: List[ReplyChannelRange] = Nil,
+                                 from: Int,
+                                 gossipQueriesSupport: GossipQueriesSupport = NoGossipQueries) extends SyncWorkerData {
   // This class contains a list of shortId ranges collected from a single remote peer, we need to make sure all of them are sound, that is, TLV data is of same size as main data
-  def isHolistic: Boolean = ranges.forall(rng => rng.shortChannelIds.array.size == rng.timestamps.timestamps.size && rng.timestamps.timestamps.size == rng.checksums.checksums.size)
+  def isHolistic: Boolean = gossipQueriesSupport match {
+    case ExtendedGossipQueries => ranges.forall { rng =>
+      rng.timestamps.exists(_.timestamps.size == rng.shortChannelIds.array.size) &&
+        rng.checksums.exists(_.checksums.size == rng.shortChannelIds.array.size)
+    }
+    case BasicGossipQueries => true
+    case NoGossipQueries => false
+  }
   lazy val allShortIds: Seq[Long] = ranges.flatMap(_.shortChannelIds.array)
 }
 
@@ -55,6 +71,7 @@ case class CMDShortIdsComplete(sync: SyncWorker, data: SyncWorkerShortIdsData)
 case class CMDChunkComplete(sync: SyncWorker, data: SyncWorkerGossipData)
 case class SyncDisconnected(sync: SyncWorker, removePeer: Boolean)
 case class CMDGossipComplete(sync: SyncWorker)
+case class SyncPeerOperational(worker: CommsTower.Worker, gossipQueriesSupport: GossipQueriesSupport)
 
 // This entirely relies on fact that peer sends ChannelAnnouncement messages first, then ChannelUpdate messages
 
@@ -94,19 +111,33 @@ case class SyncWorker(master: CanBeRepliedTo, keyPair: KeyPair, remoteInfo: Remo
   implicit val context: ExecutionContextExecutor = ExecutionContext fromExecutor Executors.newSingleThreadExecutor
 
   val pair: KeyPairAndPubKey = KeyPairAndPubKey(keyPair, remoteInfo.nodeId)
+  @volatile private[this] var connectedWorker: Option[CommsTower.Worker] = None
 
-  def supportsExtQueries(init: Init): Boolean = LNParams.isPeerSupports(init)(ChannelRangeQueriesExtended)
+  def gossipQueriesSupport(init: Init): GossipQueriesSupport = GossipQueriesSupport.from(init)
 
-  def process(changeMessage: Any): Unit = scala.concurrent.Future(me doProcess changeMessage)
+  def process(changeMessage: Any): Unit = scala.concurrent.Future(me doProcess changeMessage).failed.foreach { err =>
+    LNParams.logBag.put("sync-worker-error", err.stackTraceAsString)
+  }
 
   val listener: ConnectionListener = new ConnectionListener {
-    override def onOperational(worker: CommsTower.Worker, init: Init): Unit = if (me supportsExtQueries init) process(worker) else worker.disconnect
+    override def onOperational(worker: CommsTower.Worker, init: Init): Unit = gossipQueriesSupport(init) match {
+      case NoGossipQueries => worker.disconnect
+      case support =>
+        connectedWorker = Some(worker)
+        data match {
+          case _: SyncWorkerShortIdsData => process(SyncPeerOperational(worker, support))
+          case _: SyncWorkerGossipData | _: SyncWorkerPHCData => process(worker)
+          case _ => // The master will trigger this worker after it supplies the initial sync data.
+        }
+    }
     override def onHostedMessage(worker: CommsTower.Worker, remoteMessage: HostedChannelMessage): Unit = process(remoteMessage)
     override def onMessage(worker: CommsTower.Worker, remoteMessage: LightningMessage): Unit = process(remoteMessage)
 
     override def onDisconnect(worker: CommsTower.Worker): Unit = {
-      val hasExtQueriesSupport = worker.theirInit.forall(supportsExtQueries)
-      master process SyncDisconnected(me, removePeer = !hasExtQueriesSupport)
+      val hasBasicQueriesSupport = worker.theirInit.forall(init => gossipQueriesSupport(init) != NoGossipQueries)
+      val supportDescription: String = worker.theirInit.map(init => gossipQueriesSupport(init).toString).getOrElse("no init received, connection likely never completed")
+      LNParams.logBag.put("graph-sync-peer-disconnect", s"${remoteInfo.alias} ${remoteInfo.nodeId} support=$supportDescription removePeer=${!hasBasicQueriesSupport}")
+      master process SyncDisconnected(me, removePeer = !hasBasicQueriesSupport)
       CommsTower.listeners(worker.pair) -= listener
     }
   }
@@ -116,19 +147,39 @@ case class SyncWorker(master: CanBeRepliedTo, keyPair: KeyPair, remoteInfo: Remo
   CommsTower.listen(Set(listener), pair, remoteInfo)
 
   def doProcess(change: Any): Unit = (change, data, state) match {
-    case (data1: SyncWorkerPHCData, null, WAITING) => become(data1, PHC_SYNC)
-    case (data1: SyncWorkerShortIdsData, null, WAITING) => become(data1, SHORT_ID_SYNC)
-    case (data1: SyncWorkerGossipData, _, WAITING | SHORT_ID_SYNC) => become(data1, GOSSIP_SYNC)
+    case (data1: SyncWorkerPHCData, null, WAITING) =>
+      become(data1, PHC_SYNC)
+      connectedWorker.foreach(me process _)
+
+    case (data1: SyncWorkerShortIdsData, null, WAITING) =>
+      become(data1, SHORT_ID_SYNC)
+      for {
+        worker <- connectedWorker
+        init <- worker.theirInit
+      } me process SyncPeerOperational(worker, gossipQueriesSupport(init))
+
+    case (data1: SyncWorkerGossipData, _, WAITING | SHORT_ID_SYNC) =>
+      become(data1, GOSSIP_SYNC)
+      connectedWorker.foreach(me process _)
+
+    case (SyncPeerOperational(worker, support), syncData: SyncWorkerShortIdsData, SHORT_ID_SYNC) =>
+      become(syncData.copy(gossipQueriesSupport = support), SHORT_ID_SYNC)
+      me process worker
 
     case (worker: CommsTower.Worker, syncData: SyncWorkerShortIdsData, SHORT_ID_SYNC) =>
-      val tlv = QueryChannelRangeTlv.QueryFlags(flag = QueryChannelRangeTlv.QueryFlags.WANT_ALL)
-      val query = QueryChannelRange(LNParams.chainHash, syncData.from, tlvStream = TlvStream(tlv), numberOfBlocks = Int.MaxValue)
-      worker.handler process query
+      syncData.gossipQueriesSupport match {
+        case ExtendedGossipQueries =>
+          val tlv = QueryChannelRangeTlv.QueryFlags(flag = QueryChannelRangeTlv.QueryFlags.WANT_ALL)
+          worker.handler process QueryChannelRange(LNParams.chainHash, syncData.from, tlvStream = TlvStream(tlv), numberOfBlocks = Int.MaxValue)
+        case BasicGossipQueries =>
+          worker.handler process QueryChannelRange(LNParams.chainHash, syncData.from, numberOfBlocks = Int.MaxValue)
+        case NoGossipQueries => worker.disconnect
+      }
 
     case (reply: ReplyChannelRange, syncData: SyncWorkerShortIdsData, SHORT_ID_SYNC) =>
       val updatedData = syncData.copy(ranges = reply +: syncData.ranges)
-      if (reply.syncComplete != 1) become(updatedData, SHORT_ID_SYNC)
-      else master process CMDShortIdsComplete(me, updatedData)
+      become(updatedData, SHORT_ID_SYNC)
+      if (reply.syncComplete == 1) master process CMDShortIdsComplete(me, updatedData)
 
     // GOSSIP_SYNC
 
@@ -179,11 +230,17 @@ case class SyncWorker(master: CanBeRepliedTo, keyPair: KeyPair, remoteInfo: Remo
 }
 
 sealed trait SyncMasterData extends { me =>
+  def unusedSyncs: Set[RemoteNodeInfo] = activeSyncs.foldLeft(baseInfos ++ extInfos)(_ - _.remoteInfo)
+
   def getNewSync(master: CanBeRepliedTo): SyncWorker = {
-    // This relies on (1) baseInfos items are never getting removed
-    // This relies on (2) size of baseInfos is >= LNParams.maxNodesToSyncFrom
-    val unusedSyncs = activeSyncs.foldLeft(baseInfos ++ extInfos)(_ - _.remoteInfo)
-    SyncWorker(master, randomKeyPair, shuffle(unusedSyncs.toList).head, LNParams.ourInit)
+    // Channel peers are normally connected before a resync starts, so prefer a peer whose
+    // init has already confirmed gossip_queries_ex. Unknown peers are tried before known
+    // basic-only peers, which lets a newly available extended peer retain the fast path.
+    val extended = unusedSyncs.filter(info => CommsTower.gossipQueriesSupport(info.nodeId).contains(ExtendedGossipQueries))
+    val unknown = unusedSyncs.filter(info => CommsTower.gossipQueriesSupport(info.nodeId).isEmpty)
+    val basic = unusedSyncs.filter(info => CommsTower.gossipQueriesSupport(info.nodeId).contains(BasicGossipQueries))
+    val preferred = if (extended.nonEmpty) extended else if (unknown.nonEmpty) unknown else if (basic.nonEmpty) basic else unusedSyncs
+    SyncWorker(master, randomKeyPair, shuffle(preferred.toList).head, LNParams.ourInit)
   }
 
   def withoutSync(sd: SyncDisconnected): SyncMasterData = me
@@ -223,15 +280,17 @@ abstract class SyncMaster(excluded: ShortChanIdSet, requestNodeAnnounce: ShortCh
   def provenAndNotExcluded(shortId: Long): Boolean = provenShortIds.contains(shortId) && !excluded.contains(shortId)
 
   implicit val context: ExecutionContextExecutor = ExecutionContext fromExecutor Executors.newSingleThreadExecutor
-  def process(changeMessage: Any): Unit = scala.concurrent.Future(me doProcess changeMessage)
+  def process(changeMessage: Any): Unit = scala.concurrent.Future(me doProcess changeMessage).failed.foreach { err =>
+    LNParams.logBag.put("sync-master-error", err.stackTraceAsString)
+  }
   become(null, SHORT_ID_SYNC)
 
   def doProcess(change: Any): Unit = (change, data, state) match {
-    case (setupData: SyncMasterShortIdData, null, SHORT_ID_SYNC) if setupData.baseInfos.nonEmpty =>
+    case (setupData: SyncMasterShortIdData, null, SHORT_ID_SYNC) if (setupData.baseInfos ++ setupData.extInfos).nonEmpty =>
       List.fill(maxConnections)(CMDAddSync).foreach(process)
       become(setupData, SHORT_ID_SYNC)
 
-    case (CMDAddSync, data1: SyncMasterShortIdData, SHORT_ID_SYNC) if data1.activeSyncs.size < maxConnections =>
+    case (CMDAddSync, data1: SyncMasterShortIdData, SHORT_ID_SYNC) if data1.activeSyncs.size < maxConnections && data1.unusedSyncs.nonEmpty =>
       // We are asked to create a new worker AND we don't have enough workers yet: create a new one and instruct it to sync right away
 
       val newSyncWorker = data.getNewSync(me)
@@ -241,6 +300,15 @@ abstract class SyncMaster(excluded: ShortChanIdSet, requestNodeAnnounce: ShortCh
     case (sd: SyncDisconnected, data1: SyncMasterShortIdData, SHORT_ID_SYNC) =>
       become(data1.copy(ranges = data1.ranges - sd.sync.pair.them).withoutSync(sd), SHORT_ID_SYNC)
       Rx.ioQueue.delay(5.seconds).foreach(_ => me process CMDAddSync)
+
+    case (CMDShortIdsComplete(sync, ranges1), data1: SyncMasterShortIdData, SHORT_ID_SYNC) if !ranges1.isHolistic =>
+      LNParams.logBag.put("graph-sync-invalid-range", s"${sync.remoteInfo.alias} ${sync.remoteInfo.nodeId}")
+      become(data1.copy(baseInfos = data1.baseInfos.filterNot(_.nodeId == sync.pair.them),
+                        extInfos = data1.extInfos.filterNot(_.nodeId == sync.pair.them),
+                        activeSyncs = data1.activeSyncs - sync,
+                        ranges = data1.ranges - sync.pair.them), SHORT_ID_SYNC)
+      sync process CMDShutdown
+      me process CMDAddSync
 
     case (CMDShortIdsComplete(sync, ranges1), data1: SyncMasterShortIdData, SHORT_ID_SYNC) =>
       val ranges2 = data1.ranges.updated(sync.pair.them, ranges1)
@@ -255,14 +323,18 @@ abstract class SyncMaster(excluded: ShortChanIdSet, requestNodeAnnounce: ShortCh
         // IMPORTANT: provenShortIds variable MUST be set BEFORE filtering out queries because `reply2Query` uses this data
         provenShortIds = accum.collect { case (shortId, confs) if confs > LNParams.syncParams.acceptThreshold => shortId }.toSet
 
-        val queries: Seq[QueryShortChannelIds] = goodRanges.maxBy(_.allShortIds.size).ranges.par.flatMap(reply2Query).toList
         val syncData = SyncMasterGossipData(data2.baseInfos, data2.extInfos, data2.activeSyncs, LNParams.syncParams.chunksToWait)
-        totalBatchQueries = queries.size * syncData.activeSyncs.size
+        val queriesBySync = for {
+          currentActiveSync <- syncData.activeSyncs
+          rangeData <- data2.ranges.get(currentActiveSync.pair.them).toSeq
+        } yield currentActiveSync -> rangeData.ranges.par.flatMap(reply2Query(_, rangeData.gossipQueriesSupport)).toList
+        totalBatchQueries = queriesBySync.map(_._2.size).sum
 
         become(syncData, GOSSIP_SYNC)
-        // Transfer every worker into gossip syncing state
-        for (currentActiveSync <- syncData.activeSyncs) currentActiveSync process SyncWorkerGossipData(me, queries)
-        for (currentActiveSync <- syncData.activeSyncs) currentActiveSync process CMDGetGossip
+        // Transfer every worker into gossip syncing state. Basic peers receive unflagged
+        // full requests; extended peers retain the checksum/timestamp selective path.
+        for ((currentActiveSync, queries) <- queriesBySync) currentActiveSync process SyncWorkerGossipData(me, queries)
+        for ((currentActiveSync, _) <- queriesBySync) currentActiveSync process CMDGetGossip
       }
 
     // GOSSIP_SYNC
@@ -324,8 +396,23 @@ abstract class SyncMaster(excluded: ShortChanIdSet, requestNodeAnnounce: ShortCh
     pureRoutingData
   }
 
-  def reply2Query(reply: ReplyChannelRange): Iterator[QueryShortChannelIds] = {
-    val stack = (reply.shortChannelIds.array, reply.timestamps.timestamps, reply.checksums.checksums)
+  def reply2Query(reply: ReplyChannelRange, gossipQueriesSupport: GossipQueriesSupport): Iterator[QueryShortChannelIds] = gossipQueriesSupport match {
+    case ExtendedGossipQueries => extendedReply2Query(reply)
+    case BasicGossipQueries => basicReply2Query(reply)
+    case NoGossipQueries => Iterator.empty
+  }
+
+  private def basicReply2Query(reply: ReplyChannelRange): Iterator[QueryShortChannelIds] =
+    SyncMaster.basicGossipQueries(
+      chainHash = LNParams.chainHash,
+      encoding = reply.shortChannelIds.encoding,
+      shortIds = reply.shortChannelIds.array.filter(provenAndNotExcluded),
+      chunkSize = LNParams.syncParams.messagesToAsk
+    )
+
+  private def extendedReply2Query(reply: ReplyChannelRange): Iterator[QueryShortChannelIds] = {
+    // isHolistic has already validated these extensions before we reach this point.
+    val stack = (reply.shortChannelIds.array, reply.timestamps.get.timestamps, reply.checksums.get.checksums)
 
     val shortIdFlagSeq = for {
       (shortId, theirTimestamps, theirChecksums) <- stack.zipped if provenAndNotExcluded(shortId)
@@ -362,7 +449,9 @@ case class SyncMasterPHCData(baseInfos: Set[RemoteNodeInfo], extInfos: Set[Remot
 
 abstract class PHCSyncMaster(routerData: Data) extends StateMachine[SyncMasterData] with CanBeRepliedTo { me =>
   implicit val context: ExecutionContextExecutor = ExecutionContext fromExecutor Executors.newSingleThreadExecutor
-  def process(changeMessage: Any): Unit = scala.concurrent.Future(me doProcess changeMessage)
+  def process(changeMessage: Any): Unit = scala.concurrent.Future(me doProcess changeMessage).failed.foreach { err =>
+    LNParams.logBag.put("phc-sync-master-error", err.stackTraceAsString)
+  }
   become(null, PHC_SYNC)
 
   // These checks require graph

@@ -6,6 +6,7 @@ import java.util.concurrent.{ConcurrentHashMap, Executors}
 import fr.acinq.bitcoin.ByteVector32
 import fr.acinq.bitcoin.Crypto.PublicKey
 import fr.acinq.eclair._
+import fr.acinq.eclair.Features.{ChannelRangeQueries, ChannelRangeQueriesExtended}
 import fr.acinq.eclair.wire.LightningMessageCodecs.lightningMessageCodecWithFallback
 import fr.acinq.eclair.wire._
 import immortan.crypto.Noise.KeyPair
@@ -21,10 +22,30 @@ import scala.concurrent.duration._
 
 case class KeyPairAndPubKey(keyPair: KeyPair, them: PublicKey)
 
+sealed trait GossipQueriesSupport
+case object ExtendedGossipQueries extends GossipQueriesSupport
+case object BasicGossipQueries extends GossipQueriesSupport
+case object NoGossipQueries extends GossipQueriesSupport
+
+object GossipQueriesSupport {
+  def from(init: Init): GossipQueriesSupport =
+    if (init.features.hasFeature(ChannelRangeQueriesExtended)) ExtendedGossipQueries
+    else if (init.features.hasFeature(ChannelRangeQueries)) BasicGossipQueries
+    else NoGossipQueries
+}
+
 object CommsTower {
   type Listeners = Set[ConnectionListener]
   val workers: mutable.Map[KeyPairAndPubKey, Worker] = new ConcurrentHashMap[KeyPairAndPubKey, Worker].asScala
   val listeners: mutable.Map[KeyPairAndPubKey, Listeners] = new ConcurrentHashMap[KeyPairAndPubKey, Listeners].asScala withDefaultValue Set.empty
+  private[this] val peerGossipQueries: mutable.Map[PublicKey, GossipQueriesSupport] = new ConcurrentHashMap[PublicKey, GossipQueriesSupport].asScala
+  private[this] val peerInitFeatures: mutable.Map[PublicKey, Features[InitFeature]] = new ConcurrentHashMap[PublicKey, Features[InitFeature]].asScala
+
+  /** Last capability advertised by a compatible peer. It is intentionally in-memory: peers may change software between reconnects. */
+  def gossipQueriesSupport(nodeId: PublicKey): Option[GossipQueriesSupport] = peerGossipQueries.get(nodeId)
+  def advertisesFeature(features: Features[InitFeature], mandatoryBit: Int): Boolean =
+    features.activated.keys.exists(_.mandatory == mandatoryBit) || features.unknown.exists(feature => feature.bitIndex == mandatoryBit || feature.bitIndex == mandatoryBit + 1)
+  def peerSupports(nodeId: PublicKey, mandatoryBit: Int): Boolean = peerInitFeatures.get(nodeId).exists(advertisesFeature(_, mandatoryBit))
 
   def listen(listeners1: Set[ConnectionListener], pair: KeyPairAndPubKey, info: RemoteNodeInfo): Unit = synchronized {
     // Update and either insert a new worker or fire onOperational on NEW listeners if worker currently exists and online
@@ -56,6 +77,7 @@ object CommsTower {
     var lastMessage: Long = System.currentTimeMillis
     var theirInit: Option[Init] = Option.empty
     var pinging: Subscription = _
+    @volatile private[this] var disconnectRequested = false
 
     val handler: TransportHandler =
       new TransportHandler(pair.keyPair, info.nodeId.value) {
@@ -107,22 +129,27 @@ object CommsTower {
       sock.connect(info.address.socketAddress, 7500)
       handler.init
 
-      while (true) {
-        val length = sock.getInputStream.read(buffer, 0, buffer.length)
-        if (length < 0) throw new RuntimeException("Connection droppped")
-        else handler process ByteVector.view(buffer take length)
+      val input = sock.getInputStream
+      var length = input.read(buffer, 0, buffer.length)
+      while (length >= 0) {
+        handler process ByteVector.view(buffer take length)
+        length = input.read(buffer, 0, buffer.length)
       }
     }
 
-    thread onComplete { _ =>
+    thread onComplete { result =>
       // Will also run after forget
+      if (!disconnectRequested) result.failed.foreach(err => LNParams.logBag.put(s"comms-tower-disconnect ${info.nodeId}", err.toString))
       try pinging.unsubscribe catch none
       listeners(pair).foreach(_ onDisconnect me)
       // Once disconnected, worker gets removed
       workers -= pair
     }
 
-    def disconnect: Unit = try sock.close catch none
+    def disconnect: Unit = {
+      disconnectRequested = true
+      try sock.close catch none
+    }
 
     def handleTheirRemoteInitMessage(listeners1: Set[ConnectionListener], remoteInit: Init): Unit = {
       // Use a separate variable for listeners here because a set of listeners provided to this method may be different
@@ -132,7 +159,11 @@ object CommsTower {
 
       if (!thread.isCompleted) {
         val areFeaturesOK = Features.areCompatible(LNParams.ourInit.features, remoteInit.features)
-        if (areFeaturesOK) for (lst <- listeners1) lst.onOperational(me, remoteInit)
+        if (areFeaturesOK) {
+          peerGossipQueries.update(info.nodeId, GossipQueriesSupport.from(remoteInit))
+          peerInitFeatures.update(info.nodeId, remoteInit.features)
+          for (lst <- listeners1) lst.onOperational(me, remoteInit)
+        }
         else disconnect
       }
     }

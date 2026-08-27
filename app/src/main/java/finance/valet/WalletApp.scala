@@ -174,7 +174,9 @@ object WalletApp {
     val essentialInterface = new DBInterfaceSQLiteAndroidEssential(app, dbFileNameEssential)
     val graphInterface = new DBInterfaceSQLiteAndroidGraph(app, dbFileNameGraph)
     val currentCustomElectrum: Try[NodeAddress] = customElectrumAddress
-    LNParams.secret = secret
+    // The mnemonic must not linger in process memory for the whole app lifetime: it stays
+    // in the (encrypted) database and is re-loaded on demand when the user views it
+    LNParams.secret = secret.copy(mnemonic = List.empty)
 
     val normalBag = new SQLiteNetwork(graphInterface, NormalChannelUpdateTable, NormalChannelAnnouncementTable, NormalExcludedChannelTable)
     val hostedBag = new SQLiteNetwork(graphInterface, HostedChannelUpdateTable, HostedChannelAnnouncementTable, HostedExcludedChannelTable)
@@ -366,7 +368,7 @@ object WalletApp {
 }
 
 object Vibrator {
-  private val vibrator = WalletApp.app.getSystemService(Context.VIBRATOR_SERVICE).asInstanceOf[android.os.Vibrator]
+  private val vibrator = WalletApp.app.getSystemService(classOf[android.os.Vibrator])
   def vibrate: Unit = if (null != vibrator && vibrator.hasVibrator) vibrator.vibrate(VibrationEffect.createWaveform(Array(0L, 85, 200), -1))
 }
 

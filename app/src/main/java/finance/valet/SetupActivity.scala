@@ -47,6 +47,7 @@ object SetupActivity {
 
 class SetupActivity extends BaseActivity { me =>
   private[this] lazy val activitySetupMain = findViewById(R.id.activitySetupMain).asInstanceOf[LinearLayout]
+  private[this] lazy val networkSetup = findViewById(R.id.networkSetup).asInstanceOf[LinearLayout]
   private[this] lazy val restoreOptionsButton = findViewById(R.id.restoreOptionsButton).asInstanceOf[NoboButton]
   private[this] lazy val restoreOptions = findViewById(R.id.restoreOptions).asInstanceOf[LinearLayout]
   private[this] final val FILE_REQUEST_CODE = 112
@@ -104,8 +105,8 @@ class SetupActivity extends BaseActivity { me =>
 
   override def START(s: Bundle): Unit = {
     setContentView(R.layout.activity_setup)
-    activitySetupMain.addView(enforceTor.view, 0)
-    activitySetupMain.addView(electrum.view, 1)
+    networkSetup.addView(enforceTor.view)
+    networkSetup.addView(electrum.view)
     enforceTor.updateView
     electrum.updateView
   }

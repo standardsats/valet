@@ -56,7 +56,8 @@ class AwaitService extends Service { me =>
 
       startForeground(AwaitService.NOTIFICATION_ID, notification)
     } else {
-      stopForeground(true)
+      if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) stopForeground(Service.STOP_FOREGROUND_REMOVE)
+      else stopForeground(true)
       stopSelf
     }
 }

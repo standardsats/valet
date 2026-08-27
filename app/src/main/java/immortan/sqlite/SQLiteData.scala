@@ -7,6 +7,7 @@ import fr.acinq.bitcoin.{BlockHeader, ByteVector32}
 import fr.acinq.eclair.blockchain.electrum.db.HeaderDb
 import fr.acinq.eclair.wire.LightningMessageCodecs.{hostedChannelBrandingCodec, swapInStateCodec, trampolineOnCodec}
 import fr.acinq.eclair.wire.{HostedChannelBranding, SwapInState, TrampolineOn}
+import immortan.crypto.SecretCipher
 import immortan.crypto.Tools.Bytes
 import immortan.sqlite.SQLiteData._
 import immortan.utils.ImplicitJsonFormats._
@@ -21,6 +22,7 @@ import scala.util.Try
 
 object SQLiteData {
   final val LABEL_FORMAT = "label-format"
+  final val LABEL_SECRET_ENCRYPTION = "label-secret-encryption"
   final val LABEL_FEE_RATES = "label-fee-rates"
   final val LABEL_FIAT_RATES = "label-fiat-rates"
   final val LABLEL_TRAMPOLINE_ON = "label-trampoline-on"
@@ -44,10 +46,30 @@ class SQLiteData(val db: DBInterface) extends HeaderDb with DataBag {
   }
 
   // StorageFormat
+  // The secret record is stored encrypted with an AndroidKeyStore-held key when possible;
+  // LABEL_SECRET_ENCRYPTION being present marks the record as encrypted. Records written
+  // before encryption existed have no marker and are migrated on the first successful read.
 
-  def putSecret(secret: WalletSecret): Unit = put(LABEL_FORMAT, walletSecretCodec.encode(secret).require.toByteArray)
+  def putSecret(secret: WalletSecret): Unit = db txWrap {
+    val plain = walletSecretCodec.encode(secret).require.toByteArray
+    SecretCipher.encryptIfPossible(ByteVector view plain) match {
+      case Some(encrypted) =>
+        put(LABEL_FORMAT, encrypted.toArray)
+        put(LABEL_SECRET_ENCRYPTION, Array[Byte](1))
 
-  def tryGetSecret: Try[WalletSecret] = tryGet(LABEL_FORMAT).map(raw => walletSecretCodec.decode(raw.toBitVector).require.value)
+      case None =>
+        put(LABEL_FORMAT, plain)
+        delete(LABEL_SECRET_ENCRYPTION)
+    }
+  }
+
+  def tryGetSecret: Try[WalletSecret] = tryGet(LABEL_FORMAT).map { raw =>
+    val isEncrypted = tryGet(LABEL_SECRET_ENCRYPTION).isSuccess
+    val plain = if (isEncrypted) SecretCipher decrypt raw else raw
+    val secret = walletSecretCodec.decode(plain.toBitVector).require.value
+    if (!isEncrypted) putSecret(secret)
+    secret
+  }
 
   // Fiat rates, fee rates
 

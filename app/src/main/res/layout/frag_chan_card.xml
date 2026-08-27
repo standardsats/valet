@@ -229,6 +229,46 @@
                     android:text="@string/ln_hc_override"
                     style="@style/ChipTextGrayMargin"/>
 
+                <org.apmem.tools.layouts.FlowLayout
+                    android:id="@+id/channelFeatures"
+                    android:layout_marginBottom="6dp"
+                    style="@style/FillingView">
+
+                    <TextView
+                        android:id="@+id/gossipQueriesSupport"
+                        android:contentDescription="@string/chan_gossip_unknown"
+                        style="@style/ChipTextGrayMargin"/>
+
+                    <TextView
+                        android:id="@+id/commitmentType"
+                        style="@style/ChipTextGrayMargin"/>
+
+                    <TextView
+                        android:id="@+id/scidAlias"
+                        android:background="@drawable/border_green"
+                        android:contentDescription="@string/chan_scid_alias"
+                        android:text="@string/chan_scid_alias"
+                        android:visibility="gone"
+                        style="@style/ChipTextGrayMargin"/>
+
+                    <TextView
+                        android:id="@+id/zeroconf"
+                        android:background="@drawable/border_green"
+                        android:contentDescription="@string/chan_zeroconf"
+                        android:text="@string/chan_zeroconf"
+                        android:visibility="gone"
+                        style="@style/ChipTextGrayMargin"/>
+
+                    <TextView
+                        android:id="@+id/splicing"
+                        android:background="@drawable/border_green"
+                        android:contentDescription="@string/chan_splicing"
+                        android:text="@string/chan_splicing"
+                        android:visibility="gone"
+                        style="@style/ChipTextGrayMargin"/>
+
+                </org.apmem.tools.layouts.FlowLayout>
+
             </LinearLayout>
 
         </androidx.cardview.widget.CardView>

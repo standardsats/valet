@@ -35,6 +35,16 @@ import scala.util.Try
 
 
 object ChanActivity {
+  // ponytail: this fork still names bit 50 TrampolinePayment; inspect wire bits until its feature model is upgraded.
+  val ZeroconfFeatureBit = 50
+  val SpliceFeatureBit = 62
+
+  def commitmentBadge(features: ChannelFeatures): (Int, Int) = features.channelType_opt match {
+    case Some(ChannelTypes.AnchorOutputsZeroFeeHtlcTx) => chan_commitment_zero_fee_anchors -> R.drawable.border_green
+    case Some(ChannelTypes.AnchorOutputs) => chan_commitment_anchors -> R.drawable.border_yellow
+    case _ => chan_commitment_legacy -> R.drawable.border_gray
+  }
+
   def getHcState(hc: HostedCommits): String = {
     val preimages = hc.revealedFulfills.map(_.ourPreimage.toHex).mkString("\n")
     val hostedState = HostedState(hc.remoteInfo.nodeId, hc.remoteInfo.nodeSpecificPubKey, hc.lastCrossSignedState)
@@ -104,6 +114,12 @@ class ChanActivity extends ChanErrorHandlerActivity with ChoiceReceiver with Has
     val baseBar: ProgressBar = swipeWrap.findViewById(R.id.baseBar).asInstanceOf[ProgressBar]
     val overBar: ProgressBar = swipeWrap.findViewById(R.id.overBar).asInstanceOf[ProgressBar]
     val peerAddress: TextView = swipeWrap.findViewById(R.id.peerAddress).asInstanceOf[TextView]
+    val channelFeatures: View = swipeWrap.findViewById(R.id.channelFeatures).asInstanceOf[View]
+    val gossipQueriesSupport: TextView = swipeWrap.findViewById(R.id.gossipQueriesSupport).asInstanceOf[TextView]
+    val commitmentType: TextView = swipeWrap.findViewById(R.id.commitmentType).asInstanceOf[TextView]
+    val scidAlias: TextView = swipeWrap.findViewById(R.id.scidAlias).asInstanceOf[TextView]
+    val zeroconf: TextView = swipeWrap.findViewById(R.id.zeroconf).asInstanceOf[TextView]
+    val splicing: TextView = swipeWrap.findViewById(R.id.splicing).asInstanceOf[TextView]
     val chanState: View = swipeWrap.findViewById(R.id.chanState).asInstanceOf[View]
 
     val serverRateText: TextView = swipeWrap.findViewById(R.id.serverRateText).asInstanceOf[TextView]
@@ -142,6 +158,26 @@ class ChanActivity extends ChanErrorHandlerActivity with ChoiceReceiver with Has
 
   class NormalViewHolder(view: View) extends ChanCardViewHolder(view) {
     def fill(chan: ChannelNormal, cs: NormalCommits): NormalViewHolder = {
+
+      val (gossipText, gossipBackground) = CommsTower.gossipQueriesSupport(cs.remoteInfo.nodeId) match {
+        case Some(ExtendedGossipQueries) => getString(chan_gossip_extended) -> R.drawable.border_green
+        case Some(BasicGossipQueries) => getString(chan_gossip_basic) -> R.drawable.border_yellow
+        case Some(NoGossipQueries) => getString(chan_gossip_unsupported) -> R.drawable.border_red
+        case None => getString(chan_gossip_unknown) -> R.drawable.border_gray
+      }
+      gossipQueriesSupport.setText(gossipText)
+      gossipQueriesSupport.setContentDescription(gossipText)
+      gossipQueriesSupport.setBackgroundResource(gossipBackground)
+      setVis(isVisible = true, gossipQueriesSupport)
+
+      val (commitmentText, commitmentBackground) = ChanActivity.commitmentBadge(cs.channelFeatures)
+      commitmentType.setText(commitmentText)
+      commitmentType.setContentDescription(getString(commitmentText))
+      commitmentType.setBackgroundResource(commitmentBackground)
+      setVisMany(true -> channelFeatures,
+        cs.remoteAlias.isDefined -> scidAlias,
+        CommsTower.peerSupports(cs.remoteInfo.nodeId, ChanActivity.ZeroconfFeatureBit) -> zeroconf,
+        CommsTower.peerSupports(cs.remoteInfo.nodeId, ChanActivity.SpliceFeatureBit) -> splicing)
 
       val capacity: Satoshi = cs.commitInput.txOut.amount
       val barCanReceive = (cs.availableForReceive.toLong / capacity.toLong).toInt
@@ -217,6 +253,8 @@ class ChanActivity extends ChanErrorHandlerActivity with ChoiceReceiver with Has
     })
 
     def fill(chan: ChannelHosted, hc: HostedCommits): HostedViewHolder = {
+
+      setVis(isVisible = false, channelFeatures)
 
       def toHumanRate(x: MilliSatoshi): Double = 100000000000.0 / x.toLong.toDouble
 

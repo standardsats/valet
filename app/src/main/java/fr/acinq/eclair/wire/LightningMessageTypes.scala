@@ -1,6 +1,5 @@
 package fr.acinq.eclair.wire
 
-import com.google.common.base.Charsets
 import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey}
 import fr.acinq.bitcoin.{ByteVector32, ByteVector64, Crypto, Protocol, Satoshi}
 import fr.acinq.eclair._
@@ -38,7 +37,7 @@ case class Init(features: Features[InitFeature], tlvs: TlvStream[InitTlv] = TlvS
 
 object Fail {
   def apply(channelId: ByteVector32, msg: String): Fail = {
-    val bytes = msg.getBytes(Charsets.US_ASCII)
+    val bytes = msg.getBytes(StandardCharsets.US_ASCII)
     Fail(channelId, ByteVector view bytes)
   }
 }
@@ -220,7 +219,7 @@ case class Domain(domain: String, port: Int) extends NodeAddress {
 case class NodeAnnouncement(signature: ByteVector64, features: Features[FeatureScope], timestamp: Long, nodeId: PublicKey, rgbColor: Color,
                             alias: String, addresses: List[NodeAddress], unknownFields: ByteVector = ByteVector.empty) extends LightningMessage {
 
-  def toRemoteInfo: RemoteNodeInfo = RemoteNodeInfo(nodeId, addresses.minBy { case _: IPv4 => 1 case _: IPv6 => 2 case _ => 3 }, alias)
+  def toRemoteInfo: Option[RemoteNodeInfo] = addresses.sortBy { case _: IPv4 => 1 case _: IPv6 => 2 case _ => 3 }.headOption.map(RemoteNodeInfo(nodeId, _, alias))
 }
 
 object ChannelUpdate {
@@ -270,8 +269,9 @@ case class ReplyChannelRange(chainHash: ByteVector32, firstBlockNum: Long,
                              numberOfBlocks: Long, syncComplete: Byte, shortChannelIds: EncodedShortChannelIds,
                              tlvStream: TlvStream[ReplyChannelRangeTlv] = TlvStream.empty) extends LightningMessage {
 
-  val timestamps: ReplyChannelRangeTlv.EncodedTimestamps = tlvStream.get[ReplyChannelRangeTlv.EncodedTimestamps].get
-  val checksums: ReplyChannelRangeTlv.EncodedChecksums = tlvStream.get[ReplyChannelRangeTlv.EncodedChecksums].get
+  // These TLVs are supplied by gossip_queries_ex only. Basic gossip_queries replies legitimately omit both.
+  val timestamps: Option[ReplyChannelRangeTlv.EncodedTimestamps] = tlvStream.get[ReplyChannelRangeTlv.EncodedTimestamps]
+  val checksums: Option[ReplyChannelRangeTlv.EncodedChecksums] = tlvStream.get[ReplyChannelRangeTlv.EncodedChecksums]
 }
 
 case class GossipTimestampFilter(chainHash: ByteVector32, firstTimestamp: Long, timestampRange: Long) extends LightningMessage

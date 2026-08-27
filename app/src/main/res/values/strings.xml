@@ -27,6 +27,7 @@
     <string name="error_log_clear">Clear error logs</string>
 
     <string name="setup_title">Wallet setup</string>
+    <string name="network_setup_title">Network setup</string>
     <string name="setup_create_new">Create new wallet</string>
     <string name="setup_restore_existing">Restore existing wallet</string>
     <string name="setup_recovery_phrase">Recovery phrase only</string>
@@ -240,8 +241,8 @@
 
     <string name="settings_backup_disabled">Enable local channel backup</string>
     <string name="settings_backup_enabled">Local channel backup is enabled</string>
-    <string name="settings_backup_info">Set up system permission</string>
-    <string name="settings_backup_where">By default in Download folder</string>
+    <string name="settings_backup_info">Choose a folder for encrypted channel backups</string>
+    <string name="settings_backup_where">No folder selected</string>
     <string name="settings_backup_how">App permissions -> Storage</string>
 
     <string name="settings_hardware_add">Add hardware wallet</string>
@@ -371,6 +372,16 @@
     <string name="chan_can_receive">Can receive</string>
     <string name="chan_in_flight">Value in-flight</string>
     <string name="chan_refundable">Refundable</string>
+    <string name="chan_gossip_extended">Gossip sync: extended</string>
+    <string name="chan_gossip_basic">Gossip sync: basic</string>
+    <string name="chan_gossip_unsupported">Gossip sync: unavailable</string>
+    <string name="chan_gossip_unknown">Gossip sync: unknown</string>
+    <string name="chan_commitment_zero_fee_anchors">Commitment: zero-fee anchors</string>
+    <string name="chan_commitment_anchors">Commitment: anchors</string>
+    <string name="chan_commitment_legacy">Commitment: legacy</string>
+    <string name="chan_scid_alias">SCID alias</string>
+    <string name="chan_zeroconf">Zeroconf</string>
+    <string name="chan_splicing">Splicing</string>
 
     <string name="chan_nothing"><![CDATA[<i>nothing</i>]]></string>
 

@@ -317,6 +317,6 @@ object TxDescription {
     case closing: DATA_CLOSING if closing.balanceRefunds.exists(_.txid == tx.txid) => ChanRefundingTxDescription(closing.commitments.remoteInfo.nodeId)
     case closing: DATA_CLOSING if closing.paymentLeftoverRefunds.exists(_.txid == tx.txid) => HtlcClaimTxDescription(closing.commitments.remoteInfo.nodeId)
     case closing: DATA_CLOSING if closing.revokedCommitPublished.flatMap(_.penaltyTxs).exists(_.txid == tx.txid) => PenaltyTxDescription(closing.commitments.remoteInfo.nodeId)
-    case some: HasNormalCommitments if tx.txIn.exists(_.outPoint.txid == some.commitments.commitInput.outPoint.txid) => ChanRefundingTxDescription(some.commitments.remoteInfo.nodeId)
+    case some: HasNormalCommitments if tx.txIn.exists(_.outPoint == some.commitments.commitInput.outPoint) => ChanRefundingTxDescription(some.commitments.remoteInfo.nodeId)
   }
 }

@@ -17,7 +17,7 @@ import scala.util.Try
 
 case class ElectrumEclairWallet(walletRef: ActorRef, ewt: ElectrumWalletType, info: CompleteChainWalletInfo) extends EclairWallet {
 
-  import immortan.LNParams.{ec, timeout}
+  import immortan.LNParams.{ec, logBag, timeout}
 
   type GenerateTxResponseTry = Try[GenerateTxResponse]
 
@@ -43,8 +43,14 @@ case class ElectrumEclairWallet(walletRef: ActorRef, ewt: ElectrumWalletType, in
     walletRef ? BroadcastTransaction(tx) flatMap {
       case ElectrumClient.BroadcastTransactionResponse(_, None) => Future(true)
       case res: ElectrumClient.BroadcastTransactionResponse if res.error.exists(isInChain) => Future(true)
-      case res: ElectrumClient.BroadcastTransactionResponse if res.error.isDefined => Future(false)
-      case ElectrumClient.ServerError(_: ElectrumClient.BroadcastTransaction, _) => Future(false)
+
+      case res: ElectrumClient.BroadcastTransactionResponse if res.error.isDefined =>
+        logBag.put(s"chain-broadcast-fail ${tx.txid}", res.error.get.message)
+        Future(false)
+
+      case ElectrumClient.ServerError(_: ElectrumClient.BroadcastTransaction, error) =>
+        logBag.put(s"chain-broadcast-fail ${tx.txid}", error.message)
+        Future(false)
     }
   }
 
