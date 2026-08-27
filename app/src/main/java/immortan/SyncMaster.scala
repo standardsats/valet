@@ -230,10 +230,9 @@ case class SyncWorker(master: CanBeRepliedTo, keyPair: KeyPair, remoteInfo: Remo
 }
 
 sealed trait SyncMasterData extends { me =>
+  def unusedSyncs: Set[RemoteNodeInfo] = activeSyncs.foldLeft(baseInfos ++ extInfos)(_ - _.remoteInfo)
+
   def getNewSync(master: CanBeRepliedTo): SyncWorker = {
-    // This relies on (1) baseInfos items are never getting removed
-    // This relies on (2) size of baseInfos is >= LNParams.maxNodesToSyncFrom
-    val unusedSyncs = activeSyncs.foldLeft(baseInfos ++ extInfos)(_ - _.remoteInfo)
     // Channel peers are normally connected before a resync starts, so prefer a peer whose
     // init has already confirmed gossip_queries_ex. Unknown peers are tried before known
     // basic-only peers, which lets a newly available extended peer retain the fast path.
@@ -291,7 +290,7 @@ abstract class SyncMaster(excluded: ShortChanIdSet, requestNodeAnnounce: ShortCh
       List.fill(maxConnections)(CMDAddSync).foreach(process)
       become(setupData, SHORT_ID_SYNC)
 
-    case (CMDAddSync, data1: SyncMasterShortIdData, SHORT_ID_SYNC) if data1.activeSyncs.size < maxConnections =>
+    case (CMDAddSync, data1: SyncMasterShortIdData, SHORT_ID_SYNC) if data1.activeSyncs.size < maxConnections && data1.unusedSyncs.nonEmpty =>
       // We are asked to create a new worker AND we don't have enough workers yet: create a new one and instruct it to sync right away
 
       val newSyncWorker = data.getNewSync(me)
@@ -301,6 +300,15 @@ abstract class SyncMaster(excluded: ShortChanIdSet, requestNodeAnnounce: ShortCh
     case (sd: SyncDisconnected, data1: SyncMasterShortIdData, SHORT_ID_SYNC) =>
       become(data1.copy(ranges = data1.ranges - sd.sync.pair.them).withoutSync(sd), SHORT_ID_SYNC)
       Rx.ioQueue.delay(5.seconds).foreach(_ => me process CMDAddSync)
+
+    case (CMDShortIdsComplete(sync, ranges1), data1: SyncMasterShortIdData, SHORT_ID_SYNC) if !ranges1.isHolistic =>
+      LNParams.logBag.put("graph-sync-invalid-range", s"${sync.remoteInfo.alias} ${sync.remoteInfo.nodeId}")
+      become(data1.copy(baseInfos = data1.baseInfos.filterNot(_.nodeId == sync.pair.them),
+                        extInfos = data1.extInfos.filterNot(_.nodeId == sync.pair.them),
+                        activeSyncs = data1.activeSyncs - sync,
+                        ranges = data1.ranges - sync.pair.them), SHORT_ID_SYNC)
+      sync process CMDShutdown
+      me process CMDAddSync
 
     case (CMDShortIdsComplete(sync, ranges1), data1: SyncMasterShortIdData, SHORT_ID_SYNC) =>
       val ranges2 = data1.ranges.updated(sync.pair.them, ranges1)

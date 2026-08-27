@@ -4,6 +4,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import fr.acinq.bitcoin.ByteVector32
 import fr.acinq.eclair.{FeatureSupport, Features}
 import fr.acinq.eclair.Features.{ChannelRangeQueries, ChannelRangeQueriesExtended}
+import fr.acinq.eclair.wire.ReplyChannelRangeTlv.{EncodedTimestamps, Timestamps}
 import fr.acinq.eclair.wire.{EncodedShortChannelIds, EncodingType, Init, ReplyChannelRange, TlvStream}
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -31,6 +32,21 @@ class GossipQueriesSpec {
     assert(reply.timestamps.isEmpty)
     assert(reply.checksums.isEmpty)
     assert(SyncWorkerShortIdsData(ranges = List(reply), from = 0, gossipQueriesSupport = BasicGossipQueries).isHolistic)
+  }
+
+  @Test def rejectsExtendedRepliesMissingOneRequestedTlv(): Unit = {
+    val reply = ReplyChannelRange(
+      chainHash = ByteVector32.Zeroes,
+      firstBlockNum = 0,
+      numberOfBlocks = 1,
+      syncComplete = 1,
+      shortChannelIds = EncodedShortChannelIds(EncodingType.UNCOMPRESSED, List(42L)),
+      tlvStream = TlvStream(EncodedTimestamps(EncodingType.UNCOMPRESSED, List(Timestamps(0, 0))))
+    )
+
+    assert(reply.timestamps.nonEmpty)
+    assert(reply.checksums.isEmpty)
+    assert(!SyncWorkerShortIdsData(ranges = List(reply), from = 0, gossipQueriesSupport = ExtendedGossipQueries).isHolistic)
   }
 
   @Test def encodesBasicGossipRequestsWithoutFeatureTlvs(): Unit = {
