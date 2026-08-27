@@ -203,7 +203,7 @@ class SyncParams {
   val localNode: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"035912832c3eea544dc1c1bd4569f3f1f4ef58887c4df88fa17a899c84f093e3e6"), NodeAddress.unresolved(56175, host = 192, 168, 2, 11), "localnode")
   val oneML: RemoteNodeInfo = RemoteNodeInfo(PublicKey(hex"0217890e3aad8d35bc054f43acc00084b25229ecff0ab68debd82883ad65ee8266"), NodeAddress.unresolved(9735, host = 66, 109, 24, 41), "1ML")
 
-  val syncNodes: Set[RemoteNodeInfo] = Set(bCashIsTrash, silentBob, acinq, localNode, oneML)
+  val syncNodes: Set[RemoteNodeInfo] = Set(bCashIsTrash, silentBob, acinq, oneML)
   val phcSyncNodes: Set[RemoteNodeInfo] = Set.empty // Set(satm, sts) - disabled until later
 
   val maxPHCCapacity: MilliSatoshi = MilliSatoshi(100000000000000L) // PHC can not be larger than 1000 BTC

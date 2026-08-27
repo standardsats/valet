@@ -10,7 +10,7 @@ import fr.acinq.eclair.Features.{ChannelRangeQueries, ChannelRangeQueriesExtende
 import fr.acinq.eclair.wire.LightningMessageCodecs.lightningMessageCodecWithFallback
 import fr.acinq.eclair.wire._
 import immortan.crypto.Noise.KeyPair
-import immortan.crypto.Tools.{Bytes, ThrowableOps, none}
+import immortan.crypto.Tools.{Bytes, none}
 import rx.lang.scala.{Observable, Subscription}
 import scodec.bits.ByteVector
 
@@ -77,6 +77,7 @@ object CommsTower {
     var lastMessage: Long = System.currentTimeMillis
     var theirInit: Option[Init] = Option.empty
     var pinging: Subscription = _
+    @volatile private[this] var disconnectRequested = false
 
     val handler: TransportHandler =
       new TransportHandler(pair.keyPair, info.nodeId.value) {
@@ -128,23 +129,27 @@ object CommsTower {
       sock.connect(info.address.socketAddress, 7500)
       handler.init
 
-      while (true) {
-        val length = sock.getInputStream.read(buffer, 0, buffer.length)
-        if (length < 0) throw new RuntimeException("Connection droppped")
-        else handler process ByteVector.view(buffer take length)
+      val input = sock.getInputStream
+      var length = input.read(buffer, 0, buffer.length)
+      while (length >= 0) {
+        handler process ByteVector.view(buffer take length)
+        length = input.read(buffer, 0, buffer.length)
       }
     }
 
     thread onComplete { result =>
       // Will also run after forget
-      result.failed.foreach(err => LNParams.logBag.put(s"comms-tower-disconnect ${info.nodeId}", err.stackTraceAsString))
+      if (!disconnectRequested) result.failed.foreach(err => LNParams.logBag.put(s"comms-tower-disconnect ${info.nodeId}", err.toString))
       try pinging.unsubscribe catch none
       listeners(pair).foreach(_ onDisconnect me)
       // Once disconnected, worker gets removed
       workers -= pair
     }
 
-    def disconnect: Unit = try sock.close catch none
+    def disconnect: Unit = {
+      disconnectRequested = true
+      try sock.close catch none
+    }
 
     def handleTheirRemoteInitMessage(listeners1: Set[ConnectionListener], remoteInit: Init): Unit = {
       // Use a separate variable for listeners here because a set of listeners provided to this method may be different
