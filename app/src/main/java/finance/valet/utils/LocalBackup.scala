@@ -49,11 +49,13 @@ object LocalBackup { me =>
   }
 
   def saveChosenDirectory(context: Context, uri: Uri): Unit = {
-    for (oldUri <- customBackupLocation) {
-      Try(context.getContentResolver.releasePersistableUriPermission(oldUri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION))
+    val resolver = context.getContentResolver
+    val oldUri = customBackupLocation.filterNot(_ == uri)
+    Try(resolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION)).foreach { _ =>
+      if (WalletApp.app.prefs.edit.putString(WalletApp.CUSTOM_BACKUP_LOCATION, uri.toString).commit) {
+        oldUri.foreach(uri => Try(resolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION)))
+      }
     }
-    Try(context.getContentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION))
-    WalletApp.app.prefs.edit.putString(WalletApp.CUSTOM_BACKUP_LOCATION, uri.toString).commit
   }
 
   def isAllowed(context: Context): Boolean = customBackupLocation.exists { uri =>
