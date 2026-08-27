@@ -93,7 +93,9 @@ class ElectrumWallet44(val secrets: Option[AccountAndXPrivKey], val xPub: Extend
   override def setUtxosWithDummySig(usableUtxos: Seq[Utxo], tx: Transaction, sequenceFlag: Long): Transaction = {
     val txIn1 = for {
       utxo <- usableUtxos
-      dummySig = ByteVector.fill(71)(1)
+      // DER-encoded sig + sighash byte is 71 bytes normally, but 72 when r needs a leading zero pad;
+      // use the worst case here so the fee estimate is never lower than the real signed tx size
+      dummySig = ByteVector.fill(72)(1)
       sigScript = Script.write(OP_PUSHDATA(dummySig) :: OP_PUSHDATA(utxo.key.publicKey) :: Nil)
     } yield TxIn(utxo.item.outPoint, sigScript, sequenceFlag)
     tx.copy(txIn = txIn1)
@@ -143,7 +145,7 @@ class ElectrumWallet49(val secrets: Option[AccountAndXPrivKey], val xPub: Extend
     val txIn1 = for {
       utxo <- usableUtxos
       pubKeyScript = Script.write(Script pay2wpkh utxo.key.publicKey)
-      witness = ScriptWitness(ByteVector.fill(71)(1) :: utxo.key.publicKey.value :: Nil)
+      witness = ScriptWitness(ByteVector.fill(72)(1) :: utxo.key.publicKey.value :: Nil)
     } yield TxIn(utxo.item.outPoint, Script.write(OP_PUSHDATA(pubKeyScript) :: Nil), sequenceFlag, witness)
     tx.copy(txIn = txIn1)
   }
@@ -171,7 +173,7 @@ class ElectrumWallet84(val secrets: Option[AccountAndXPrivKey], val xPub: Extend
   override def setUtxosWithDummySig(usableUtxos: Seq[Utxo], tx: Transaction, sequenceFlag: Long): Transaction = {
     val txIn1 = for {
       utxo <- usableUtxos
-      witness = ScriptWitness(ByteVector.fill(71)(1) :: utxo.key.publicKey.value :: Nil)
+      witness = ScriptWitness(ByteVector.fill(72)(1) :: utxo.key.publicKey.value :: Nil)
     } yield TxIn(utxo.item.outPoint, signatureScript = ByteVector.empty, sequenceFlag, witness)
     tx.copy(txIn = txIn1)
   }
