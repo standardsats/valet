@@ -1,14 +1,23 @@
-# Containerfile.fdroid
+# Dockerfile
 #
 # Rebuilds F-Droid's buildserver-trixie environment FROM SOURCE instead of
 # pulling registry.gitlab.com/fdroid/fdroidserver:buildserver-trixie (what the
-# plain `Containerfile` in this repo does). The fdroid-buildserver stage below
+# `Containerfile` in this repo does). The fdroid-buildserver stage below
 # reproduces fdroidserver's own buildserver/Dockerfile and provision-* scripts
 # line for line, pinned to a fixed fdroidserver commit, so the image can be
 # regenerated and audited without trusting a pre-built third-party tag.
 #
-# Usage:
-#   podman build -t valet-fdroid -f Containerfile.fdroid .
+# This repo intentionally carries both a `Containerfile` and this `Dockerfile`,
+# and the two build tools disagree on which one is picked by default:
+#   - `docker build .`             -> picks THIS file (Dockerfile)
+#   - `podman build .`             -> picks `Containerfile` instead -- podman
+#                                      prefers Containerfile over Dockerfile
+#                                      when both are present and no `-f` is
+#                                      given
+# Always pass `-f` explicitly to avoid depending on that precedence:
+#
+#   docker build -t valet-fdroid -f Dockerfile .
+#   podman build -t valet-fdroid -f Dockerfile .
 #   podman run -v $PWD:/app/valet:z valet-fdroid
 #
 # Source: https://gitlab.com/fdroid/fdroidserver buildserver/Dockerfile and
@@ -16,7 +25,7 @@
 # F-Droid's actual build infrastructure moves to a newer fdroidserver
 # revision.
 
-FROM debian:trixie as fdroid-buildserver
+FROM debian:trixie AS fdroid-buildserver
 
 ENV LANG=C.UTF-8 \
     DEBIAN_FRONTEND=noninteractive
@@ -54,7 +63,7 @@ RUN useradd --create-home -s /bin/bash vagrant && echo -n 'vagrant:vagrant' | ch
 #
 # One deviation from upstream: upstream's Dockerfile COPYs the provision-*
 # scripts from its own build context (it lives right next to them in the
-# fdroidserver repo). This Containerfile has no such context, so it clones
+# fdroidserver repo). This file has no such context, so it clones
 # fdroidserver at the pinned commit above and copies the same six scripts out
 # of it instead -- what ends up at /opt/buildserver/ is byte-for-byte
 # identical to upstream's either way.
@@ -99,7 +108,7 @@ RUN echo 'vagrant ALL = NOPASSWD: ALL' > /etc/sudoers.d/vagrant \
 # see there for the two-JDK rationale and REPRODUCIBLE_BUILDS.md for why it
 # has to be this way.
 # ---------------------------------------------------------------------------
-FROM fdroid-buildserver as BUILD
+FROM fdroid-buildserver AS build
 
 # Two JDKs on purpose:
 #   21 -- the buildserver image's own default (its provision script installs
@@ -130,11 +139,22 @@ RUN set -ex; \
     mkdir -p "/app/sdk/licenses" "/app/valet/"; \
     printf "\n24333f8a63b6825ea9c5514f83c2829b004d1fee" > "/app/sdk/licenses/android-sdk-license";
 
-FROM BUILD
+FROM build
 
 WORKDIR /app/valet/
 
 # Matching to FDROID: fdroidserver derives SOURCE_DATE_EPOCH from the checked-out
 # commit's timestamp. The buildserver image already runs on Etc/UTC, so no TZ
 # override is needed.
-CMD export SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct) && ./gradlew assembleRelease && ./gradlew bundleRelease
+#
+# --no-daemon is required, not optional: fdroidserver's own provision-gradle disables
+# the daemon via /home/vagrant/.gradle/gradle.properties, and F-Droid's real builder
+# always runs gradle as the unprivileged 'vagrant' user (see BUILD_USER in
+# fdroidserver/common.py) so that file applies. This container runs as root, which has
+# no such gradle.properties, so without --no-daemon Gradle starts a persistent daemon
+# instead -- and that daemon's file-system-watching VFS service (Gradle-daemon-only,
+# see https://docs.gradle.org/current/userguide/file_system_watching.html) fails at
+# startup inside this container with "Cannot create service of type
+# FileAccessTimeJournal ... For input string: \"\"". --no-daemon skips that subsystem
+# entirely, matching what tools/fdroid-repro-test.sh already does.
+CMD export SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct) && ./gradlew --no-daemon assembleRelease && ./gradlew --no-daemon bundleRelease

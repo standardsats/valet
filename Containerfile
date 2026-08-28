@@ -1,4 +1,4 @@
-FROM registry.gitlab.com/fdroid/fdroidserver:buildserver-trixie as BUILD
+FROM registry.gitlab.com/fdroid/fdroidserver:buildserver-trixie AS build
 
 # Two JDKs on purpose:
 #   21 -- the buildserver image's own default (its provision script installs
@@ -29,11 +29,22 @@ RUN set -ex; \
     mkdir -p "/app/sdk/licenses" "/app/valet/"; \
     printf "\n24333f8a63b6825ea9c5514f83c2829b004d1fee" > "/app/sdk/licenses/android-sdk-license";
 
-FROM BUILD
+FROM build
 
 WORKDIR /app/valet/
 
 # Matching to FDROID: fdroidserver derives SOURCE_DATE_EPOCH from the checked-out
 # commit's timestamp. The buildserver image already runs on Etc/UTC, so no TZ
 # override is needed.
-CMD export SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct) && ./gradlew assembleRelease && ./gradlew bundleRelease
+#
+# --no-daemon is required, not optional: fdroidserver's own provision-gradle disables
+# the daemon via /home/vagrant/.gradle/gradle.properties, and F-Droid's real builder
+# always runs gradle as the unprivileged 'vagrant' user (see BUILD_USER in
+# fdroidserver/common.py) so that file applies. This container runs as root, which has
+# no such gradle.properties, so without --no-daemon Gradle starts a persistent daemon
+# instead -- and that daemon's file-system-watching VFS service (Gradle-daemon-only,
+# see https://docs.gradle.org/current/userguide/file_system_watching.html) fails at
+# startup inside this container with "Cannot create service of type
+# FileAccessTimeJournal ... For input string: \"\"". --no-daemon skips that subsystem
+# entirely, matching what tools/fdroid-repro-test.sh already does.
+CMD export SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct) && ./gradlew --no-daemon assembleRelease && ./gradlew --no-daemon bundleRelease
