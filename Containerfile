@@ -37,14 +37,14 @@ WORKDIR /app/valet/
 # commit's timestamp. The buildserver image already runs on Etc/UTC, so no TZ
 # override is needed.
 #
-# --no-daemon is required, not optional: fdroidserver's own provision-gradle disables
-# the daemon via /home/vagrant/.gradle/gradle.properties, and F-Droid's real builder
-# always runs gradle as the unprivileged 'vagrant' user (see BUILD_USER in
-# fdroidserver/common.py) so that file applies. This container runs as root, which has
-# no such gradle.properties, so without --no-daemon Gradle starts a persistent daemon
-# instead -- and that daemon's file-system-watching VFS service (Gradle-daemon-only,
-# see https://docs.gradle.org/current/userguide/file_system_watching.html) fails at
-# startup inside this container with "Cannot create service of type
-# FileAccessTimeJournal ... For input string: \"\"". --no-daemon skips that subsystem
-# entirely, matching what tools/fdroid-repro-test.sh already does.
+# --no-daemon matches what fdroidserver's provision-gradle configures
+# (org.gradle.daemon=false in /home/vagrant/.gradle/gradle.properties). That file
+# only applies to the vagrant user, and this container builds as root, so the flag
+# has to be passed explicitly here.
+#
+# NOTE: this file is the quick, in-place build path -- it runs as root, in the
+# bind-mounted tree, with the project's own ./gradlew. That is NOT how F-Droid
+# builds, and it inherits whatever .gradle/ the host left in the working tree.
+# For a build that mirrors fdroidserver (vagrant user, login shell, gradlew-fdroid,
+# cleaned tree) use the Dockerfile and tools/fdroid-build.sh instead.
 CMD export SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct) && ./gradlew --no-daemon assembleRelease && ./gradlew --no-daemon bundleRelease

@@ -132,29 +132,46 @@ RUN set -ex; \
 # No JAVA_TOOL_OPTIONS/-Dfile.encoding here on purpose: F-Droid's builder does not
 # set it, and the Scala compiler's encoding is pinned in app/build.gradle instead,
 # so the build must not depend on this container providing it.
-ENV ANDROID_SDK_ROOT="/app/sdk" \
-    ANDROID_HOME="/app/sdk"
-
-RUN set -ex; \
-    mkdir -p "/app/sdk/licenses" "/app/valet/"; \
-    printf "\n24333f8a63b6825ea9c5514f83c2829b004d1fee" > "/app/sdk/licenses/android-sdk-license";
-
+#
+# Deliberately NO `ENV ANDROID_HOME=...` here either. The buildserver image already
+# provisions a complete SDK at /opt/android-sdk -- all four license files, the
+# `tools` package, the disabled-proprietary-repo settings, and build-tools/ and
+# platforms/ made group-writable for the vagrant user so AGP can add what it needs
+# (see fdroidserver's provision-android-sdk). It exports that path from
+# /etc/profile.d/bsenv.sh, which a LOGIN shell picks up. Setting ANDROID_HOME as a
+# Docker ENV would override bsenv.sh unconditionally and point the build at an
+# empty directory instead.
 FROM build
 
+# The bind mount lands here; the build itself happens in /home/vagrant/build,
+# which is what F-Droid does. See tools/fdroid-build.sh.
+RUN mkdir -p /app/valet
 WORKDIR /app/valet/
 
-# Matching to FDROID: fdroidserver derives SOURCE_DATE_EPOCH from the checked-out
-# commit's timestamp. The buildserver image already runs on Etc/UTC, so no TZ
-# override is needed.
+COPY tools/fdroid-build.sh /usr/local/bin/fdroid-build.sh
+RUN chmod 0755 /usr/local/bin/fdroid-build.sh
+
+# The bind-mounted checkout arrives owned by the host's uid, which is nobody this
+# container knows about, and git 2.35.2+ refuses to read a repo owned by another
+# user. System scope so it applies to root and to vagrant alike; system config is
+# "protected configuration", which is the only scope safe.directory is read from.
+RUN git config --system --add safe.directory /app/valet
+
+# Runs the build the way fdroidserver runs it: as the vagrant user, through a
+# login shell, with `gradle` (gradlew-fdroid) rather than ./gradlew, after
+# clearing the host's .gradle/ out of the bind-mounted tree, with
+# SOURCE_DATE_EPOCH taken from the commit. Every one of those is load-bearing --
+# tools/fdroid-build.sh documents which part of fdroidserver each mirrors.
 #
-# --no-daemon is required, not optional: fdroidserver's own provision-gradle disables
-# the daemon via /home/vagrant/.gradle/gradle.properties, and F-Droid's real builder
-# always runs gradle as the unprivileged 'vagrant' user (see BUILD_USER in
-# fdroidserver/common.py) so that file applies. This container runs as root, which has
-# no such gradle.properties, so without --no-daemon Gradle starts a persistent daemon
-# instead -- and that daemon's file-system-watching VFS service (Gradle-daemon-only,
-# see https://docs.gradle.org/current/userguide/file_system_watching.html) fails at
-# startup inside this container with "Cannot create service of type
-# FileAccessTimeJournal ... For input string: \"\"". --no-daemon skips that subsystem
-# entirely, matching what tools/fdroid-repro-test.sh already does.
-CMD export SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct) && ./gradlew --no-daemon assembleRelease && ./gradlew --no-daemon bundleRelease
+# ENTRYPOINT + CMD rather than a bare CMD, so that arguments APPEND as gradle
+# tasks instead of replacing the whole command:
+#   podman run --network=host -v $PWD:/app/valet:z valet-fdroid assembleMainnetRelease
+# which is what F-Droid's own metadata (gradle: [mainnet]) makes their CI run.
+#
+# --network=host is required wherever podman's default rootless network has no
+# outbound route: nothing is pre-seeded in this image, so Gradle, the SDK components
+# and every dependency are fetched at build time. Without it the run dies minutes in,
+# at scalaToolchainRuntimeClasspath, behind a misleading "SSL misconfiguration"
+# message; tools/fdroid-build.sh now preflights this and fails immediately instead.
+ENTRYPOINT ["fdroid-build.sh"]
+CMD ["assembleRelease"]
