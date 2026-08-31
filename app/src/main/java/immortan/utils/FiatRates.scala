@@ -13,7 +13,10 @@ object FiatRates {
 }
 
 class FiatRates(bag: DataBag) extends CanBeShutDown {
-  override def becomeShutDown: Unit = listeners = Set.empty
+  override def becomeShutDown: Unit = {
+    listeners = Set.empty
+    subscription.unsubscribe
+  }
 
   val customFiatSymbols: Map[String, String] = Map("rub" -> "\u20BD", "usd" -> "$", "inr" -> "₹", "gbp" -> "£", "cny" -> "CN¥", "jpy" -> "¥", "brl" -> "R$", "eur" -> "€", "krw" -> "₩",
     "cym" -> "￠", "lvl" -> "ℒ\uD835\uDCC8", "svc" -> "₡", "frf" -> "₣", "brl" -> "R$", "sos" -> "Sh.So.")
@@ -47,12 +50,6 @@ class FiatRates(bag: DataBag) extends CanBeShutDown {
       "eip" -> (1.0 / 1.2697) * eur // https://remitradar.com/IEP-to-EUR-best-exchange-rate
     )
     fs ++ richFiats
-  }
-
-
-  def updateInfo(newRates: Tools.Fiat2Btc): Unit = {
-    info = FiatRatesInfo(newRates, info.rates, System.currentTimeMillis)
-    for (lst <- listeners) lst.onFiatRates(info)
   }
 
   var listeners: Set[FiatRatesListener] = Set.empty

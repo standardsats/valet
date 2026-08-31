@@ -327,11 +327,6 @@ object WalletApp {
       val feerateObs = Rx.initDelay(rateRepeat, LNParams.feeRates.info.stamp, feeratePeriodHours * 3600 * 1000L)
       feerateObs.foreach(LNParams.feeRates.updateInfo, none)
 
-      val fiatPeriodSecs = 60 * 30
-      val fiatRetry = Rx.retry(Rx.ioQueue.map(_ => LNParams.fiatRates.reloadData), Rx.incSec, 3 to 18 by 3)
-      val fiatRepeat = Rx.repeat(fiatRetry, Rx.incSec, fiatPeriodSecs to Int.MaxValue by fiatPeriodSecs)
-      val fiatObs = Rx.initDelay(fiatRepeat, LNParams.fiatRates.info.stamp, fiatPeriodSecs * 1000L)
-      fiatObs.foreach(LNParams.fiatRates.updateInfo, none)
     }
   }
 

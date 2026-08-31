@@ -1099,6 +1099,7 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
     // Tor service could have been stopped in background
     try LNParams.connectionProvider.notifyAppAvailable catch none
     try checkExternalData(noneRunnable) catch none
+    try LNParams.fiatRates.updateNow catch none
     super.onResume
   }
 
@@ -1352,6 +1353,7 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
     } walletCards.toggleGroup.check(itemId)
 
     walletCards.recoveryPhrase setOnClickListener onButtonTap(viewRecoveryCode)
+    walletCards.fiatUnitPriceAndChange setOnClickListener onButtonTap(LNParams.fiatRates.updateNow)
     walletCards.toggleGroup addOnButtonCheckedListener new OnButtonCheckedListener {
       def onButtonChecked(group: MaterialButtonToggleGroup, checkId: Int, isChecked: Boolean): Unit = {
         WalletApp.putCheckedButtons(itemsToTags.filterKeys(group.getCheckedButtonIds.contains).values.toSet)
