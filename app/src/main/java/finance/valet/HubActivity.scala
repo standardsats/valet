@@ -1279,7 +1279,7 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
     snack(contentWindow, getString(dialog_lnurl_processing).format(lnUrl.warnUri).html, dialog_cancel) foreach { snack =>
       def onErrorFromVendor(error: Throwable): Unit = error.getMessage match {
         case msg if msg != null && msg.startsWith("Lightning address is invalid") => onFail(msg)
-        case _ => onFail(s"Error from vendor:<br><br><tt>${error.toString}</tt>")
+        case _ => onFail(s"Error from vendor:<br><br><tt>${WalletApp.app.userFacingError(error)}</tt>")
       }
       val level1Sub = lnUrl.level1DataResponse.doOnUnsubscribe(snack.dismiss).doOnTerminate(snack.dismiss)
       val level2Sub = level1Sub.subscribe(resolve, onErrorFromVendor)

@@ -93,7 +93,7 @@ abstract class ScannerBottomSheet(host: BaseActivity) extends BottomSheetDialogF
 }
 
 class OnceBottomSheet(host: BaseActivity, instructionOpt: Option[String], onScan: Runnable) extends ScannerBottomSheet(host) {
-  def failedScan(error: Throwable): Unit = WalletApp.app.quickToast(error.getMessage)
+  def failedScan(error: Throwable): Unit = WalletApp.app.quickToast(error)
   def successfulScan(result: Any): Unit = runAnd(dismiss)(onScan.run)
 
   override def onViewCreated(view: View, savedState: Bundle): Unit = {
@@ -154,7 +154,7 @@ class URBottomSheet(host: BaseActivity, onPairData: PairingData => Unit) extends
 
   def onZPub(zPubText: String): Unit = {
     scala.util.Try(ZPubPairingData apply zPubText) match {
-      case Failure(why) => onError(why.getMessage)
+      case Failure(why) => host.onFail(why)
       case Success(data) => onPairData(data)
     }
 
@@ -167,7 +167,7 @@ class URBottomSheet(host: BaseActivity, onPairData: PairingData => Unit) extends
       case urAccount: CryptoAccount => HWAccountPairingData(urAccount)
       case _ => throw new RuntimeException(host getString R.string.error_nothing_useful)
     } match {
-      case Failure(why) => onError(why.getMessage)
+      case Failure(why) => host.onFail(why)
       case Success(data) => onPairData(data)
     }
 

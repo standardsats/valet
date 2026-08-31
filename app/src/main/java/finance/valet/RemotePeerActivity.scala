@@ -321,7 +321,7 @@ class RemotePeerActivity extends ChanErrorHandlerActivity with ExternalDataCheck
         def onFailure(reason: Throwable): Unit = UITask {
           // We need to disconnect instead of just showing an error because of HC specifics
           // remote peer awaits for our response and won't react to another HC open request
-          WalletApp.app.quickToast(reason.toString)
+          WalletApp.app.quickToast(reason)
           disconnectListenersAndFinish
           whenBackPressed.run
         }.run
@@ -332,8 +332,7 @@ class RemotePeerActivity extends ChanErrorHandlerActivity with ExternalDataCheck
   def revertAndInform(reason: Throwable): Unit = UITask {
     setVis(isVisible = criticalSupportAvailable, viewYesFeatureSupport)
     CommsTower.listenNative(Set(incomingAcceptingListener), hasInfo.remoteInfo)
-    val details = Option(reason.getMessage).getOrElse(reason.stackTraceAsString)
-    WalletApp.app.quickToast(details)
+    WalletApp.app.quickToast(reason)
   }.run
 
   def stopAcceptingIncomingOffers: Unit = {

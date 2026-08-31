@@ -136,7 +136,7 @@ class SetupActivity extends BaseActivity { me =>
       if (resultCode == Activity.RESULT_OK) grantedUri.foreach { mediaUri =>
         Try(LocalBackup.clearPendingFlag(me, mediaUri)) match {
           case Success(_) => restoreFromBackupUri(mediaUri)
-          case Failure(exception) => onFail(getString(R.string.error_could_not_read_backup) format exception.getMessage)
+          case Failure(exception) => onFail(getString(R.string.error_could_not_read_backup) format WalletApp.app.userFacingError(exception))
         }
       }
     }
@@ -146,7 +146,7 @@ class SetupActivity extends BaseActivity { me =>
       case Success(cipherBytes) => askMnemonicsAndRestore(uri, cipherBytes)
       case Failure(exception) => LocalBackup.pendingItemUri(me, uri, exception) match {
         case Some(mediaUri) => askPendingItemAccess(mediaUri, exception)
-        case None => onFail(getString(R.string.error_could_not_read_backup) format exception.getMessage)
+        case None => onFail(getString(R.string.error_could_not_read_backup) format WalletApp.app.userFacingError(exception))
       }
     }
 
@@ -161,12 +161,12 @@ class SetupActivity extends BaseActivity { me =>
           pendingItemUri = Some(mediaUri)
 
           Try(startIntentSenderForResult(request.getIntentSender, PENDING_ITEM_REQUEST_CODE, null, 0, 0, 0)) match {
-            case Failure(sendError) => onFail(getString(R.string.error_could_not_read_backup) format sendError.getMessage)
+            case Failure(sendError) => onFail(getString(R.string.error_could_not_read_backup) format WalletApp.app.userFacingError(sendError))
             case _ => ()
           }
         }
 
-      case None => onFail(getString(R.string.error_could_not_read_backup) format exception.getMessage)
+      case None => onFail(getString(R.string.error_could_not_read_backup) format WalletApp.app.userFacingError(exception))
     }
 
   private def askMnemonicsAndRestore(uri: Uri, cipherBytes: Array[Byte]): Unit =
@@ -184,7 +184,7 @@ class SetupActivity extends BaseActivity { me =>
 
         case Failure(exception) =>
           val msg = getString(R.string.error_could_not_decrypt)
-          onFail(msg format exception.getMessage)
+          onFail(msg format WalletApp.app.userFacingError(exception))
       }
     }
 
@@ -229,7 +229,7 @@ class SetupActivity extends BaseActivity { me =>
     } catch {
       case exception: Throwable =>
         val msg = getString(R.string.error_wrong_phrase)
-        onFail(msg format exception.getMessage)
+        onFail(msg format WalletApp.app.userFacingError(exception))
     }
 
     val builder = titleBodyAsViewBuilder(getString(title).asDefView, mnemonicWrap)

@@ -453,7 +453,9 @@ class WalletApp extends Application { me =>
     androidx.core.content.ContextCompat.startForegroundService(me, withBodyAction)
   }
 
+  def userFacingError(error: Throwable): String = Option(error.getMessage).map(_.trim).filter(_.nonEmpty).getOrElse(me getString emergency_mode)
   def quickToast(code: Int): Unit = quickToast(me getString code)
+  def quickToast(error: Throwable): Unit = quickToast(userFacingError(error))
   def quickToast(msg: CharSequence): Unit = Toast.makeText(me, msg, Toast.LENGTH_LONG).show
   def plurOrZero(num: Long, opts: Array[String] = Array.empty): String = if (num > 0) plur(opts, num).format(num) else opts(0)
   def clipboardManager: ClipboardManager = getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]

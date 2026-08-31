@@ -286,7 +286,7 @@ trait BaseActivity extends AppCompatActivity { me =>
 
   def onFail(error: Throwable): Unit = error match {
     case exc if exc.getCause.isInstanceOf[java.io.InterruptedIOException] =>
-    case _ => onFail(error.toString)
+    case _ => onFail(WalletApp.app.userFacingError(error))
   }
 
   def getPositiveButton(alert: AlertDialog): Button = alert.getButton(DialogInterface.BUTTON_POSITIVE)
@@ -579,7 +579,7 @@ trait BaseActivity extends AppCompatActivity { me =>
     override def onUR(ur: UR): Unit = {
       obtainPsbt(ur).flatMap(extractBip84Tx) match {
         case Success(signedTx) => onSignedTx(signedTx)
-        case Failure(why) => onError(why.stackTraceAsString)
+        case Failure(why) => me onFail why
       }
     }
   }
