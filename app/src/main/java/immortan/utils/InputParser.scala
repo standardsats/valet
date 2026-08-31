@@ -46,36 +46,46 @@ object InputParser {
 
   def recordValue(raw: String): Unit = value = parse(raw)
 
-  private def parseUnsafe(rawInput: String): Any = rawInput take 2880 match {
-    case lnUrl(prefix, data) => LNUrl.fromBech32(s"$prefix$data")
-    case nodeLink(key, host, port) => RemoteNodeInfo(PublicKey.fromBin(ByteVector fromValidHex key), NodeAddress.fromParts(host, port.toInt), host)
-    case shortNodeLink(key, host) => RemoteNodeInfo(PublicKey.fromBin(ByteVector fromValidHex key), NodeAddress.fromParts(host, port = 9735), host)
+  private[this] val maxInputLength = 4096
 
-    case _ =>
-      val withoutSlashes = PaymentRequestExt.removePrefix(rawInput).trim
-      val isLightningInvoice = lnPayReq.findFirstMatchIn(rawInput).isDefined
-      val isIdentifier = identifier.findFirstMatchIn(withoutSlashes).isDefined
-      val addressToAmount = MultiAddressParser.parseAll(MultiAddressParser.parse, rawInput)
+  private def parseUnsafe(rawInput: String): Any = {
+    require(rawInput.length <= maxInputLength, "Input is too long")
 
-      if (isIdentifier) LNUrl.fromIdentifier(withoutSlashes)
-      else if (isLightningInvoice) PaymentRequestExt.fromUri(withoutSlashes.toLowerCase)
-      else addressToAmount getOrElse BitcoinUri.fromRaw(s"$bitcoin$withoutSlashes")
+    rawInput match {
+      case lnUrl(prefix, data) => LNUrl.fromBech32(s"$prefix$data")
+      case nodeLink(key, host, port) => RemoteNodeInfo(PublicKey.fromBin(ByteVector fromValidHex key), NodeAddress.fromParts(host, port.toInt), host)
+      case shortNodeLink(key, host) => RemoteNodeInfo(PublicKey.fromBin(ByteVector fromValidHex key), NodeAddress.fromParts(host, port = 9735), host)
+
+      case _ =>
+        val withoutSlashes = PaymentRequestExt.removePrefix(rawInput)
+        val isLightningInvoice = lnPayReq.findFirstMatchIn(rawInput).isDefined
+        val isIdentifier = identifier.findFirstMatchIn(withoutSlashes).isDefined
+        val addressToAmount = MultiAddressParser.parseAll(MultiAddressParser.parse, rawInput)
+
+        if (isIdentifier) LNUrl.fromIdentifier(withoutSlashes)
+        else if (isLightningInvoice) PaymentRequestExt.fromUri(withoutSlashes.toLowerCase)
+        else addressToAmount getOrElse BitcoinUri.fromRaw(s"$bitcoin$withoutSlashes")
+    }
   }
 
-  def parse(rawInput: String): Any = Try(parseUnsafe(rawInput)) recover {
-    case exc: Throwable =>
-      val hint = if (rawInput.toLowerCase.contains("lnurl")) "The Lightning URL (LNURL) address could not be resolved or is malformed."
-      else if (rawInput.toLowerCase.contains("lightning:") || rawInput.toLowerCase.contains("lnbc")) "The Lightning invoice appears to be invalid or corrupted."
-      else "The scanned data does not appear to be a valid Lightning address, Bitcoin address, or Lightning invoice."
-      throw new RuntimeException(hint)
-  } get
+  def parse(rawInput: String): Any = {
+    val normalized = Option(rawInput).map(_.trim).getOrElse("")
+    Try(parseUnsafe(normalized)) recover {
+      case _: Throwable =>
+        val hint = if (normalized.toLowerCase.contains("lnurl")) "The Lightning URL (LNURL) address could not be resolved or is malformed."
+        else if (normalized.toLowerCase.contains("lightning:") || normalized.toLowerCase.contains("lnbc")) "The Lightning invoice appears to be invalid or corrupted."
+        else "The scanned data does not appear to be a valid Lightning address, Bitcoin address, or Lightning invoice."
+        throw new RuntimeException(hint)
+    } get
+  }
 }
 
 object PaymentRequestExt {
-  def removePrefix(raw: String): String = raw.split(':').toList match {
-    case prefix :: content if lightning.startsWith(prefix.toLowerCase) => content.mkString.replace("//", "")
-    case prefix :: content if bitcoin.startsWith(prefix.toLowerCase) => content.mkString.replace("//", "")
-    case _ => raw
+  def removePrefix(raw: String): String = {
+    val trimmed = raw.trim
+    val lower = trimmed.toLowerCase
+    val prefix = if (lower.startsWith(lightning)) lightning else if (lower.startsWith(bitcoin)) bitcoin else ""
+    if (prefix.isEmpty) trimmed else trimmed.substring(prefix.length).stripPrefix("//")
   }
 
   def withoutSlashes(prefix: String, uri: Uri): String = prefix + removePrefix(uri.toString)

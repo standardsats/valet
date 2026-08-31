@@ -28,6 +28,10 @@ class FiatRates(bag: DataBag) extends CanBeShutDown {
     "frf" -> "French franc", "svc" -> "Salvadoran colón", "esd" -> "Salvadoran dollar", "sps" -> "Salvadoran peso", "eip" -> "Punt na hÉireann", "brl" -> "Brazilian Real", "sos" -> "Somali Shilling")
 
   def reloadData: Tools.Fiat2Btc = focused.map(_.toLowerCase) match {
+    case Some("aud") =>
+      val price = to[CoinSpotLatest](LNParams.connectionProvider.get("https://www.coinspot.com.au/pubapi/v2/latest/btc").string).prices.last.toDouble
+      require(price > 0 && !price.isNaN && !price.isInfinite)
+      Map("aud" -> price)
     case Some("sos") => to[Bitpay](LNParams.connectionProvider.get("https://bitpay.com/rates").string).data.map { case BitpayItem(code, rate) => code.toLowerCase -> rate }.toMap
     case _ => fr.acinq.eclair.secureRandom nextInt 2 match {
       case 0 => to[CoinGecko](LNParams.connectionProvider.get("https://api.coingecko.com/api/v3/exchange_rates").string).rates.map { case (code, item) => code.toLowerCase -> item.value }
@@ -85,6 +89,8 @@ trait FiatRatesListener {
 case class CoinGeckoItem(value: Double)
 case class BlockchainInfoItem(last: Double)
 case class BitpayItem(code: String, rate: Double)
+case class CoinSpotPrice(last: String)
+case class CoinSpotLatest(prices: CoinSpotPrice)
 
 case class Bitpay(data: FiatRates.BitpayItemList)
 case class CoinGecko(rates: FiatRates.CoinGeckoItemMap)

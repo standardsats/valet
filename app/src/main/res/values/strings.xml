@@ -141,6 +141,9 @@
     <string name="error_wrong_phrase"><![CDATA[<b>Provided phrase is incorrect</b>.<br><br>Error details<br><b>%1$s</b>]]></string>
     <string name="error_old_api_level">Requires API 24+, yours is %1$s</string>
     <string name="error_nothing_useful">Nothing useful is found</string>
+    <string name="error_scan_no_qr">No readable QR code found. Move closer, improve lighting, or turn on the flashlight.</string>
+    <string name="error_camera_unavailable">The camera could not be started. Check camera permission and try again.</string>
+    <string name="error_camera_permission">Camera permission is required to scan. Enable it in app settings and try again.</string>
 
     <string name="error_ln_no_chans"><![CDATA[Can neither send nor receive Lightning payments because no open channels are present.]]></string>
     <string name="error_ln_waiting"><![CDATA[Can neither send nor receive Lightning payments because no channel is open yet.]]></string>

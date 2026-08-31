@@ -4,7 +4,6 @@ import java.net.InetSocketAddress
 import java.util.TimerTask
 import android.app.Activity
 import android.content.{DialogInterface, Intent}
-import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
 import android.graphics.{Bitmap, BitmapFactory}
 import android.os.Bundle
@@ -132,6 +131,16 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
   def reloadPaymentInfos: Unit = paymentInfos = LNParams.cm.payBag.listRecentPayments(20).iterable(LNParams.cm.payBag.toPaymentInfo)
   def reloadRelayedPreimageInfos: Unit = relayedPreimageInfos = LNParams.cm.payBag.listRecentRelays(20).iterable(LNParams.cm.payBag.toRelayedPreimageInfo)
   def reloadPayMarketInfos: Unit = lnUrlPayLinks = WalletApp.lnUrlPayBag.listRecentLinks(20).iterable(WalletApp.lnUrlPayBag.toLinkInfo)
+
+  def refreshPendingTxStatuses: Unit = {
+    val pendingTxs = WalletApp.txDataBag.listPendingTxs(LNParams.minDepthBlocks).iterable(WalletApp.txDataBag.toTxInfo)
+    for {
+      txInfo <- pendingTxs
+      relatedChainWallet <- LNParams.chainWallets.findByPubKey(pub = txInfo.pubKey)
+      res <- relatedChainWallet.doubleSpent(txInfo.tx)
+      if res.depth != txInfo.depth || res.isDoubleSpent != txInfo.isDoubleSpent
+    } WalletApp.txDataBag.updStatus(txInfo.txid, res.depth, updatedStamp = res.stamp, res.isDoubleSpent)
+  }
 
   def isImportantItem: PartialFunction[TransactionDetails, Boolean] = {
     case anyFreshInfo if anyFreshInfo.updatedAt > disaplyThreshold => true
@@ -1099,6 +1108,7 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
     // Tor service could have been stopped in background
     try LNParams.connectionProvider.notifyAppAvailable catch none
     try checkExternalData(noneRunnable) catch none
+    try Rx.ioQueue.foreach(_ => refreshPendingTxStatuses) catch none
     try LNParams.fiatRates.updateNow catch none
     super.onResume
   }
@@ -1126,12 +1136,6 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
     case prd: PureRoutingData => walletCards.updateLnSyncProgress(prd.queriesTotal, prd.queriesLeft)
     case _: SyncMaster => UITask(walletCards.lnSyncIndicator setVisibility View.GONE).run
     case _ => // Do nothing
-  }
-
-  type GrantResults = Array[Int]
-
-  override def onRequestPermissionsResult(reqCode: Int, permissions: Array[String], results: GrantResults): Unit = {
-    if (reqCode == scannerRequestCode && results.nonEmpty && results.head == PackageManager.PERMISSION_GRANTED) bringScanner(null)
   }
 
   override def onActivityResult(requestCode: Int, resultCode: Int, resultData: Intent): Unit = {
@@ -1386,15 +1390,9 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
 
     val window = 600.millis
     val txEvents = Rx.uniqueFirstAndLastWithinWindow(ChannelMaster.txDbStream, window).doOnNext { _ =>
-      // After each delayed update we check if pending txs got confirmed or double-spent
-      // do this check specifically after updating txInfos with new items
+      // After each delayed update we check if pending txs got confirmed or double-spent.
       reloadTxInfos
-
-      for {
-        txInfo <- txInfos if !txInfo.isDoubleSpent && !txInfo.isConfirmed
-        relatedChainWallet <- LNParams.chainWallets.findByPubKey(pub = txInfo.pubKey)
-        res <- relatedChainWallet.doubleSpent(txInfo.tx) if res.depth != txInfo.depth || res.isDoubleSpent != txInfo.isDoubleSpent
-      } WalletApp.txDataBag.updStatus(txInfo.txid, res.depth, updatedStamp = res.stamp, res.isDoubleSpent)
+      refreshPendingTxStatuses
     }
 
     val relayEvents = Rx.uniqueFirstAndLastWithinWindow(ChannelMaster.relayDbStream, window).doOnNext(_ => reloadRelayedPreimageInfos)
@@ -1407,6 +1405,9 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
     inFinalizedSubscription = ChannelMaster.inFinalized.collect { case _: IncomingRevealed => true }.subscribe(_ => Vibrator.vibrate).asSome
 
     timer.scheduleAtFixedRate(paymentAdapterDataChanged, 30000, 30000)
+    timer.scheduleAtFixedRate(new TimerTask {
+      def run: Unit = Rx.ioQueue.foreach(_ => refreshPendingTxStatuses)
+    }, 30.minutes.toMillis, 30.minutes.toMillis)
     val backupAllowed = LocalBackup.isAllowed(context = WalletApp.app)
     if (!backupAllowed) {
       val listener = new DialogInterface.OnClickListener {

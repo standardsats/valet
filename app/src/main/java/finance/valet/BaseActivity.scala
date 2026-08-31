@@ -128,6 +128,7 @@ trait BaseActivity extends AppCompatActivity { me =>
   }
 
   override def onDestroy: Unit = {
+    pendingScanner = None
     super.onDestroy
     timer.cancel
   }
@@ -347,11 +348,31 @@ trait BaseActivity extends AppCompatActivity { me =>
   // Scanner
 
   final val scannerRequestCode = 101
+  private var pendingScanner = Option.empty[sheets.ScannerBottomSheet]
 
   def callScanner(sheet: sheets.ScannerBottomSheet): Unit = {
     val allowed = ContextCompat.checkSelfPermission(me, android.Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-    if (!allowed) ActivityCompat.requestPermissions(me, Array(android.Manifest.permission.CAMERA), scannerRequestCode)
-    else sheet.show(getSupportFragmentManager, "scanner-bottom-sheet-fragment")
+    if (!allowed) {
+      pendingScanner = sheet.asSome
+      ActivityCompat.requestPermissions(me, Array(android.Manifest.permission.CAMERA), scannerRequestCode)
+    } else {
+      pendingScanner = None
+      sheet.show(getSupportFragmentManager, "scanner-bottom-sheet-fragment")
+    }
+  }
+
+  override def onRequestPermissionsResult(requestCode: Int, permissions: Array[String], grantResults: Array[Int]): Unit = {
+    super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+    if (requestCode == scannerRequestCode) {
+      val sheet = pendingScanner
+      pendingScanner = None
+      sheet match {
+        case Some(scanner) if grantResults.headOption.contains(PackageManager.PERMISSION_GRANTED) =>
+          scanner.show(getSupportFragmentManager, "scanner-bottom-sheet-fragment")
+        case Some(_) => WalletApp.app.quickToast(R.string.error_camera_permission)
+        case _ =>
+      }
+    }
   }
 
   def addFlowChip(flow: FlowLayout, chipText: String, backgroundRes: Int, shareText: Option[String] = None): TextView = {
