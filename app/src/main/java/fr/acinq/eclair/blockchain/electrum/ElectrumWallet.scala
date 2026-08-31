@@ -65,6 +65,13 @@ class ElectrumWallet(client: ActorRef, chainSync: ActorRef, params: WalletParame
       data1.pendingMerkleResponses.foreach(self.!)
       stay using persistAndNotify(data1)
 
+    case Event(ElectrumClient.ScriptHashSubscriptionResponse(scriptHash, _), data) if !data.accountKeyMap.contains(scriptHash) && !data.changeKeyMap.contains(scriptHash) => stay
+
+    case Event(ElectrumClient.ScriptHashSubscriptionResponse(scriptHash, status), data) if status.isEmpty =>
+      val history1 = data.history.get(scriptHash).map(_ filter data.wasConfirmed).map(data.history.updated(scriptHash, _)).getOrElse(data.history)
+      val data1 = data.copy(status = data.status.updated(scriptHash, status), history = history1)
+      stay using persistAndNotify(data1)
+
     case Event(ElectrumClient.ScriptHashSubscriptionResponse(scriptHash, status), data) if data.status.get(scriptHash).contains(status) =>
       val missing = data.history.getOrElse(scriptHash, Nil).map(item => item.txHash -> item.height).toMap -- data.transactions.keySet -- data.pendingTransactionRequests
 
@@ -78,13 +85,6 @@ class ElectrumWallet(client: ActorRef, chainSync: ActorRef, params: WalletParame
         val data1 = data.copy(pendingTransactionRequests = data.pendingTransactionRequests ++ missing.keySet)
         stay using persistAndNotify(data1)
       } else stay
-
-    case Event(ElectrumClient.ScriptHashSubscriptionResponse(scriptHash, _), data) if !data.accountKeyMap.contains(scriptHash) && !data.changeKeyMap.contains(scriptHash) => stay
-
-    case Event(ElectrumClient.ScriptHashSubscriptionResponse(scriptHash, status), data) if status.isEmpty =>
-      val history1 = data.history.get(scriptHash).map(_ filter data.wasConfirmed).map(data.history.updated(scriptHash, _)).getOrElse(data.history)
-      val data1 = data.copy(status = data.status.updated(scriptHash, status), history = history1)
-      stay using persistAndNotify(data1)
 
     case Event(ElectrumClient.ScriptHashSubscriptionResponse(scriptHash, status), data) =>
       val data1 = data.copy(status = data.status.updated(scriptHash, status), pendingHistoryRequests = data.pendingHistoryRequests + scriptHash)
