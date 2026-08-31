@@ -31,9 +31,14 @@ podman run -v $PWD:/app/valet:z valet
 
 The container runs `./gradlew assembleRelease && ./gradlew bundleRelease`, producing
 an APK for every product flavor (`mainnet`, `tnet3`, `tnet4`, `regtest`) under
-`app/build/outputs/apk/release/`, named `<applicationId>_<versionCode>.apk`
-(e.g. `finance.valet_107.apk` for mainnet), plus `.aab` bundles under
+`app/build/outputs/apk/<flavor>/release/`, named `<applicationId>_<versionCode>.apk`
+(e.g. `finance.valet_111.apk` for mainnet), plus `.aab` bundles under
 `app/build/outputs/bundle/release/`.
+
+Released APKs have to be reproducible byte for byte, because F-Droid rebuilds them and
+refuses to publish a release it cannot reproduce. Read
+[REPRODUCIBLE_BUILDS.md](REPRODUCIBLE_BUILDS.md) before changing anything about how the
+APK is packaged or signed.
 
 ### Signing APKs with your self-signed certificate
 
@@ -60,31 +65,31 @@ variables are present at build time, so for APKs you usually don't need to run
 
    With these variables set, every `assemble<Flavor>Release` task is finalized by a
    `sign<Flavor>ReleaseApk` task that zipaligns and signs the APK in place
-   (`--v1-signing-enabled true --v2-signing-enabled true`). If `SIGNING_KEY_ALIAS`
-   is not set, the build still normalizes timestamps and zipaligns the APK, but
-   leaves it unsigned.
+   (`--v1-signing-enabled true --v2-signing-enabled true`), followed by a
+   `verify<Flavor>ReleaseApk` task that checks the result is still reproducible.
+   If `SIGNING_KEY_ALIAS` is not set, the build still normalizes timestamps and
+   zipaligns the APK, but leaves it unsigned.
 
 #### Manually signing an unsigned APK
 
-If you ended up with an unsigned (but already zipaligned) APK, sign it directly with
-`apksigner`:
+Don't, if the APK is going to be published. F-Droid rebuilds each release and grafts the
+published signature onto its own build; that only works if signing left the ZIP layout
+untouched, and `apksigner` rewrites the alignment padding of every uncompressed entry
+unless it is told not to. The build's signing task passes the flag that prevents this and
+then proves it worked — a hand-rolled `apksigner sign` does neither.
+
+If you are signing a throwaway build for a device, the invocation the build uses is:
 
 ```
-$ <Android SDK dir>/build-tools/<version>/apksigner sign \
+$ <Android SDK dir>/build-tools/36.0.0/apksigner sign \
+    --alignment-preserved true \
     --ks release.keystore --ks-key-alias release \
     --v1-signing-enabled true --v2-signing-enabled true \
-    app/build/outputs/apk/release/finance.valet_107.apk
+    app/build/outputs/apk/mainnet/release/finance.valet_111.apk
 ```
 
-If the APK isn't aligned yet, align it first:
-
-```
-$ <Android SDK dir>/build-tools/<version>/zipalign -v 4 \
-    app/build/outputs/apk/release/finance.valet_107.apk \
-    app/build/outputs/apk/release/finance.valet_107-aligned.apk
-```
-
-then sign the `-aligned.apk` file and rename it back if desired.
+The APK must already be zipaligned, which `assemble<Flavor>Release` does. Do not run
+`zipalign` on it again afterwards. See [REPRODUCIBLE_BUILDS.md](REPRODUCIBLE_BUILDS.md).
 
 ### Signing App Bundles (`.aab`)
 

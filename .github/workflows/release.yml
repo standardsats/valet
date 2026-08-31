@@ -33,6 +33,17 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      # apksigcopier is the tool fdroidserver uses to transplant our signature onto its own
+      # rebuild. It reconstructs the v1 signature entries with Python's zipfile, and Python 3.13
+      # changed zipfile to drop the UTF-8 general-purpose flag that apksigner sets on those
+      # entries -- under 3.13 the check fails on APKs that are perfectly fine. Pin 3.12, which is
+      # what F-Droid's buildserver runs. See REPRODUCIBLE_BUILDS.md.
+      - name: Set up apksigcopier
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install apksigcopier==1.1.1
+
       # A silently-empty keystore surfaces as an unreadable ASN.1 error inside apksigner
       # ("Tag number over 30 is not supported"), so validate here where the message can
       # say what actually went wrong.
@@ -75,6 +86,26 @@ jobs:
           export SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct)
           echo "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH ($(date -u -d "@$SOURCE_DATE_EPOCH"))"
           ./gradlew assembleRelease -Porg.gradle.java.installations.fromEnv=JAVA_HOME_11_X64
+
+      # gradle's verify<Variant>Apk already asserts that signing did not touch the entry region.
+      # This runs the real thing on top: exactly the apksigcopier + apksigner round trip
+      # fdroidserver performs when it compares its rebuild to the APK published here. If this
+      # passes, F-Droid's verification of this release passes too.
+      - name: Verify the signature transplants onto an unsigned rebuild
+        shell: bash
+        run: |
+          set -euo pipefail
+          apksigner="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+          test -x "$apksigner" || { echo "::error::build-tools 36.0.0 apksigner not found"; exit 1; }
+          for signed in $(find app/build/outputs/apk -path '*/release/*.apk'); do
+            unsigned="$signed.unsigned"
+            test -f "$unsigned" || { echo "::error::missing $unsigned"; exit 1; }
+            echo "== $(basename "$signed")"
+            apksigcopier copy "$signed" "$unsigned" /tmp/transplanted.apk
+            "$apksigner" verify --verbose /tmp/transplanted.apk > /dev/null
+            echo "   signature verifies against the unsigned build"
+            rm -f /tmp/transplanted.apk
+          done
 
       # Every flavour's release APK, under the name build.gradle already gives it
       # (<applicationId>_<versionCode>.apk), so nothing here has to track versionCode
