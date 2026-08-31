@@ -19,6 +19,9 @@ mismatch can be localised to a 1 MiB window instead of "somewhere in the file".
     ./apk-chunked-digest.py <apk>                 stored vs recomputed
     ./apk-chunked-digest.py <apk> --chunks        per-chunk digests
     ./apk-chunked-digest.py <a.apk> <b.apk>       compare two APKs chunk by chunk
+    ./apk-chunked-digest.py <apk> --strip <out>   write the APK without its
+                                                  signing block, so it can be
+                                                  byte-compared with a rebuild
 
 Spec: https://source.android.com/docs/security/features/apksigning/v2
 Pure stdlib -- no apksigner, apksigtool or androguard needed.
@@ -146,6 +149,22 @@ def sections(data):
     ]
 
 
+def strip_block(data):
+    """Drop the APK Signing Block, leaving the bytes the digest actually covers.
+
+    The EOCD's "offset of central directory" is rewritten to the offset the
+    signing block had, which is where the Central Directory now starts. The
+    result is what an unsigned build of the same sources must equal byte for
+    byte -- so `cmp` on it says *where* a reproducible build diverged.
+    """
+    eocd_off, cd_off, cd_size, sig_start = locate(data)
+    if sig_start is None:
+        raise ValueError("APK has no signing block -- nothing to strip")
+    out = bytearray(data[:sig_start] + data[cd_off:])
+    struct.pack_into("<I", out, eocd_off - (cd_off - sig_start) + 16, sig_start)
+    return bytes(out)
+
+
 def chunk_digests(data, algo="sha256"):
     """Per-chunk digests: SHA256(0xa5 || uint32le(len) || chunk)."""
     out = []
@@ -246,7 +265,18 @@ def main(argv):
     args = [a for a in argv if not a.startswith("--")]
     if not args:
         sys.exit(__doc__)
-    if len(args) == 1:
+    if "--strip" in argv:
+        if len(args) != 2:
+            sys.exit("--strip needs an input APK and an output path")
+        data = open(args[0], "rb").read()
+        out = strip_block(data)
+        open(args[1], "wb").write(out)
+        print(f"{args[1]}: {len(out)} bytes ({len(data) - len(out)} bytes of "
+              f"signing block removed)")
+        print("compare it with the unsigned rebuild:")
+        print(f"  cmp -l {args[1]} <rebuild.apk> | head")
+        print(f"  ./tools/zipdiff.py {args[1]} <rebuild.apk>")
+    elif len(args) == 1:
         report(args[0], show_chunks="--chunks" in argv)
     else:
         compare(args[0], args[1])
