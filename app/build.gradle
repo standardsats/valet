@@ -1,3 +1,7 @@
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
@@ -175,12 +179,60 @@ tasks.withType(Jar).configureEach {
     from { files.sort() }
 }
 
+// Offset of the central directory, i.e. the size of the entry region of a ZIP.
+// No ZIP64 here: an APK that large would not install anyway.
+static long centralDirectoryOffset(File zip) {
+    def raf = new RandomAccessFile(zip, 'r')
+    try {
+        int tailLen = (int) Math.min(zip.length(), 22L + 0xffff)
+        byte[] tail = new byte[tailLen]
+        raf.seek(zip.length() - tailLen)
+        raf.readFully(tail)
+        for (int i = tailLen - 22; i >= 0; i--) {
+            if (tail[i] == 0x50 && tail[i + 1] == 0x4b && tail[i + 2] == 0x05 && tail[i + 3] == 0x06) {
+                return ByteBuffer.wrap(tail, i + 16, 4).order(ByteOrder.LITTLE_ENDIAN).getInt() & 0xffffffffL
+            }
+        }
+    } finally {
+        raf.close()
+    }
+    throw new GradleException("not a ZIP file: ${zip}")
+}
+
+/** Offset of the first byte in which a and b differ over `length` bytes, or -1 if none. */
+static long firstDifference(File a, File b, long length) {
+    byte[] bufA = new byte[1 << 16]
+    byte[] bufB = new byte[1 << 16]
+    def inA = new DataInputStream(new BufferedInputStream(new FileInputStream(a)))
+    def inB = new DataInputStream(new BufferedInputStream(new FileInputStream(b)))
+    try {
+        for (long pos = 0; pos < length;) {
+            int n = (int) Math.min((long) bufA.length, length - pos)
+            inA.readFully(bufA, 0, n)
+            inB.readFully(bufB, 0, n)
+            for (int i = 0; i < n; i++) {
+                if (bufA[i] != bufB[i]) return pos + i
+            }
+            pos += n
+        }
+        return -1L
+    } finally {
+        inA.close()
+        inB.close()
+    }
+}
+
 android.applicationVariants.all { variant ->
     if (variant.buildType.name != 'release') return
 
     def variantName = variant.name.capitalize()
     def buildToolsDir = "${android.sdkDirectory}/build-tools/${android.buildToolsVersion}"
     def apkProvider = { variant.outputs.first().outputFile }
+    // apksigner signs in place, so the pre-signing bytes -- which are exactly what
+    // F-Droid's builder ends up with, since it has no key and never runs signTask --
+    // are kept aside for verifyTask. The suffix deliberately does not end in `.apk`
+    // so that release tooling globbing for '*.apk' does not pick it up.
+    def unsignedApkProvider = { file("${apkProvider().absolutePath}.unsigned") }
 
     def normalizeTask = tasks.create("normalize${variantName}ApkTimestamps") {
         doLast {
@@ -230,11 +282,30 @@ android.applicationVariants.all { variant ->
         }
     }
 
-    def signTask = tasks.create("sign${variantName}Apk", Exec) {
+    // Alignment is what makes the layout of the unsigned APK final: apksigner is told to
+    // preserve it and apksigcopier never introduces it, so if zipalign were ever to not take
+    // effect the APK would ship unaligned -- which Android 11+ refuses to install, and which
+    // no later step would notice. `-c` re-checks the file zipalign just wrote.
+    def alignCheckTask = tasks.create("check${variantName}ApkAlignment", Exec) {
         dependsOn zipalignTask
+        doFirst {
+            commandLine "${buildToolsDir}/zipalign", '-c', '-p', '4', apkProvider().absolutePath
+        }
+    }
+
+    def signTask = tasks.create("sign${variantName}Apk", Exec) {
+        dependsOn alignCheckTask
         onlyIf { System.getenv("SIGNING_KEY_ALIAS") != null }
         doFirst {
+            Files.copy(apkProvider().toPath(), unsignedApkProvider().toPath(),
+                    StandardCopyOption.REPLACE_EXISTING)
             commandLine "${buildToolsDir}/apksigner", 'sign',
+                    // Mandatory. Without it apksigner re-pads every uncompressed entry with its
+                    // own 0xd935 alignment records, rewriting the ZIP layout that zipalign just
+                    // produced. F-Droid transplants this APK's signature onto its own rebuild
+                    // with apksigcopier, which copies entries verbatim and never re-pads, so any
+                    // layout change here makes the v2/v3 digests mismatch on their builder.
+                    // See REPRODUCIBLE_BUILDS.md.
                     '--alignment-preserved', 'true',
                     '--ks', System.getenv("SIGNING_STORE_FILENAME") ?: '',
                     '--ks-key-alias', System.getenv("SIGNING_KEY_ALIAS") ?: '',
@@ -248,8 +319,36 @@ android.applicationVariants.all { variant ->
         }
     }
 
-    def pgpSignTask = tasks.create("pgpSign${variantName}Apk", Exec) {
+    // F-Droid rebuilds the APK from source, transplants the published signature onto its own
+    // build with apksigcopier and checks the v2/v3 digests. That only succeeds if signing left
+    // every byte before the signature untouched, so assert exactly that: signing may append the
+    // v1 signature entries and insert the APK Signing Block, and nothing else. Catching a
+    // violation here costs one comparison; catching it in F-Droid's CI costs a re-release.
+    def verifyTask = tasks.create("verify${variantName}Apk") {
         dependsOn signTask
+        onlyIf { System.getenv("SIGNING_KEY_ALIAS") != null }
+        doLast {
+            def signed = apkProvider()
+            def unsigned = unsignedApkProvider()
+            long contentSize = centralDirectoryOffset(unsigned)
+
+            if (signed.length() <= contentSize) {
+                throw new GradleException("${signed.name}: signing shrank the APK -- expected the "
+                        + "unsigned entry region (${contentSize} bytes) plus a signature")
+            }
+            long diff = firstDifference(unsigned, signed, contentSize)
+            if (diff >= 0) {
+                throw new GradleException("${signed.name} is not reproducible: signing rewrote the "
+                        + "ZIP layout, first differing byte at offset ${diff} of ${contentSize}. "
+                        + "F-Droid will not be able to verify this build. See REPRODUCIBLE_BUILDS.md.")
+            }
+            logger.lifecycle("${signed.name}: signature added over an unmodified "
+                    + "${contentSize}-byte entry region -- reproducible for F-Droid")
+        }
+    }
+
+    def pgpSignTask = tasks.create("pgpSign${variantName}Apk", Exec) {
+        dependsOn verifyTask
         onlyIf { System.getenv("SIGNING_KEY_ALIAS") != null &&
                 System.getenv("PGP_SIGNING_KEY_ID") != null }
         doFirst {
@@ -265,5 +364,9 @@ android.applicationVariants.all { variant ->
         }
     }
 
-    variant.assembleProvider.configure { finalizedBy(signTask, pgpSignTask) }
+    // alignCheckTask is listed explicitly so that it also runs on builders that have no signing
+    // key -- F-Droid's, in particular -- where signTask and everything after it is skipped.
+    variant.assembleProvider.configure {
+        finalizedBy(alignCheckTask, signTask, verifyTask, pgpSignTask)
+    }
 }
