@@ -2,11 +2,11 @@ package finance.valet
 
 import android.app.Activity
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import android.widget.{ArrayAdapter, LinearLayout}
 import androidx.appcompat.app.AlertDialog
-import androidx.documentfile.provider.DocumentFile
 import androidx.transition.TransitionManager
 import finance.valet.BaseActivity.StringOps
 import finance.valet.R.string._
@@ -21,7 +21,7 @@ import immortan.wire.ExtCodecs
 import immortan.{LNParams, LightningNodeKeys, WalletSecret}
 import scodec.bits.{BitVector, ByteVector}
 
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 
 
 object SetupActivity {
@@ -51,6 +51,8 @@ class SetupActivity extends BaseActivity { me =>
   private[this] lazy val restoreOptionsButton = findViewById(R.id.restoreOptionsButton).asInstanceOf[NoboButton]
   private[this] lazy val restoreOptions = findViewById(R.id.restoreOptions).asInstanceOf[LinearLayout]
   private[this] final val FILE_REQUEST_CODE = 112
+  private[this] final val PENDING_ITEM_REQUEST_CODE = 113
+  private[this] var pendingItemUri = Option.empty[Uri]
 
   lazy private[this] val enforceTor = new SettingsHolder(me) {
     override def updateView: Unit = settingsCheck.setChecked(WalletApp.ensureTor)
@@ -126,24 +128,63 @@ class SetupActivity extends BaseActivity { me =>
 
   override def onActivityResult(requestCode: Int, resultCode: Int, resultData: Intent): Unit =
     if (requestCode == FILE_REQUEST_CODE && resultCode == Activity.RESULT_OK && resultData != null) {
-      val cipherBytes = ByteStreams.toByteArray(getContentResolver openInputStream resultData.getData)
+      restoreFromBackupUri(resultData.getData)
+    } else if (requestCode == PENDING_ITEM_REQUEST_CODE) {
+      val grantedUri = pendingItemUri
+      pendingItemUri = None
 
-      showMnemonicPopup(R.string.action_backup_present_title) { mnemonics =>
-        val walletSeed = MnemonicCode.toSeed(mnemonics, passphrase = new String)
-        LocalBackup.decryptBackup(ByteVector.view(cipherBytes), walletSeed) match {
-
-          case Success(plainEssentialBytes) =>
-            // We were able to decrypt a file, implant it into db location and proceed
-            LocalBackup.copyPlainDataToDbLocation(me, WalletApp.dbFileNameEssential, plainEssentialBytes)
-            // Delete user-selected backup file while we can here and make an app-owned backup shortly
-            DocumentFile.fromSingleUri(me, resultData.getData).delete
-            WalletApp.backupSaveWorker.replaceWork(true)
-            proceedWithMnemonics(mnemonics)
-
-          case Failure(exception) =>
-            val msg = getString(R.string.error_could_not_decrypt)
-            onFail(msg format exception.getMessage)
+      if (resultCode == Activity.RESULT_OK) grantedUri.foreach { mediaUri =>
+        Try(LocalBackup.clearPendingFlag(me, mediaUri)) match {
+          case Success(_) => restoreFromBackupUri(mediaUri)
+          case Failure(exception) => onFail(getString(R.string.error_could_not_read_backup) format exception.getMessage)
         }
+      }
+    }
+
+  private def restoreFromBackupUri(uri: Uri): Unit =
+    Try(LocalBackup.readAllBytes(me, uri)) match {
+      case Success(cipherBytes) => askMnemonicsAndRestore(uri, cipherBytes)
+      case Failure(exception) => LocalBackup.pendingItemUri(me, uri, exception) match {
+        case Some(mediaUri) => askPendingItemAccess(mediaUri, exception)
+        case None => onFail(getString(R.string.error_could_not_read_backup) format exception.getMessage)
+      }
+    }
+
+  // A backup left pending by an older app version can not be opened until the user gives access to it
+  private def askPendingItemAccess(mediaUri: Uri, exception: Throwable): Unit =
+    LocalBackup.pendingAccessRequest(me, mediaUri) match {
+      case Some(request) =>
+        val builder = new AlertDialog.Builder(me).setMessage(getString(R.string.error_backup_pending).html)
+        mkCheckForm(alert => runAnd(alert.dismiss)(askAccess), none, builder, dialog_ok, dialog_cancel)
+
+        def askAccess: Unit = {
+          pendingItemUri = Some(mediaUri)
+
+          Try(startIntentSenderForResult(request.getIntentSender, PENDING_ITEM_REQUEST_CODE, null, 0, 0, 0)) match {
+            case Failure(sendError) => onFail(getString(R.string.error_could_not_read_backup) format sendError.getMessage)
+            case _ => ()
+          }
+        }
+
+      case None => onFail(getString(R.string.error_could_not_read_backup) format exception.getMessage)
+    }
+
+  private def askMnemonicsAndRestore(uri: Uri, cipherBytes: Array[Byte]): Unit =
+    showMnemonicPopup(R.string.action_backup_present_title) { mnemonics =>
+      val walletSeed = MnemonicCode.toSeed(mnemonics, passphrase = new String)
+      LocalBackup.decryptBackup(ByteVector.view(cipherBytes), walletSeed) match {
+
+        case Success(plainEssentialBytes) =>
+          // We were able to decrypt a file, implant it into db location and proceed
+          LocalBackup.copyPlainDataToDbLocation(me, WalletApp.dbFileNameEssential, plainEssentialBytes)
+          // Delete user-selected backup file while we can here and make an app-owned backup shortly
+          LocalBackup.deleteBackupFile(me, uri)
+          WalletApp.backupSaveWorker.replaceWork(true)
+          proceedWithMnemonics(mnemonics)
+
+        case Failure(exception) =>
+          val msg = getString(R.string.error_could_not_decrypt)
+          onFail(msg format exception.getMessage)
       }
     }
 

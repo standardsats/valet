@@ -107,6 +107,19 @@ else
 fi
 echo "==> commit epoch $SOURCE_DATE_EPOCH ($(date -u -d "@$SOURCE_DATE_EPOCH" '+%Y-%m-%d %H:%M:%S UTC'))"
 
+# Say exactly which commit is being built. Without this the only way to tell one
+# build from another is to unzip the APK afterwards, and it is far too easy to
+# rebuild in one directory and then diff a stale APK from another.
+if commit_sha=$("${GIT[@]}" rev-parse HEAD 2>/dev/null); then
+    echo "==> commit $commit_sha"
+    echo "==>        $("${GIT[@]}" log -1 --pretty=%s 2>/dev/null)"
+    if ! "${GIT[@]}" diff --quiet HEAD 2>/dev/null; then
+        echo "    WARNING: the working tree has uncommitted changes. They WILL be built," >&2
+        echo "    but SOURCE_DATE_EPOCH and the embedded VCS revision describe HEAD only," >&2
+        echo "    so the result cannot reproduce." >&2
+    fi
+fi
+
 # Preflight the network. settings.gradle resolves from google() and mavenCentral(),
 # and nothing is pre-seeded in this image, so a container without working outbound
 # networking cannot build -- but Gradle only discovers that once it resolves a
@@ -178,5 +191,44 @@ for out in apk bundle; do
     echo "    $dest_dir"
 done
 
-find "$SRC/app/build/outputs" \( -name '*.apk' -o -name '*.aab' \) -print 2>/dev/null | sort
+# Verify what actually came out, rather than trusting that it came from the commit
+# above. A stale APK left over from an earlier run in a different directory looks
+# exactly like a fresh one until you read its embedded timestamps, and diffing the
+# wrong file wastes far more time than this check costs.
+echo "==> verifying artifacts"
+python3 - "$SRC/app/build/outputs" "$SOURCE_DATE_EPOCH" "${commit_sha:-}" <<'PY'
+import datetime, pathlib, sys, zipfile
+
+root, epoch, sha = pathlib.Path(sys.argv[1]), int(sys.argv[2]), sys.argv[3]
+want = datetime.datetime.fromtimestamp(epoch, datetime.timezone.utc)
+files = sorted(p for p in root.rglob("*") if p.suffix in (".apk", ".aab"))
+if not files:
+    sys.exit("    no .apk/.aab produced!")
+
+bad = False
+for p in files:
+    with zipfile.ZipFile(p) as z:
+        times = {i.date_time for i in z.infolist()}
+        try:
+            vcs = z.read("META-INF/version-control-info.textproto")
+            rev = "".join(c for c in vcs.decode("latin1") if c.isalnum() or c in "/:.-")
+            rev = rev[-40:] if len(rev) >= 40 else rev
+        except KeyError:
+            rev = "(none -- vcsInfo disabled)"
+    print(f"    {p}")
+    print(f"      entry timestamps: {sorted(times)[:2]}  ({len(times)} distinct)")
+    print(f"      embedded vcs rev: {rev}")
+    # DOS timestamps have 2-second granularity, so allow the epoch to round down.
+    ok = all(t[:5] == (want.year, want.month, want.day, want.hour, want.minute)
+             for t in times)
+    if not ok:
+        bad = True
+        print(f"      !! does NOT match SOURCE_DATE_EPOCH {epoch} ({want:%Y-%m-%d %H:%M:%S} UTC)")
+    if sha and rev not in ("(none -- vcsInfo disabled)",) and sha[:12] not in rev:
+        print(f"      !! embedded revision is not the commit that was built ({sha[:12]})")
+        bad = True
+if bad:
+    sys.exit("    verification FAILED -- this artifact will not reproduce")
+print("    OK: timestamps and revision match the commit that was built")
+PY
 echo "==> done"
