@@ -82,8 +82,8 @@ class ElectrumWallet(client: ActorRef, chainSync: ActorRef, params: WalletParame
     case Event(ElectrumClient.ScriptHashSubscriptionResponse(scriptHash, _), data) if !data.accountKeyMap.contains(scriptHash) && !data.changeKeyMap.contains(scriptHash) => stay
 
     case Event(ElectrumClient.ScriptHashSubscriptionResponse(scriptHash, status), data) if status.isEmpty =>
-      val status1 = data.status.updated(scriptHash, status)
-      val data1 = data.copy(status = status1)
+      val history1 = data.history.get(scriptHash).map(_ filter data.wasConfirmed).map(data.history.updated(scriptHash, _)).getOrElse(data.history)
+      val data1 = data.copy(status = data.status.updated(scriptHash, status), history = history1)
       stay using persistAndNotify(data1)
 
     case Event(ElectrumClient.ScriptHashSubscriptionResponse(scriptHash, status), data) =>
@@ -97,7 +97,7 @@ class ElectrumWallet(client: ActorRef, chainSync: ActorRef, params: WalletParame
 
       val shadowItems = for {
         existingItems <- data.history.get(scriptHash).toList
-        item <- existingItems if !items.exists(_.txHash == item.txHash)
+        item <- existingItems if !items.exists(_.txHash == item.txHash) && data.wasConfirmed(item)
       } yield item
 
       val items1 = items ++ shadowItems
@@ -377,6 +377,8 @@ case class ElectrumData(ewt: ElectrumWalletType, blockchain: Blockchain,
   def reset: ElectrumData = copy(status = status -- pendingHistoryRequests, pendingHistoryRequests = Set.empty, pendingTransactionRequests = Set.empty, pendingHeadersRequests = Set.empty, lastReadyMessage = None)
 
   def toPersistent: PersistentData = PersistentData(accountKeys.length, changeKeys.length, status, transactions, overriddenPendingTxids, history, proofs, pendingTransactions, excludedOutPoints)
+
+  def wasConfirmed(item: TransactionHistoryItem): Boolean = item.height > 0 || proofs.contains(item.txHash)
 
   def isTxKnown(txid: ByteVector32): Boolean = transactions.contains(txid) || pendingTransactionRequests.contains(txid) || pendingTransactions.exists(_.txid == txid)
 
