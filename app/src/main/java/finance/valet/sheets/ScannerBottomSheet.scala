@@ -151,7 +151,7 @@ abstract class ScannerBottomSheet(host: BaseActivity) extends BottomSheetDialogF
       override def cameraClosed(): Unit = none
     })
 
-    val readerFrame = view.findViewById(R.id.readerFrame)
+    val readerFrame = view.findViewById(R.id.readerFrame).asInstanceOf[View]
     readerFrame.post(new Runnable { override def run: Unit = resizeReaderFrame(readerFrame) })
   }
 
