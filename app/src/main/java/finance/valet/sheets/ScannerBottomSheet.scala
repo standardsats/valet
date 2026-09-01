@@ -10,7 +10,9 @@ import finance.valet.{BaseActivity, WalletApp}
 import finance.valet.BaseActivity
 import finance.valet.R
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
-import com.journeyapps.barcodescanner.{BarcodeCallback, BarcodeResult, BarcodeView}
+import com.google.zxing.{BarcodeFormat, DecodeHintType}
+import com.journeyapps.barcodescanner.{BarcodeCallback, BarcodeResult, BarcodeView, CameraPreview, DefaultDecoderFactory}
+import com.journeyapps.barcodescanner.camera.CameraSettings
 import com.sparrowwallet.hummingbird.registry.{CryptoAccount, CryptoHDKey}
 import com.sparrowwallet.hummingbird.{ResultType, UR, URDecoder}
 import fr.acinq.bitcoin.DeterministicWallet._
@@ -27,7 +29,7 @@ import scala.util.{Failure, Success, Try}
 
 
 trait HasBarcodeReader extends BarcodeCallback {
-  var lastAttempt: Long = System.currentTimeMillis
+  var lastAttempt: Long = 0L
   var barcodeReader: BarcodeView = _
   var instruction: TextView = _
 }
@@ -56,12 +58,63 @@ trait HasUrDecoder extends HasBarcodeReader {
 }
 
 abstract class ScannerBottomSheet(host: BaseActivity) extends BottomSheetDialogFragment with HasBarcodeReader {
-  def resumeBarcodeReader: Unit = runAnd(barcodeReader decodeContinuous this)(barcodeReader.resume)
-  def pauseBarcodeReader: Unit = runAnd(barcodeReader setTorch false)(barcodeReader.pause)
+  private var barcodeDecoded = false
+  private val noQrHint = new Runnable {
+    override def run: Unit = if (!barcodeDecoded && isAdded) WalletApp.app.quickToast(R.string.error_scan_no_qr)
+  }
 
-  override def onDestroy: Unit = runAnd(barcodeReader.stopDecoding)(super.onStop)
-  override def onResume: Unit = runAnd(resumeBarcodeReader)(super.onResume)
-  override def onStop: Unit = runAnd(pauseBarcodeReader)(super.onStop)
+  def resumeBarcodeReader: Unit = Option(barcodeReader).foreach { reader =>
+    barcodeDecoded = false
+    reader.removeCallbacks(noQrHint)
+    reader.decodeContinuous(this)
+    reader.resume
+    reader.postDelayed(noQrHint, 8000L)
+  }
+
+  def pauseBarcodeReader: Unit = Option(barcodeReader).foreach { reader =>
+    reader.removeCallbacks(noQrHint)
+    reader.setTorch(false)
+    reader.pause
+    Option(flashlight).foreach { button =>
+      button.setImageResource(R.drawable.flashlight_off)
+      button.setTag(R.drawable.flashlight_off)
+    }
+  }
+
+  def markBarcodeDecoded: Unit = {
+    barcodeDecoded = true
+    Option(barcodeReader).foreach(_.removeCallbacks(noQrHint))
+  }
+
+  private def stopBarcodeReader: Unit = Option(barcodeReader).foreach { reader =>
+    reader.removeCallbacks(noQrHint)
+    reader.stopDecoding
+  }
+
+  override def onDestroy: Unit = {
+    stopBarcodeReader
+    super.onDestroy
+  }
+
+  override def onDestroyView: Unit = {
+    pauseBarcodeReader
+    stopBarcodeReader
+    barcodeReader = null
+    flashlight = null
+    instruction = null
+    super.onDestroyView
+  }
+
+  override def onResume: Unit = {
+    super.onResume
+    resumeBarcodeReader
+  }
+
+  override def onStop: Unit = {
+    pauseBarcodeReader
+    super.onStop
+  }
+
   var flashlight: ImageButton = _
 
   override def onCreateView(inflater: LayoutInflater, container: ViewGroup, state: Bundle): View = {
@@ -74,13 +127,58 @@ abstract class ScannerBottomSheet(host: BaseActivity) extends BottomSheetDialogF
     instruction = view.findViewById(R.id.instruction).asInstanceOf[TextView]
     barcodeReader = view.findViewById(R.id.reader).asInstanceOf[BarcodeView]
     flashlight = view.findViewById(R.id.flashlight).asInstanceOf[ImageButton]
+    flashlight.setTag(R.drawable.flashlight_off)
     flashlight setOnClickListener host.onButtonTap(toggleTorch)
+
+    val decodeHints = new java.util.HashMap[DecodeHintType, AnyRef]
+    decodeHints.put(DecodeHintType.TRY_HARDER, java.lang.Boolean.TRUE)
+    barcodeReader.setDecoderFactory(new DefaultDecoderFactory(
+      java.util.Collections.singletonList[BarcodeFormat](BarcodeFormat.QR_CODE), decodeHints, null, 0))
+    barcodeReader.setMarginFraction(0.05d)
+
+    val cameraSettings: CameraSettings = barcodeReader.getCameraSettings
+    cameraSettings.setAutoFocusEnabled(true)
+    cameraSettings.setContinuousFocusEnabled(true)
+    cameraSettings.setMeteringEnabled(true)
+    cameraSettings.setBarcodeSceneModeEnabled(true)
+    barcodeReader.setCameraSettings(cameraSettings)
+
+    barcodeReader.addStateListener(new CameraPreview.StateListener {
+      override def previewSized(): Unit = none
+      override def previewStarted(): Unit = none
+      override def previewStopped(): Unit = none
+      override def cameraError(error: Exception): Unit = onCameraError(error)
+      override def cameraClosed(): Unit = none
+    })
+
+    val readerFrame = view.findViewById(R.id.readerFrame).asInstanceOf[View]
+    readerFrame.post(new Runnable { override def run: Unit = resizeReaderFrame(readerFrame) })
+  }
+
+  private def resizeReaderFrame(readerFrame: View): Unit = {
+    val metrics = host.getResources.getDisplayMetrics
+    val density = metrics.density
+    val width = readerFrame.getWidth
+    if (width > 0) {
+      val sideMargin = (24D * density).toInt
+      val availableWidth = Math.max(1, width - sideMargin)
+      val availableHeight = Math.max(1, (metrics.heightPixels * 0.7D).toInt)
+      val layoutParams = readerFrame.getLayoutParams
+      layoutParams.height = Math.min(availableWidth, availableHeight)
+      readerFrame.setLayoutParams(layoutParams)
+    }
+  }
+
+  def onCameraError(error: Exception): Unit = {
+    Option(barcodeReader).foreach(_.removeCallbacks(noQrHint))
+    WalletApp.app.quickToast(R.string.error_camera_unavailable)
+    try {
+      if (isAdded) dismiss
+    } catch none
   }
 
   def toggleTorch: Unit = {
-    val currentTag = flashlight.getTag.asInstanceOf[Int]
-
-    if (currentTag != R.drawable.flashlight_on) {
+    if (flashlight.getTag != R.drawable.flashlight_on) {
       flashlight.setImageResource(R.drawable.flashlight_on)
       flashlight.setTag(R.drawable.flashlight_on)
       barcodeReader.setTorch(true)
@@ -93,7 +191,7 @@ abstract class ScannerBottomSheet(host: BaseActivity) extends BottomSheetDialogF
 }
 
 class OnceBottomSheet(host: BaseActivity, instructionOpt: Option[String], onScan: Runnable) extends ScannerBottomSheet(host) {
-  def failedScan(error: Throwable): Unit = WalletApp.app.quickToast(error.getMessage)
+  def failedScan(error: Throwable): Unit = WalletApp.app.quickToast(error)
   def successfulScan(result: Any): Unit = runAnd(dismiss)(onScan.run)
 
   override def onViewCreated(view: View, savedState: Bundle): Unit = {
@@ -105,10 +203,16 @@ class OnceBottomSheet(host: BaseActivity, instructionOpt: Option[String], onScan
     }
   }
 
-  override def barcodeResult(scanningResult: BarcodeResult): Unit = for {
-    text <- Option(scanningResult.getText) if System.currentTimeMillis - lastAttempt > 2000
-    _ = host.runInFutureProcessOnUI(InputParser.recordValue(text), failedScan)(successfulScan)
-  } lastAttempt = System.currentTimeMillis
+  override def barcodeResult(scanningResult: BarcodeResult): Unit = {
+    val now = System.currentTimeMillis
+    for {
+      text <- Option(scanningResult.getText).map(_.trim).filter(_.nonEmpty) if now - lastAttempt > 2000
+    } {
+      markBarcodeDecoded
+      lastAttempt = now
+      host.runInFutureProcessOnUI(InputParser.recordValue(text), failedScan)(successfulScan)
+    }
+  }
 }
 
 trait PairingData {
@@ -141,7 +245,10 @@ case class HWAccountPairingData(urAccount: CryptoAccount) extends PairingData {
 }
 
 class URBottomSheet(host: BaseActivity, onPairData: PairingData => Unit) extends ScannerBottomSheet(host) with HasUrDecoder {
-  override def barcodeResult(res: BarcodeResult): Unit = if (res.getText.toLowerCase startsWith "zpub") onZPub(res.getText) else handleUR(res.getText)
+  override def barcodeResult(res: BarcodeResult): Unit = {
+    markBarcodeDecoded
+    if (res.getText.toLowerCase startsWith "zpub") onZPub(res.getText) else handleUR(res.getText)
+  }
   override def onError(error: String): Unit = host.onFail(error)
 
   override def onViewCreated(view: View, savedState: Bundle): Unit = {
@@ -154,7 +261,7 @@ class URBottomSheet(host: BaseActivity, onPairData: PairingData => Unit) extends
 
   def onZPub(zPubText: String): Unit = {
     scala.util.Try(ZPubPairingData apply zPubText) match {
-      case Failure(why) => onError(why.getMessage)
+      case Failure(why) => host.onFail(why)
       case Success(data) => onPairData(data)
     }
 
@@ -167,7 +274,7 @@ class URBottomSheet(host: BaseActivity, onPairData: PairingData => Unit) extends
       case urAccount: CryptoAccount => HWAccountPairingData(urAccount)
       case _ => throw new RuntimeException(host getString R.string.error_nothing_useful)
     } match {
-      case Failure(why) => onError(why.getMessage)
+      case Failure(why) => host.onFail(why)
       case Success(data) => onPairData(data)
     }
 

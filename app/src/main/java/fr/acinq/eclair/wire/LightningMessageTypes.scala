@@ -12,7 +12,7 @@ import immortan.{ChannelMaster, LNParams, RemoteNodeInfo, Ticker}
 import scodec.DecodeResult
 import scodec.bits.ByteVector
 
-import java.net.{Inet4Address, Inet6Address, InetAddress, InetSocketAddress}
+import java.net.{Inet4Address, Inet6Address, InetAddress, InetSocketAddress, UnknownHostException}
 import java.nio.ByteOrder
 import java.nio.charset.StandardCharsets
 
@@ -171,11 +171,19 @@ object NodeAddress {
     else if (host.endsWith(onionSuffix) && host.length == V3Len + onionSuffix.length) Tor3(host.dropRight(onionSuffix.length), port)
     else orElse(host, port)
 
-  def resolveIp(host: String, port: Int): NodeAddress =
-    InetAddress getByName host match {
+  def resolveIp(host: String, port: Int): NodeAddress = {
+    def resolve(attemptsLeft: Int): InetAddress = try InetAddress getByName host catch {
+      case _: UnknownHostException if attemptsLeft > 1 =>
+        // ponytail: three synchronous attempts; use an async resolver if this path ever runs on UI.
+        Thread.sleep(1000L)
+        resolve(attemptsLeft - 1)
+    }
+
+    resolve(3) match {
       case inetV4Address: Inet4Address => IPv4(inetV4Address, port)
       case inetV6Address: Inet6Address => IPv6(inetV6Address, port)
     }
+  }
 
   def unresolved(port: Int, host: Int*): NodeAddress =
     InetAddress getByAddress host.toArray.map(_.toByte) match {

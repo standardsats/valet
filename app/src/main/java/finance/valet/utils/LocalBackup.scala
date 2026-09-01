@@ -5,9 +5,11 @@ import fr.acinq.bitcoin.{Block, ByteVector32, Crypto}
 import androidx.appcompat.app.AppCompatActivity
 import fr.acinq.eclair.randomBytes
 import com.google.common.io.{ByteStreams, Files}
-import android.content.{Context, Intent}
+import android.app.PendingIntent
+import android.content.{ContentValues, Context, Intent}
 import android.net.Uri
-import android.provider.DocumentsContract
+import android.os.Build
+import android.provider.{DocumentsContract, MediaStore}
 import androidx.documentfile.provider.DocumentFile
 import finance.valet.WalletApp
 import finance.valet.WalletApp.customBackupLocation
@@ -98,19 +100,48 @@ object LocalBackup { me =>
     println("LocalBackup: Will write backup to: " ++ downloadedUri.toString)
 
     val outputStream = resolver.openOutputStream(downloadedUri, "wt")
-    val brr = Array.ofDim[Byte](1024)
-    var len: Int = 0
     val bufferedInputStream = new BufferedInputStream(new FileInputStream(downloadedFile.getAbsoluteFile))
-    while ({
-      val it = bufferedInputStream.read(brr, 0, brr.size)
-      len = it
-      it != -1
-    }) {
-      outputStream.write(brr, 0, len)
+
+    try ByteStreams.copy(bufferedInputStream, outputStream) finally {
+      Try(outputStream.close)
+      Try(bufferedInputStream.close)
     }
-    outputStream.flush()
-    bufferedInputStream.close()
+
     downloadedUri
+  }
+
+  def readAllBytes(context: Context, uri: Uri): Array[Byte] = {
+    val inputStream = context.getContentResolver openInputStream uri
+    try ByteStreams.toByteArray(inputStream) finally Try(inputStream.close)
+  }
+
+  def deleteBackupFile(context: Context, uri: Uri): Unit = {
+    val isRemoved = Try(DocumentFile.fromSingleUri(context, uri).delete).getOrElse(false)
+    if (!isRemoved) Try(context.getContentResolver.delete(uri, null, null))
+  }
+
+  // Versions before 5.1.2 inserted backups into MediaStore Downloads with IS_PENDING set and never
+  // cleared it, so on disk such a file is named ".pending-<expiry>-<name>" and MediaProvider opens it
+  // for the owner install only. After a reinstall or a package rename there is no owner any more and
+  // each read fails with IllegalStateException. The user can grant access to the item through a system
+  // dialog, after that the flag can be cleared and the file becomes a usual download again.
+  private[this] val pendingItemPattern = """content://media/\S+""".r
+
+  def pendingItemUri(context: Context, uri: Uri, error: Throwable): Option[Uri] =
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R || !error.isInstanceOf[IllegalStateException]) None
+    else Try(MediaStore.getMediaUri(context, uri)).toOption.filter(_ != null) orElse {
+      // MediaProvider puts the item uri into the message, use it when the translation above is refused
+      Option(error.getMessage).flatMap(pendingItemPattern.findFirstIn).map(Uri.parse)
+    }
+
+  def pendingAccessRequest(context: Context, mediaUri: Uri): Option[PendingIntent] =
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) None
+    else Try(MediaStore.createWriteRequest(context.getContentResolver, List(mediaUri).asJava)).toOption
+
+  def clearPendingFlag(context: Context, mediaUri: Uri): Unit = {
+    val contentValues = new ContentValues
+    contentValues.put(MediaStore.MediaColumns.IS_PENDING, Integer.valueOf(0))
+    context.getContentResolver.update(mediaUri, contentValues, null, null)
   }
 
   // Prefixing by one byte to discern future backup types (full wallet backup / minimal channel backup etc)
