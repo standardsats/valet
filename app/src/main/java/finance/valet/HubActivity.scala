@@ -1565,7 +1565,7 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
       alert.dismiss
     }
 
-    lazy val feeView = new FeeView[GenerateTxResponse](FeeratePerByte(1L.sat), sendView.chainEditView.host) {
+    lazy val feeView = new FeeView[GenerateTxResponse](FeeratePerByte(100L.msat), sendView.chainEditView.host) {
       rate = LNParams.feeRates.info.onChainFeeConf.feeEstimator.getFeeratePerKw(LNParams.feeRates.info.onChainFeeConf.feeTargets.mutualCloseBlockTarget)
 
       worker = new ThrottledWork[String, GenerateTxResponse] {
@@ -1634,7 +1634,7 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
       alert.dismiss
     }
 
-    lazy val feeView = new FeeView[GenerateTxResponse](FeeratePerByte(1L.sat), sendView.chainEditView.host) {
+    lazy val feeView = new FeeView[GenerateTxResponse](FeeratePerByte(100L.msat), sendView.chainEditView.host) {
       rate = LNParams.feeRates.info.onChainFeeConf.feeEstimator.getFeeratePerKw(LNParams.feeRates.info.onChainFeeConf.feeTargets.mutualCloseBlockTarget)
 
       worker = new ThrottledWork[String, GenerateTxResponse] {

@@ -17,6 +17,7 @@
 package fr.acinq.eclair.blockchain.fee
 
 import fr.acinq.bitcoin.{Satoshi, SatoshiLong}
+import fr.acinq.eclair.MilliSatoshi
 
 import scala.concurrent.Future
 
@@ -28,11 +29,12 @@ trait FeeProvider {
 case object CannotRetrieveFeerates extends RuntimeException("cannot retrieve feerates: channels may be at risk")
 
 object FeeratePerByte {
-  def apply(feeratePerKw: FeeratePerKw): FeeratePerByte = FeeratePerByte(FeeratePerKB(feeratePerKw).feerate / 1000)
+  def apply(feerate: Satoshi): FeeratePerByte = FeeratePerByte(MilliSatoshi(feerate.toLong * 1000L))
+  def apply(feeratePerKw: FeeratePerKw): FeeratePerByte = FeeratePerByte(MilliSatoshi(FeeratePerKB(feeratePerKw).toLong))
 }
 
-/** Fee rate in satoshi-per-bytes. */
-case class FeeratePerByte(feerate: Satoshi)
+/** Fee rate in millisatoshi-per-byte. */
+case class FeeratePerByte(feerate: MilliSatoshi)
 
 /** Fee rate in satoshi-per-kilo-bytes (1 kB = 1000 bytes). */
 case class FeeratePerKB(feerate: Satoshi) extends Ordered[FeeratePerKB] {
@@ -46,7 +48,7 @@ case class FeeratePerKB(feerate: Satoshi) extends Ordered[FeeratePerKB] {
 
 object FeeratePerKB {
   // @formatter:off
-  def apply(feeratePerByte: FeeratePerByte): FeeratePerKB = FeeratePerKB(feeratePerByte.feerate * 1000)
+  def apply(feeratePerByte: FeeratePerByte): FeeratePerKB = FeeratePerKB(feeratePerByte.feerate.toLong.sat)
   def apply(feeratePerKw: FeeratePerKw): FeeratePerKB = FeeratePerKB(feeratePerKw.feerate * 4)
   // @formatter:on
 }
@@ -70,27 +72,25 @@ object FeeratePerKw {
    * Minimum relay fee rate in satoshi per kilo-vbyte (taken from Bitcoin Core).
    * Note that Bitcoin Core uses a *virtual size* and not the actual size in bytes: see [[MinimumFeeratePerKw]] below.
    */
-  val MinimumRelayFeeRate = 1000
+  val MinimumRelayFeeRate = 100
 
   /**
-   * Why 253 and not 250 since feerate-per-kw should be feerate-per-kvb / 4 and the minimum relay fee rate is
-   * 1000 satoshi/kvb (see [[MinimumRelayFeeRate]])?
+   * Why 26 and not 25 since feerate-per-kw should be feerate-per-kvb / 4 and the minimum relay fee rate is
+   * 100 satoshi/kvb (see [[MinimumRelayFeeRate]])?
    *
    * Because Bitcoin Core uses neither the actual tx size in bytes nor the tx weight to check fees, but a "virtual size"
    * which is (3 + weight) / 4.
    * So we want:
-   * fee > 1000 * virtual size
-   * feerate-per-kw * weight > 1000 * (3 + weight / 4)
-   * feerate-per-kw > 250 + 3000 / (4 * weight)
+   * fee > 100 * virtual size
+   * feerate-per-kw * weight > 100 * (3 + weight / 4)
+   * feerate-per-kw > 25 + 300 / (4 * weight)
    *
    * With a conservative minimum weight of 400, assuming the result of the division may be rounded up and using strict
-   * inequality to err on the side of safety, we get:
-   * feerate-per-kw > 252
-   * hence feerate-per-kw >= 253
+   * inequality to err on the side of safety, we get feerate-per-kw >= 26.
    *
-   * See also https://github.com/ElementsProject/lightning/pull/1251
+   * See also https://github.com/ElementsProject/lightning/pull/1251 and https://github.com/bitcoin/bitcoin/pull/33106
    */
-  val MinimumFeeratePerKw: FeeratePerKw = FeeratePerKw(253.sat)
+  val MinimumFeeratePerKw: FeeratePerKw = FeeratePerKw(26.sat)
 
   // @formatter:off
   def apply(feeratePerKB: FeeratePerKB): FeeratePerKw = MinimumFeeratePerKw.max(FeeratePerKw(feeratePerKB.feerate / 4))

@@ -540,8 +540,10 @@ trait BaseActivity extends AppCompatActivity { me =>
     var worker: ThrottledWork[String, T] = _
     var rate: FeeratePerKw = _
 
+    private def satPerVbyte(feerate: FeeratePerKw): BigDecimal = BigDecimal(FeeratePerByte(feerate).feerate.toLong) / 1000
+
     def update(feeOpt: Option[MilliSatoshi], showIssue: Boolean): Unit = {
-      feeRate setText getString(dialog_fee_sat_vbyte).format(FeeratePerByte(rate).feerate.toLong).html
+      feeRate setText getString(dialog_fee_sat_vbyte).format(satPerVbyte(rate).bigDecimal.stripTrailingZeros.toPlainString).html
       setVisMany(feeOpt.isDefined -> bitcoinFee, feeOpt.isDefined -> fiatFee, showIssue -> txIssues)
 
       feeOpt.foreach { fee =>
@@ -552,8 +554,8 @@ trait BaseActivity extends AppCompatActivity { me =>
     }
 
     private val revealSlider = onButtonTap {
-      val currentFeerate = FeeratePerByte(rate).feerate.toLong
-      customFeerate.setValueFrom(from.feerate.toLong)
+      val currentFeerate = satPerVbyte(rate).toFloat
+      customFeerate.setValueFrom(from.feerate.toLong / 1000F)
       customFeerate.setValueTo(currentFeerate * 10)
       customFeerate.setValue(currentFeerate)
 
@@ -566,7 +568,7 @@ trait BaseActivity extends AppCompatActivity { me =>
 
     customFeerate addOnChangeListener new Slider.OnChangeListener {
       override def onValueChange(slider: Slider, value: Float, fromUser: Boolean): Unit = {
-        val feeratePerByte = FeeratePerByte(value.toLong.sat)
+        val feeratePerByte = FeeratePerByte(math.round(value * 1000F).toLong.msat)
         rate = FeeratePerKw(feeratePerByte)
         worker addWork "SLIDER-CHANGE"
       }

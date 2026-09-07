@@ -263,7 +263,7 @@ class RemotePeerActivity extends ChanErrorHandlerActivity with ExternalDataCheck
       mkCheckFormNeutral(attempt, none, setMax, builder, dialog_ok, dialog_cancel, dialog_max)
     }
 
-    lazy val feeView: FeeView[GenerateTxResponse] = new FeeView[GenerateTxResponse](FeeratePerByte(1L.sat), sendView.body) {
+    lazy val feeView: FeeView[GenerateTxResponse] = new FeeView[GenerateTxResponse](FeeratePerByte(100L.msat), sendView.body) {
       rate = LNParams.feeRates.info.onChainFeeConf.feeEstimator.getFeeratePerKw(LNParams.feeRates.info.onChainFeeConf.feeTargets.fundingBlockTarget)
 
       worker = new ThrottledWork[String, GenerateTxResponse] {
