@@ -9,7 +9,7 @@ import android.content.{DialogInterface, Intent}
 import android.graphics.Bitmap.Config.ARGB_8888
 import android.graphics.{Bitmap, Color}
 import android.net.Uri
-import android.os.Bundle
+import android.os.{Build, Bundle}
 import android.text.method.LinkMovementMethod
 import android.text.{Editable, Spanned, TextWatcher}
 import android.view.View.OnClickListener
@@ -20,6 +20,7 @@ import androidx.appcompat.widget.AppCompatButton
 import androidx.cardview.widget.CardView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.{ContextCompat, FileProvider}
+import androidx.core.view.{OnApplyWindowInsetsListener, ViewCompat, WindowInsetsCompat}
 import androidx.recyclerview.widget.RecyclerView
 import finance.valet.BaseActivity.StringOps
 import finance.valet.Colors._
@@ -125,6 +126,18 @@ trait BaseActivity extends AppCompatActivity { me =>
     Thread setDefaultUncaughtExceptionHandler new UncaughtHandler(me)
     super.onCreate(savedActivityState)
     START(savedActivityState)
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+      val content: View = findViewById(android.R.id.content)
+      ViewCompat.setOnApplyWindowInsetsListener(content, new OnApplyWindowInsetsListener {
+        override def onApplyWindowInsets(view: View, insets: WindowInsetsCompat): WindowInsetsCompat = {
+          val safe = insets.getInsets(WindowInsetsCompat.Type.systemBars | WindowInsetsCompat.Type.displayCutout)
+          view.setPadding(safe.left, safe.top, safe.right, safe.bottom)
+          insets
+        }
+      })
+      ViewCompat.requestApplyInsets(content)
+    }
   }
 
   override def onDestroy: Unit = {
