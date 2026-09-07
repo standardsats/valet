@@ -116,4 +116,8 @@
     <!-- /CPFP/RBF -->
 
     <string name="confirm_remove_item">&#9888; Хочете видалити цей елемент?</string>
+
+    <string name="settings_sync_chain">Синхронізувати ланцюг</string>
+    <string name="settings_sync_graph">Синхронізувати граф</string>
+    <string name="settings_sync_started">Синхронізацію розпочато, не закривайте застосунок</string>
 </resources>

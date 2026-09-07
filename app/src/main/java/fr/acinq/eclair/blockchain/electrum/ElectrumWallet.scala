@@ -65,6 +65,31 @@ class ElectrumWallet(client: ActorRef, chainSync: ActorRef, params: WalletParame
       data1.pendingMerkleResponses.foreach(self.!)
       stay using persistAndNotify(data1)
 
+    case Event(ForceResync, data) =>
+      val scriptHashes = data.accountKeyMap.keys ++ data.changeKeyMap.keys
+      val usedScriptHashes = scriptHashes.filter(hash => data.status.get(hash).exists(_.nonEmpty) || data.history.contains(hash)).toSet
+
+      // Subscribe again to get a current status of every derived key, exactly as it happens when a wallet gets initialized,
+      // then ask for a history of used keys again: a server sends a full list of transactions related to each of them,
+      // stale unspents and missing parent transactions are found and corrected as these responses come in
+      for (scriptHash <- scriptHashes) client ! ElectrumClient.ScriptHashSubscription(scriptHash, self)
+      for (scriptHash <- usedScriptHashes) client ! ElectrumClient.GetScriptHashHistory(scriptHash)
+
+      // An excluded outpoint which is not seen as unspent anymore can not be spent by us anyway, so stop keeping it
+      val excludedOutPoints1 = data.excludedOutPoints intersect data.unExcludedUtxos.map(_.item.outPoint)
+
+      // Pending requests are dropped because we ask for the same data again right here
+      val data1 = data.copy(excludedOutPoints = excludedOutPoints1, pendingHistoryRequests = usedScriptHashes,
+        pendingTransactionRequests = Set.empty, pendingHeadersRequests = Set.empty)
+      stay using persistAndNotify(data1)
+
+    case Event(ElectrumClient.ScriptHashSubscriptionResponse(scriptHash, _), data) if !data.accountKeyMap.contains(scriptHash) && !data.changeKeyMap.contains(scriptHash) => stay
+
+    case Event(ElectrumClient.ScriptHashSubscriptionResponse(scriptHash, status), data) if status.isEmpty =>
+      val history1 = data.history.get(scriptHash).map(_ filter data.wasConfirmed).map(data.history.updated(scriptHash, _)).getOrElse(data.history)
+      val data1 = data.copy(status = data.status.updated(scriptHash, status), history = history1)
+      stay using persistAndNotify(data1)
+
     case Event(ElectrumClient.ScriptHashSubscriptionResponse(scriptHash, status), data) if data.status.get(scriptHash).contains(status) =>
       val missing = data.history.getOrElse(scriptHash, Nil).map(item => item.txHash -> item.height).toMap -- data.transactions.keySet -- data.pendingTransactionRequests
 
@@ -79,13 +104,6 @@ class ElectrumWallet(client: ActorRef, chainSync: ActorRef, params: WalletParame
         stay using persistAndNotify(data1)
       } else stay
 
-    case Event(ElectrumClient.ScriptHashSubscriptionResponse(scriptHash, _), data) if !data.accountKeyMap.contains(scriptHash) && !data.changeKeyMap.contains(scriptHash) => stay
-
-    case Event(ElectrumClient.ScriptHashSubscriptionResponse(scriptHash, status), data) if status.isEmpty =>
-      val status1 = data.status.updated(scriptHash, status)
-      val data1 = data.copy(status = status1)
-      stay using persistAndNotify(data1)
-
     case Event(ElectrumClient.ScriptHashSubscriptionResponse(scriptHash, status), data) =>
       val data1 = data.copy(status = data.status.updated(scriptHash, status), pendingHistoryRequests = data.pendingHistoryRequests + scriptHash)
       client ! ElectrumClient.GetScriptHashHistory(scriptHash)
@@ -97,7 +115,7 @@ class ElectrumWallet(client: ActorRef, chainSync: ActorRef, params: WalletParame
 
       val shadowItems = for {
         existingItems <- data.history.get(scriptHash).toList
-        item <- existingItems if !items.exists(_.txHash == item.txHash)
+        item <- existingItems if !items.exists(_.txHash == item.txHash) && data.wasConfirmed(item)
       } yield item
 
       val items1 = items ++ shadowItems
@@ -181,6 +199,10 @@ class ElectrumWallet(client: ActorRef, chainSync: ActorRef, params: WalletParame
   }
 
   whenUnhandled {
+    case Event(ForceResync, _) =>
+      // A wallet which is not running gets a full resync anyway once it connects
+      stay
+
     case Event(tx: Transaction, data) =>
       val doubleSpendTrials: Option[Boolean] = for {
         spendingTxid <- data.overriddenPendingTxids.get(tx.txid)
@@ -281,6 +303,8 @@ object ElectrumWallet {
   case object GetData extends Request
   case class GetDataResponse(data: ElectrumData) extends Response
 
+  case object ForceResync extends Request
+
   case class ProvideExcludedOutPoints(excludedOutPoints: List[OutPoint] = Nil) extends Request
 
   case object GetCurrentReceiveAddresses extends Request
@@ -377,6 +401,8 @@ case class ElectrumData(ewt: ElectrumWalletType, blockchain: Blockchain,
   def reset: ElectrumData = copy(status = status -- pendingHistoryRequests, pendingHistoryRequests = Set.empty, pendingTransactionRequests = Set.empty, pendingHeadersRequests = Set.empty, lastReadyMessage = None)
 
   def toPersistent: PersistentData = PersistentData(accountKeys.length, changeKeys.length, status, transactions, overriddenPendingTxids, history, proofs, pendingTransactions, excludedOutPoints)
+
+  def wasConfirmed(item: TransactionHistoryItem): Boolean = item.height > 0 || proofs.contains(item.txHash)
 
   def isTxKnown(txid: ByteVector32): Boolean = transactions.contains(txid) || pendingTransactionRequests.contains(txid) || pendingTransactions.exists(_.txid == txid)
 

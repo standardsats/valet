@@ -327,11 +327,6 @@ object WalletApp {
       val feerateObs = Rx.initDelay(rateRepeat, LNParams.feeRates.info.stamp, feeratePeriodHours * 3600 * 1000L)
       feerateObs.foreach(LNParams.feeRates.updateInfo, none)
 
-      val fiatPeriodSecs = 60 * 30
-      val fiatRetry = Rx.retry(Rx.ioQueue.map(_ => LNParams.fiatRates.reloadData), Rx.incSec, 3 to 18 by 3)
-      val fiatRepeat = Rx.repeat(fiatRetry, Rx.incSec, fiatPeriodSecs to Int.MaxValue by fiatPeriodSecs)
-      val fiatObs = Rx.initDelay(fiatRepeat, LNParams.fiatRates.info.stamp, fiatPeriodSecs * 1000L)
-      fiatObs.foreach(LNParams.fiatRates.updateInfo, none)
     }
   }
 
@@ -453,7 +448,9 @@ class WalletApp extends Application { me =>
     androidx.core.content.ContextCompat.startForegroundService(me, withBodyAction)
   }
 
+  def userFacingError(error: Throwable): String = Option(error.getMessage).map(_.trim).filter(_.nonEmpty).getOrElse(me getString emergency_mode)
   def quickToast(code: Int): Unit = quickToast(me getString code)
+  def quickToast(error: Throwable): Unit = quickToast(userFacingError(error))
   def quickToast(msg: CharSequence): Unit = Toast.makeText(me, msg, Toast.LENGTH_LONG).show
   def plurOrZero(num: Long, opts: Array[String] = Array.empty): String = if (num > 0) plur(opts, num).format(num) else opts(0)
   def clipboardManager: ClipboardManager = getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]

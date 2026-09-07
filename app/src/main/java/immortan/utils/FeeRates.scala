@@ -6,11 +6,11 @@ import immortan.crypto.CanBeShutDown
 import immortan.utils.FeeRates._
 import immortan.utils.ImplicitJsonFormats._
 import immortan.{DataBag, LNParams}
+import spray.json._
 
+import java.math.RoundingMode
 
 object FeeRates {
-  val minPerKw: FeeratePerKw = FeeratePerKw(1000L.sat)
-
   val defaultFeerates: FeeratesPerKB =
     FeeratesPerKB(
       mempoolMinFee = FeeratePerKB(5000.sat),
@@ -63,7 +63,7 @@ class FeeRates(bag: DataBag) extends CanBeShutDown {
 
 case class FeeRatesInfo(smoothed: FeeratesPerKw, history: List[FeeratesPerKB], stamp: Long) {
   private val targets = FeeTargets(fundingBlockTarget = 36, commitmentBlockTarget = 12, mutualCloseBlockTarget = 72, claimMainBlockTarget = 144)
-  private val estimator = new FeeEstimator { override def getFeeratePerKw(target: Int): FeeratePerKw = smoothed.feePerBlock(target) max minPerKw }
+  private val estimator = new FeeEstimator { override def getFeeratePerKw(target: Int): FeeratePerKw = smoothed.feePerBlock(target) max FeeratePerKw.MinimumFeeratePerKw }
   val onChainFeeConf: OnChainFeeConf = OnChainFeeConf(targets, estimator)
 }
 
@@ -79,10 +79,15 @@ trait FeeRatesProvider {
 // Esplora
 
 class EsploraFeeProvider(val url: String) extends FeeRatesProvider {
-  type EsploraFeeStructure = Map[String, Long]
+  type EsploraFeeStructure = Map[Int, BigDecimal]
+
+  def parseFeeRates(raw: String): EsploraFeeStructure = raw.parseJson.asJsObject.fields.collect {
+    case (target, JsNumber(feerate)) if target.nonEmpty && target.forall(_.isDigit) => target.toInt -> feerate
+  }
 
   def provide: FeeratesPerKB = {
-    val structure = to[EsploraFeeStructure](LNParams.connectionProvider.get(url).string)
+    // ponytail: this target-keyed endpoint is deprecated; add a tier-to-target adapter when it is removed.
+    val structure = parseFeeRates(LNParams.connectionProvider.get(url).string)
 
     FeeratesPerKB(
       mempoolMinFee = extractFeerate(structure, 1008),
@@ -100,8 +105,9 @@ class EsploraFeeProvider(val url: String) extends FeeRatesProvider {
   // First we keep only fee ranges with a max block delay below the limit
   // out of all the remaining fee ranges, we select the one with the minimum higher bound
   def extractFeerate(structure: EsploraFeeStructure, maxBlockDelay: Int): FeeratePerKB = {
-    val belowLimit = structure.filter { case (key, _) => key.toInt <= maxBlockDelay }.values
-    FeeratePerKB(belowLimit.min.sat * 1000L)
+    val belowLimit = structure.filter { case (target, _) => target <= maxBlockDelay }.values
+    val millisatoshiPerVbyte = (belowLimit.min * 1000).bigDecimal.setScale(0, RoundingMode.HALF_UP).longValueExact
+    FeeratePerKB(millisatoshiPerVbyte.sat)
   }
 }
 

@@ -9,7 +9,7 @@ import android.content.{DialogInterface, Intent}
 import android.graphics.Bitmap.Config.ARGB_8888
 import android.graphics.{Bitmap, Color}
 import android.net.Uri
-import android.os.Bundle
+import android.os.{Build, Bundle}
 import android.text.method.LinkMovementMethod
 import android.text.{Editable, Spanned, TextWatcher}
 import android.view.View.OnClickListener
@@ -20,6 +20,7 @@ import androidx.appcompat.widget.AppCompatButton
 import androidx.cardview.widget.CardView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.{ContextCompat, FileProvider}
+import androidx.core.view.{OnApplyWindowInsetsListener, ViewCompat, WindowInsetsCompat}
 import androidx.recyclerview.widget.RecyclerView
 import finance.valet.BaseActivity.StringOps
 import finance.valet.Colors._
@@ -125,9 +126,22 @@ trait BaseActivity extends AppCompatActivity { me =>
     Thread setDefaultUncaughtExceptionHandler new UncaughtHandler(me)
     super.onCreate(savedActivityState)
     START(savedActivityState)
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+      val content: View = findViewById(android.R.id.content)
+      ViewCompat.setOnApplyWindowInsetsListener(content, new OnApplyWindowInsetsListener {
+        override def onApplyWindowInsets(view: View, insets: WindowInsetsCompat): WindowInsetsCompat = {
+          val safe = insets.getInsets(WindowInsetsCompat.Type.systemBars | WindowInsetsCompat.Type.displayCutout)
+          view.setPadding(safe.left, safe.top, safe.right, safe.bottom)
+          insets
+        }
+      })
+      ViewCompat.requestApplyInsets(content)
+    }
   }
 
   override def onDestroy: Unit = {
+    pendingScanner = None
     super.onDestroy
     timer.cancel
   }
@@ -286,7 +300,7 @@ trait BaseActivity extends AppCompatActivity { me =>
 
   def onFail(error: Throwable): Unit = error match {
     case exc if exc.getCause.isInstanceOf[java.io.InterruptedIOException] =>
-    case _ => onFail(error.toString)
+    case _ => onFail(WalletApp.app.userFacingError(error))
   }
 
   def getPositiveButton(alert: AlertDialog): Button = alert.getButton(DialogInterface.BUTTON_POSITIVE)
@@ -347,11 +361,31 @@ trait BaseActivity extends AppCompatActivity { me =>
   // Scanner
 
   final val scannerRequestCode = 101
+  private var pendingScanner = Option.empty[sheets.ScannerBottomSheet]
 
   def callScanner(sheet: sheets.ScannerBottomSheet): Unit = {
     val allowed = ContextCompat.checkSelfPermission(me, android.Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-    if (!allowed) ActivityCompat.requestPermissions(me, Array(android.Manifest.permission.CAMERA), scannerRequestCode)
-    else sheet.show(getSupportFragmentManager, "scanner-bottom-sheet-fragment")
+    if (!allowed) {
+      pendingScanner = sheet.asSome
+      ActivityCompat.requestPermissions(me, Array(android.Manifest.permission.CAMERA), scannerRequestCode)
+    } else {
+      pendingScanner = None
+      sheet.show(getSupportFragmentManager, "scanner-bottom-sheet-fragment")
+    }
+  }
+
+  override def onRequestPermissionsResult(requestCode: Int, permissions: Array[String], grantResults: Array[Int]): Unit = {
+    super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+    if (requestCode == scannerRequestCode) {
+      val sheet = pendingScanner
+      pendingScanner = None
+      sheet match {
+        case Some(scanner) if grantResults.headOption.contains(PackageManager.PERMISSION_GRANTED) =>
+          scanner.show(getSupportFragmentManager, "scanner-bottom-sheet-fragment")
+        case Some(_) => WalletApp.app.quickToast(R.string.error_camera_permission)
+        case _ =>
+      }
+    }
   }
 
   def addFlowChip(flow: FlowLayout, chipText: String, backgroundRes: Int, shareText: Option[String] = None): TextView = {
@@ -506,8 +540,10 @@ trait BaseActivity extends AppCompatActivity { me =>
     var worker: ThrottledWork[String, T] = _
     var rate: FeeratePerKw = _
 
+    private def satPerVbyte(feerate: FeeratePerKw): BigDecimal = BigDecimal(FeeratePerByte(feerate).feerate.toLong) / 1000
+
     def update(feeOpt: Option[MilliSatoshi], showIssue: Boolean): Unit = {
-      feeRate setText getString(dialog_fee_sat_vbyte).format(FeeratePerByte(rate).feerate.toLong).html
+      feeRate setText getString(dialog_fee_sat_vbyte).format(satPerVbyte(rate).bigDecimal.stripTrailingZeros.toPlainString).html
       setVisMany(feeOpt.isDefined -> bitcoinFee, feeOpt.isDefined -> fiatFee, showIssue -> txIssues)
 
       feeOpt.foreach { fee =>
@@ -518,8 +554,8 @@ trait BaseActivity extends AppCompatActivity { me =>
     }
 
     private val revealSlider = onButtonTap {
-      val currentFeerate = FeeratePerByte(rate).feerate.toLong
-      customFeerate.setValueFrom(from.feerate.toLong)
+      val currentFeerate = satPerVbyte(rate).toFloat
+      customFeerate.setValueFrom(from.feerate.toLong / 1000F)
       customFeerate.setValueTo(currentFeerate * 10)
       customFeerate.setValue(currentFeerate)
 
@@ -532,7 +568,7 @@ trait BaseActivity extends AppCompatActivity { me =>
 
     customFeerate addOnChangeListener new Slider.OnChangeListener {
       override def onValueChange(slider: Slider, value: Float, fromUser: Boolean): Unit = {
-        val feeratePerByte = FeeratePerByte(value.toLong.sat)
+        val feeratePerByte = FeeratePerByte(math.round(value * 1000F).toLong.msat)
         rate = FeeratePerKw(feeratePerByte)
         worker addWork "SLIDER-CHANGE"
       }
@@ -579,7 +615,7 @@ trait BaseActivity extends AppCompatActivity { me =>
     override def onUR(ur: UR): Unit = {
       obtainPsbt(ur).flatMap(extractBip84Tx) match {
         case Success(signedTx) => onSignedTx(signedTx)
-        case Failure(why) => onError(why.stackTraceAsString)
+        case Failure(why) => me onFail why
       }
     }
   }

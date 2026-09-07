@@ -60,7 +60,7 @@
             app:tickVisible="false"
             app:trackHeight="2dp"
             app:haloRadius="20dp"
-            android:stepSize="1"/>
+            android:stepSize="0"/>
 
     </FrameLayout>
 </LinearLayout>

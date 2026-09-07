@@ -149,6 +149,8 @@ case class WalletExt(wallets: List[ElectrumEclairWallet], catcher: ActorRef, syn
 
   def findByPubKey(pub: PublicKey): Option[ElectrumEclairWallet] = wallets.find(_.ewt.xPub.publicKey == pub)
 
+  def forceResync: Unit = for (wallet <- wallets) wallet.walletRef ! ElectrumWallet.ForceResync
+
   def makeSigningWalletParts(core: SigningWallet, lastBalance: Satoshi, label: String): ElectrumEclairWallet = {
     val ewt = ElectrumWalletType.makeSigningType(tag = core.walletType, master = LNParams.secret.keys.master, chainHash = LNParams.chainHash)
     val walletRef = LNParams.loggedActor(Props(classOf[ElectrumWallet], pool, sync, params, ewt), core.walletType + "-signing-wallet")
