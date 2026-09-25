@@ -129,9 +129,12 @@ trait BaseActivity extends AppCompatActivity { me =>
 
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
       val content: View = findViewById(android.R.id.content)
+      // An edge-to-edge window is not resized for the keyboard, so content makes room for it unless the activity uses adjustNothing
+      val adjustMode = getWindow.getAttributes.softInputMode & WindowManager.LayoutParams.SOFT_INPUT_MASK_ADJUST
+      val keyboard = if (adjustMode == WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING) 0 else WindowInsetsCompat.Type.ime
       ViewCompat.setOnApplyWindowInsetsListener(content, new OnApplyWindowInsetsListener {
         override def onApplyWindowInsets(view: View, insets: WindowInsetsCompat): WindowInsetsCompat = {
-          val safe = insets.getInsets(WindowInsetsCompat.Type.systemBars | WindowInsetsCompat.Type.displayCutout)
+          val safe = insets.getInsets(WindowInsetsCompat.Type.systemBars | WindowInsetsCompat.Type.displayCutout | keyboard)
           view.setPadding(safe.left, safe.top, safe.right, safe.bottom)
           insets
         }
@@ -141,7 +144,6 @@ trait BaseActivity extends AppCompatActivity { me =>
   }
 
   override def onDestroy: Unit = {
-    pendingScanner = None
     super.onDestroy
     timer.cancel
   }
@@ -218,7 +220,7 @@ trait BaseActivity extends AppCompatActivity { me =>
         addFlowChip(content.flow, item, R.drawable.border_green, _ => ())
       }
 
-      WalletApp.app.prefs.edit.putBoolean(WalletApp.RECOVERY_PHRASE_VIEWED, true).commit
+      if (!WalletApp.recoveryPhraseViewed) WalletApp.app.prefs.edit.putBoolean(WalletApp.RECOVERY_PHRASE_VIEWED, true).apply
   }
 
   // Snackbar
@@ -381,12 +383,8 @@ trait BaseActivity extends AppCompatActivity { me =>
     if (requestCode == scannerRequestCode) {
       val sheet = pendingScanner
       pendingScanner = None
-      sheet match {
-        case Some(scanner) if grantResults.headOption.contains(PackageManager.PERMISSION_GRANTED) =>
-          scanner.show(getSupportFragmentManager, "scanner-bottom-sheet-fragment")
-        case Some(_) => WalletApp.app.quickToast(R.string.error_camera_permission)
-        case _ =>
-      }
+      val granted = grantResults.headOption.contains(PackageManager.PERMISSION_GRANTED)
+      for (scanner <- sheet) if (granted) callScanner(scanner) else WalletApp.app.quickToast(R.string.error_camera_permission)
     }
   }
 
@@ -542,7 +540,7 @@ trait BaseActivity extends AppCompatActivity { me =>
     var worker: ThrottledWork[String, T] = _
     var rate: FeeratePerKw = _
 
-    private def satPerVbyte(feerate: FeeratePerKw): BigDecimal = BigDecimal(FeeratePerByte(feerate).feerate.toLong) / 1000
+    private def satPerVbyte(feerate: FeeratePerKw): BigDecimal = SatDenomination.fromMsat(FeeratePerByte(feerate).feerate)
 
     def update(feeOpt: Option[MilliSatoshi], showIssue: Boolean): Unit = {
       feeRate setText getString(dialog_fee_sat_vbyte).format(satPerVbyte(rate).bigDecimal.stripTrailingZeros.toPlainString).html
@@ -557,7 +555,7 @@ trait BaseActivity extends AppCompatActivity { me =>
 
     private val revealSlider = onButtonTap {
       val currentFeerate = satPerVbyte(rate).toFloat
-      customFeerate.setValueFrom(from.feerate.toLong / 1000F)
+      customFeerate.setValueFrom(SatDenomination.fromMsat(from.feerate).toFloat)
       customFeerate.setValueTo(currentFeerate * 10)
       customFeerate.setValue(currentFeerate)
 

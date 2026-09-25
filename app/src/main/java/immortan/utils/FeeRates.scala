@@ -65,6 +65,8 @@ case class FeeRatesInfo(smoothed: FeeratesPerKw, history: List[FeeratesPerKB], s
   private val targets = FeeTargets(fundingBlockTarget = 36, commitmentBlockTarget = 12, mutualCloseBlockTarget = 72, claimMainBlockTarget = 144)
   private val estimator = new FeeEstimator { override def getFeeratePerKw(target: Int): FeeratePerKw = smoothed.feePerBlock(target) max FeeratePerKw.MinimumFeeratePerKw }
   val onChainFeeConf: OnChainFeeConf = OnChainFeeConf(targets, estimator)
+
+  def commitmentFeeratePerKw: FeeratePerKw = estimator.getFeeratePerKw(targets.commitmentBlockTarget) max FeeratePerKw.MinimumLightningFeeratePerKw
 }
 
 trait FeeRatesListener {

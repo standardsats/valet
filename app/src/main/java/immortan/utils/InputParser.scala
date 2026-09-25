@@ -85,7 +85,7 @@ object PaymentRequestExt {
     val trimmed = raw.trim
     val lower = trimmed.toLowerCase
     val prefix = if (lower.startsWith(lightning)) lightning else if (lower.startsWith(bitcoin)) bitcoin else ""
-    if (prefix.isEmpty) trimmed else trimmed.substring(prefix.length).stripPrefix("//")
+    if (prefix.isEmpty) trimmed else trimmed.substring(prefix.length).stripPrefix("//").trim
   }
 
   def withoutSlashes(prefix: String, uri: Uri): String = prefix + removePrefix(uri.toString)

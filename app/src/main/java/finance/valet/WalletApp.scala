@@ -450,7 +450,12 @@ class WalletApp extends Application { me =>
     androidx.core.content.ContextCompat.startForegroundService(me, withBodyAction)
   }
 
-  def userFacingError(error: Throwable): String = Option(error.getMessage).map(_.trim).filter(_.nonEmpty).getOrElse(me getString emergency_mode)
+  def userFacingError(error: Throwable): String = {
+    val message = Option(error.getMessage).map(_.trim).filter(_.nonEmpty)
+    // Channel exceptions are case classes which keep their details in toString and have no message
+    val details = Some(error).collect { case product: Product => product.toString }
+    message.orElse(details).getOrElse(me getString emergency_mode)
+  }
   def quickToast(code: Int): Unit = quickToast(me getString code)
   def quickToast(error: Throwable): Unit = quickToast(userFacingError(error))
   def quickToast(msg: CharSequence): Unit = Toast.makeText(me, msg, Toast.LENGTH_LONG).show

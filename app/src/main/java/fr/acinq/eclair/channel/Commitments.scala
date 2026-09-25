@@ -201,7 +201,7 @@ case class NormalCommits(channelFlags: Byte, channelId: ByteVector32, channelFea
 
   def receiveFee(fee: UpdateFee): NormalCommits = {
     if (localParams.isFunder) throw ChannelTransitionFail(channelId, fee)
-    if (fee.feeratePerKw < FeeratePerKw.MinimumFeeratePerKw) throw ChannelTransitionFail(channelId, fee)
+    if (fee.feeratePerKw < FeeratePerKw.MinimumLightningFeeratePerKw) throw ChannelTransitionFail(channelId, fee)
     val commitments1 = me.modify(_.remoteChanges.proposed).using(changes => changes.filter { case _: UpdateFee => false case _ => true } :+ fee)
     val reduced = CommitmentSpec.reduce(commitments1.localCommit.spec, commitments1.localChanges.acked, commitments1.remoteChanges.proposed)
 

@@ -20,7 +20,7 @@ import scodec.Attempt.{Failure, Successful}
 
 import scala.collection.JavaConverters._
 import scala.util.Try
-import java.io.{BufferedInputStream, File, FileInputStream}
+import java.io.{File, FileInputStream}
 object LocalBackup { me =>
   final val BACKUP_NAME = "encrypted.channels"
   final val GRAPH_NAME = "graph.snapshot"
@@ -99,13 +99,13 @@ object LocalBackup { me =>
     }
     println("LocalBackup: Will write backup to: " ++ downloadedUri.toString)
 
-    val outputStream = resolver.openOutputStream(downloadedUri, "wt")
-    val bufferedInputStream = new BufferedInputStream(new FileInputStream(downloadedFile.getAbsoluteFile))
+    // Open the source first: "wt" empties an existing backup. A provider may commit on close, so its errors are not ignored.
+    val inputStream = new FileInputStream(downloadedFile)
 
-    try ByteStreams.copy(bufferedInputStream, outputStream) finally {
-      Try(outputStream.close)
-      Try(bufferedInputStream.close)
-    }
+    try {
+      val outputStream = resolver.openOutputStream(downloadedUri, "wt")
+      try ByteStreams.copy(inputStream, outputStream) finally outputStream.close
+    } finally Try(inputStream.close)
 
     downloadedUri
   }
@@ -113,11 +113,6 @@ object LocalBackup { me =>
   def readAllBytes(context: Context, uri: Uri): Array[Byte] = {
     val inputStream = context.getContentResolver openInputStream uri
     try ByteStreams.toByteArray(inputStream) finally Try(inputStream.close)
-  }
-
-  def deleteBackupFile(context: Context, uri: Uri): Unit = {
-    val isRemoved = Try(DocumentFile.fromSingleUri(context, uri).delete).getOrElse(false)
-    if (!isRemoved) Try(context.getContentResolver.delete(uri, null, null))
   }
 
   // Versions before 5.1.2 inserted backups into MediaStore Downloads with IS_PENDING set and never
@@ -141,7 +136,8 @@ object LocalBackup { me =>
   def clearPendingFlag(context: Context, mediaUri: Uri): Unit = {
     val contentValues = new ContentValues
     contentValues.put(MediaStore.MediaColumns.IS_PENDING, Integer.valueOf(0))
-    context.getContentResolver.update(mediaUri, contentValues, null, null)
+    val updatedRows = context.getContentResolver.update(mediaUri, contentValues, null, null)
+    require(updatedRows > 0, s"Pending flag of $mediaUri was not cleared")
   }
 
   // Prefixing by one byte to discern future backup types (full wallet backup / minimal channel backup etc)

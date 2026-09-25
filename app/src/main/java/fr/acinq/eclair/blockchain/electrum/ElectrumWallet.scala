@@ -85,7 +85,8 @@ class ElectrumWallet(client: ActorRef, chainSync: ActorRef, params: WalletParame
 
     case Event(ElectrumClient.ScriptHashSubscriptionResponse(scriptHash, _), data) if !data.accountKeyMap.contains(scriptHash) && !data.changeKeyMap.contains(scriptHash) => stay
 
-    case Event(ElectrumClient.ScriptHashSubscriptionResponse(scriptHash, status), data) if status.isEmpty =>
+    // Unused keys get the same empty status on each subscription: these go to the unchanged status case below and are not persisted
+    case Event(ElectrumClient.ScriptHashSubscriptionResponse(scriptHash, status), data) if status.isEmpty && (!data.status.get(scriptHash).contains(status) || data.hasUnconfirmedHistory(scriptHash)) =>
       val history1 = data.history.get(scriptHash).map(_ filter data.wasConfirmed).map(data.history.updated(scriptHash, _)).getOrElse(data.history)
       val data1 = data.copy(status = data.status.updated(scriptHash, status), history = history1)
       stay using persistAndNotify(data1)
@@ -403,6 +404,8 @@ case class ElectrumData(ewt: ElectrumWalletType, blockchain: Blockchain,
   def toPersistent: PersistentData = PersistentData(accountKeys.length, changeKeys.length, status, transactions, overriddenPendingTxids, history, proofs, pendingTransactions, excludedOutPoints)
 
   def wasConfirmed(item: TransactionHistoryItem): Boolean = item.height > 0 || proofs.contains(item.txHash)
+
+  def hasUnconfirmedHistory(scriptHash: ByteVector32): Boolean = history.getOrElse(scriptHash, Nil).exists(item => !wasConfirmed(item))
 
   def isTxKnown(txid: ByteVector32): Boolean = transactions.contains(txid) || pendingTransactionRequests.contains(txid) || pendingTransactions.exists(_.txid == txid)
 

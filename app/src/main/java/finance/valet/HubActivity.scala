@@ -31,7 +31,7 @@ import fr.acinq.bitcoin._
 import fr.acinq.eclair._
 import fr.acinq.eclair.blockchain.electrum.ElectrumWallet.{GenerateTxResponse, RBFResponse, WalletReady}
 import fr.acinq.eclair.blockchain.electrum.{ElectrumEclairWallet, ElectrumWallet}
-import fr.acinq.eclair.blockchain.fee.FeeratePerByte
+import fr.acinq.eclair.blockchain.fee.{FeeratePerByte, FeeratePerKw}
 import fr.acinq.eclair.channel._
 import fr.acinq.eclair.transactions.{LocalFulfill, RemoteFulfill, Scripts}
 import fr.acinq.eclair.wire.{FullPaymentTag, NodeAnnouncement, PaymentTagTlv, UnknownNextPeer}
@@ -1108,10 +1108,10 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
     // Tor service could have been stopped in background
     try LNParams.connectionProvider.notifyAppAvailable catch none
     try checkExternalData(noneRunnable) catch none
-    try Rx.ioQueue.foreach(_ => refreshPendingTxStatuses) catch none
-    try LNParams.fiatRates.updateNow catch none
+    try Rx.ioQueue.foreach(_ => refreshPendingTxStatuses, none) catch none
+    try LNParams.fiatRates.updateIfStale catch none
     // Recovery phrase could have been viewed in settings
-    try if (WalletApp.recoveryPhraseViewed) setVis(isVisible = false, walletCards.recoveryPhrase) catch none
+    try paymentAdapterDataChanged.run catch none
     super.onResume
   }
 
@@ -1392,7 +1392,6 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
 
     val window = 600.millis
     val txEvents = Rx.uniqueFirstAndLastWithinWindow(ChannelMaster.txDbStream, window).doOnNext { _ =>
-      // After each delayed update we check if pending txs got confirmed or double-spent.
       reloadTxInfos
       refreshPendingTxStatuses
     }
@@ -1408,7 +1407,7 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
 
     timer.scheduleAtFixedRate(paymentAdapterDataChanged, 30000, 30000)
     timer.scheduleAtFixedRate(new TimerTask {
-      def run: Unit = Rx.ioQueue.foreach(_ => refreshPendingTxStatuses)
+      def run: Unit = Rx.ioQueue.foreach(_ => refreshPendingTxStatuses, none)
     }, 30.minutes.toMillis, 30.minutes.toMillis)
     val backupAllowed = LocalBackup.isAllowed(context = WalletApp.app)
     if (!backupAllowed) {
@@ -1567,7 +1566,7 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
       alert.dismiss
     }
 
-    lazy val feeView = new FeeView[GenerateTxResponse](FeeratePerByte(100L.msat), sendView.chainEditView.host) {
+    lazy val feeView = new FeeView[GenerateTxResponse](FeeratePerByte(FeeratePerKw.MinimumFeeratePerKw), sendView.chainEditView.host) {
       rate = LNParams.feeRates.info.onChainFeeConf.feeEstimator.getFeeratePerKw(LNParams.feeRates.info.onChainFeeConf.feeTargets.mutualCloseBlockTarget)
 
       worker = new ThrottledWork[String, GenerateTxResponse] {
@@ -1636,7 +1635,7 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
       alert.dismiss
     }
 
-    lazy val feeView = new FeeView[GenerateTxResponse](FeeratePerByte(100L.msat), sendView.chainEditView.host) {
+    lazy val feeView = new FeeView[GenerateTxResponse](FeeratePerByte(FeeratePerKw.MinimumFeeratePerKw), sendView.chainEditView.host) {
       rate = LNParams.feeRates.info.onChainFeeConf.feeEstimator.getFeeratePerKw(LNParams.feeRates.info.onChainFeeConf.feeTargets.mutualCloseBlockTarget)
 
       worker = new ThrottledWork[String, GenerateTxResponse] {

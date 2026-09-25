@@ -29,7 +29,6 @@ trait FeeProvider {
 case object CannotRetrieveFeerates extends RuntimeException("cannot retrieve feerates: channels may be at risk")
 
 object FeeratePerByte {
-  def apply(feerate: Satoshi): FeeratePerByte = FeeratePerByte(MilliSatoshi(feerate.toLong * 1000L))
   def apply(feeratePerKw: FeeratePerKw): FeeratePerByte = FeeratePerByte(MilliSatoshi(FeeratePerKB(feeratePerKw).toLong))
 }
 
@@ -91,6 +90,12 @@ object FeeratePerKw {
    * See also https://github.com/ElementsProject/lightning/pull/1251 and https://github.com/bitcoin/bitcoin/pull/33106
    */
   val MinimumFeeratePerKw: FeeratePerKw = FeeratePerKw(26.sat)
+
+  /**
+   * Lightning peers still reject open_channel and update_fee below 253 sat/kw (the floor for a 1000 sat/kvb relay fee),
+   * so fee rates we propose or accept for channel transactions keep the old floor.
+   */
+  val MinimumLightningFeeratePerKw: FeeratePerKw = FeeratePerKw(253.sat)
 
   // @formatter:off
   def apply(feeratePerKB: FeeratePerKB): FeeratePerKw = MinimumFeeratePerKw.max(FeeratePerKw(feeratePerKB.feerate / 4))

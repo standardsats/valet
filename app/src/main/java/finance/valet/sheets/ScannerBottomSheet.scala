@@ -58,13 +58,11 @@ trait HasUrDecoder extends HasBarcodeReader {
 }
 
 abstract class ScannerBottomSheet(host: BaseActivity) extends BottomSheetDialogFragment with HasBarcodeReader {
-  private var barcodeDecoded = false
   private val noQrHint = new Runnable {
-    override def run: Unit = if (!barcodeDecoded && isAdded) WalletApp.app.quickToast(R.string.error_scan_no_qr)
+    override def run: Unit = if (isAdded) WalletApp.app.quickToast(R.string.error_scan_no_qr)
   }
 
   def resumeBarcodeReader: Unit = Option(barcodeReader).foreach { reader =>
-    barcodeDecoded = false
     reader.removeCallbacks(noQrHint)
     reader.decodeContinuous(this)
     reader.resume
@@ -73,32 +71,15 @@ abstract class ScannerBottomSheet(host: BaseActivity) extends BottomSheetDialogF
 
   def pauseBarcodeReader: Unit = Option(barcodeReader).foreach { reader =>
     reader.removeCallbacks(noQrHint)
-    reader.setTorch(false)
+    setTorch(on = false)
     reader.pause
-    Option(flashlight).foreach { button =>
-      button.setImageResource(R.drawable.flashlight_off)
-      button.setTag(R.drawable.flashlight_off)
-    }
   }
 
-  def markBarcodeDecoded: Unit = {
-    barcodeDecoded = true
-    Option(barcodeReader).foreach(_.removeCallbacks(noQrHint))
-  }
-
-  private def stopBarcodeReader: Unit = Option(barcodeReader).foreach { reader =>
-    reader.removeCallbacks(noQrHint)
-    reader.stopDecoding
-  }
-
-  override def onDestroy: Unit = {
-    stopBarcodeReader
-    super.onDestroy
-  }
+  def cancelNoQrHint: Unit = Option(barcodeReader).foreach(_.removeCallbacks(noQrHint))
 
   override def onDestroyView: Unit = {
     pauseBarcodeReader
-    stopBarcodeReader
+    Option(barcodeReader).foreach(_.stopDecoding)
     barcodeReader = null
     flashlight = null
     instruction = null
@@ -127,7 +108,6 @@ abstract class ScannerBottomSheet(host: BaseActivity) extends BottomSheetDialogF
     instruction = view.findViewById(R.id.instruction).asInstanceOf[TextView]
     barcodeReader = view.findViewById(R.id.reader).asInstanceOf[BarcodeView]
     flashlight = view.findViewById(R.id.flashlight).asInstanceOf[ImageButton]
-    flashlight.setTag(R.drawable.flashlight_off)
     flashlight setOnClickListener host.onButtonTap(toggleTorch)
 
     val decodeHints = new java.util.HashMap[DecodeHintType, AnyRef]
@@ -147,7 +127,7 @@ abstract class ScannerBottomSheet(host: BaseActivity) extends BottomSheetDialogF
       override def previewSized(): Unit = none
       override def previewStarted(): Unit = none
       override def previewStopped(): Unit = none
-      override def cameraError(error: Exception): Unit = onCameraError(error)
+      override def cameraError(error: Exception): Unit = onCameraError
       override def cameraClosed(): Unit = none
     })
 
@@ -169,25 +149,22 @@ abstract class ScannerBottomSheet(host: BaseActivity) extends BottomSheetDialogF
     }
   }
 
-  def onCameraError(error: Exception): Unit = {
-    Option(barcodeReader).foreach(_.removeCallbacks(noQrHint))
+  def onCameraError: Unit = {
+    cancelNoQrHint
     WalletApp.app.quickToast(R.string.error_camera_unavailable)
     try {
       if (isAdded) dismiss
     } catch none
   }
 
-  def toggleTorch: Unit = {
-    if (flashlight.getTag != R.drawable.flashlight_on) {
-      flashlight.setImageResource(R.drawable.flashlight_on)
-      flashlight.setTag(R.drawable.flashlight_on)
-      barcodeReader.setTorch(true)
-    } else {
-      flashlight.setImageResource(R.drawable.flashlight_off)
-      flashlight.setTag(R.drawable.flashlight_off)
-      barcodeReader.setTorch(false)
-    }
+  private def setTorch(on: Boolean): Unit = {
+    val icon = if (on) R.drawable.flashlight_on else R.drawable.flashlight_off
+    flashlight.setImageResource(icon)
+    flashlight.setTag(icon)
+    barcodeReader.setTorch(on)
   }
+
+  def toggleTorch: Unit = setTorch(on = flashlight.getTag != R.drawable.flashlight_on)
 }
 
 class OnceBottomSheet(host: BaseActivity, instructionOpt: Option[String], onScan: Runnable) extends ScannerBottomSheet(host) {
@@ -208,7 +185,7 @@ class OnceBottomSheet(host: BaseActivity, instructionOpt: Option[String], onScan
     for {
       text <- Option(scanningResult.getText).map(_.trim).filter(_.nonEmpty) if now - lastAttempt > 2000
     } {
-      markBarcodeDecoded
+      cancelNoQrHint
       lastAttempt = now
       host.runInFutureProcessOnUI(InputParser.recordValue(text), failedScan)(successfulScan)
     }
@@ -246,7 +223,7 @@ case class HWAccountPairingData(urAccount: CryptoAccount) extends PairingData {
 
 class URBottomSheet(host: BaseActivity, onPairData: PairingData => Unit) extends ScannerBottomSheet(host) with HasUrDecoder {
   override def barcodeResult(res: BarcodeResult): Unit = {
-    markBarcodeDecoded
+    cancelNoQrHint
     if (res.getText.toLowerCase startsWith "zpub") onZPub(res.getText) else handleUR(res.getText)
   }
   override def onError(error: String): Unit = host.onFail(error)
