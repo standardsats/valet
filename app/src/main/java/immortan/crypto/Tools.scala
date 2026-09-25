@@ -109,7 +109,7 @@ object Tools {
 
   // Defines whether updated feerate exceeds a given threshold
   def newFeerate(info1: FeeRatesInfo, spec: CommitmentSpec, threshold: Double): Option[FeeratePerKw] = {
-    val newFeerate = info1.onChainFeeConf.feeEstimator.getFeeratePerKw(info1.onChainFeeConf.feeTargets.commitmentBlockTarget)
+    val newFeerate = info1.commitmentFeeratePerKw
     if (spec.feeratePerKw.max(newFeerate).toLong.toDouble / spec.feeratePerKw.min(newFeerate).toLong > threshold) Some(newFeerate) else None
   }
 

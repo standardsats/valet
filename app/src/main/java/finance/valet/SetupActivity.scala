@@ -1,12 +1,12 @@
 package finance.valet
 
-import android.app.Activity
+import android.app.{Activity, PendingIntent}
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import android.widget.{ArrayAdapter, LinearLayout}
 import androidx.appcompat.app.AlertDialog
-import androidx.documentfile.provider.DocumentFile
 import androidx.transition.TransitionManager
 import finance.valet.BaseActivity.StringOps
 import finance.valet.R.string._
@@ -21,7 +21,7 @@ import immortan.wire.ExtCodecs
 import immortan.{LNParams, LightningNodeKeys, WalletSecret}
 import scodec.bits.{BitVector, ByteVector}
 
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 
 
 object SetupActivity {
@@ -51,6 +51,9 @@ class SetupActivity extends BaseActivity { me =>
   private[this] lazy val restoreOptionsButton = findViewById(R.id.restoreOptionsButton).asInstanceOf[NoboButton]
   private[this] lazy val restoreOptions = findViewById(R.id.restoreOptions).asInstanceOf[LinearLayout]
   private[this] final val FILE_REQUEST_CODE = 112
+  private[this] final val PENDING_ITEM_REQUEST_CODE = 113
+  private[this] final val PENDING_ITEM_URI = "pendingItemUri"
+  private[this] var pendingItemUri = Option.empty[Uri]
 
   lazy private[this] val enforceTor = new SettingsHolder(me) {
     override def updateView: Unit = settingsCheck.setChecked(WalletApp.ensureTor)
@@ -104,11 +107,17 @@ class SetupActivity extends BaseActivity { me =>
   }
 
   override def START(s: Bundle): Unit = {
+    pendingItemUri = Option(s).flatMap(state => Option(state getString PENDING_ITEM_URI)).map(Uri.parse)
     setContentView(R.layout.activity_setup)
     networkSetup.addView(enforceTor.view)
     networkSetup.addView(electrum.view)
     enforceTor.updateView
     electrum.updateView
+  }
+
+  override def onSaveInstanceState(outState: Bundle): Unit = {
+    super.onSaveInstanceState(outState)
+    pendingItemUri.foreach(uri => outState.putString(PENDING_ITEM_URI, uri.toString))
   }
 
   private[this] lazy val englishWordList = {
@@ -126,24 +135,61 @@ class SetupActivity extends BaseActivity { me =>
 
   override def onActivityResult(requestCode: Int, resultCode: Int, resultData: Intent): Unit =
     if (requestCode == FILE_REQUEST_CODE && resultCode == Activity.RESULT_OK && resultData != null) {
-      val cipherBytes = ByteStreams.toByteArray(getContentResolver openInputStream resultData.getData)
+      restoreFromBackupUri(resultData.getData, canAskAccess = true)
+    } else if (requestCode == PENDING_ITEM_REQUEST_CODE) {
+      val grantedUri = pendingItemUri
+      pendingItemUri = None
 
-      showMnemonicPopup(R.string.action_backup_present_title) { mnemonics =>
-        val walletSeed = MnemonicCode.toSeed(mnemonics, passphrase = new String)
-        LocalBackup.decryptBackup(ByteVector.view(cipherBytes), walletSeed) match {
-
-          case Success(plainEssentialBytes) =>
-            // We were able to decrypt a file, implant it into db location and proceed
-            LocalBackup.copyPlainDataToDbLocation(me, WalletApp.dbFileNameEssential, plainEssentialBytes)
-            // Delete user-selected backup file while we can here and make an app-owned backup shortly
-            DocumentFile.fromSingleUri(me, resultData.getData).delete
-            WalletApp.backupSaveWorker.replaceWork(true)
-            proceedWithMnemonics(mnemonics)
-
-          case Failure(exception) =>
-            val msg = getString(R.string.error_could_not_decrypt)
-            onFail(msg format exception.getMessage)
+      if (resultCode == Activity.RESULT_OK) grantedUri.foreach { mediaUri =>
+        Try(LocalBackup.clearPendingFlag(me, mediaUri)) match {
+          case Success(_) => restoreFromBackupUri(mediaUri, canAskAccess = false)
+          case Failure(exception) => onReadFail(exception)
         }
+      }
+    }
+
+  private def onReadFail(error: Throwable): Unit =
+    onFail(getString(R.string.error_could_not_read_backup) format WalletApp.app.userFacingError(error))
+
+  // Access is asked once: if a granted item still can not be read, asking again would only show the same dialog
+  private def restoreFromBackupUri(uri: Uri, canAskAccess: Boolean): Unit =
+    Try(LocalBackup.readAllBytes(me, uri)) match {
+      case Success(cipherBytes) => askMnemonicsAndRestore(cipherBytes)
+      case Failure(exception) =>
+        val access = if (!canAskAccess) None else for {
+          mediaUri <- LocalBackup.pendingItemUri(me, uri, exception)
+          request <- LocalBackup.pendingAccessRequest(me, mediaUri)
+        } yield (mediaUri, request)
+
+        access.fold(onReadFail(exception)) { case (mediaUri, request) => askPendingItemAccess(mediaUri, request) }
+    }
+
+  // A backup left pending by an older app version can not be opened until the user gives access to it
+  private def askPendingItemAccess(mediaUri: Uri, request: PendingIntent): Unit = {
+    val builder = new AlertDialog.Builder(me).setMessage(getString(R.string.error_backup_pending).html)
+    mkCheckForm(alert => runAnd(alert.dismiss)(askAccess), none, builder, dialog_ok, dialog_cancel)
+
+    def askAccess: Unit = {
+      pendingItemUri = Some(mediaUri)
+      Try(startIntentSenderForResult(request.getIntentSender, PENDING_ITEM_REQUEST_CODE, null, 0, 0, 0)).failed.foreach(onReadFail)
+    }
+  }
+
+  private def askMnemonicsAndRestore(cipherBytes: Array[Byte]): Unit =
+    showMnemonicPopup(R.string.action_backup_present_title) { mnemonics =>
+      val walletSeed = MnemonicCode.toSeed(mnemonics, passphrase = new String)
+      LocalBackup.decryptBackup(ByteVector.view(cipherBytes), walletSeed) match {
+
+        case Success(plainEssentialBytes) =>
+          // We were able to decrypt a file, implant it into db location and proceed
+          LocalBackup.copyPlainDataToDbLocation(me, WalletApp.dbFileNameEssential, plainEssentialBytes)
+          // Keep the user-selected backup file: until a backup directory is chosen it is the only copy
+          WalletApp.backupSaveWorker.replaceWork(true)
+          proceedWithMnemonics(mnemonics)
+
+        case Failure(exception) =>
+          val msg = getString(R.string.error_could_not_decrypt)
+          onFail(msg format WalletApp.app.userFacingError(exception))
       }
     }
 
@@ -188,7 +234,7 @@ class SetupActivity extends BaseActivity { me =>
     } catch {
       case exception: Throwable =>
         val msg = getString(R.string.error_wrong_phrase)
-        onFail(msg format exception.getMessage)
+        onFail(msg format WalletApp.app.userFacingError(exception))
     }
 
     val builder = titleBodyAsViewBuilder(getString(title).asDefView, mnemonicWrap)

@@ -41,7 +41,7 @@ object Helpers {
     if (open.pushMsat > open.fundingSatoshis) throw InvalidPushAmount(open.temporaryChannelId, open.pushMsat, open.fundingSatoshis.toMilliSatoshi)
     if (open.toSelfDelay > LNParams.maxToLocalDelay) throw ToSelfDelayTooHigh(open.temporaryChannelId, open.toSelfDelay, LNParams.maxToLocalDelay)
     if (LNParams.chainHash != open.chainHash) throw InvalidChainHash(open.temporaryChannelId, local = LNParams.chainHash, remote = open.chainHash)
-    if (open.feeratePerKw < FeeratePerKw.MinimumFeeratePerKw) throw FeerateTooSmall(open.temporaryChannelId, open.feeratePerKw)
+    if (open.feeratePerKw < FeeratePerKw.MinimumLightningFeeratePerKw) throw FeerateTooSmall(open.temporaryChannelId, open.feeratePerKw)
 
     val minFunding = LNParams.minChanDustLimit * 100
     if (open.fundingSatoshis < minFunding || open.fundingSatoshis > LNParams.maxFundingSatoshis) {
@@ -171,7 +171,7 @@ object Helpers {
     }
 
     def firstClosingFee(commitments: NormalCommits, localScriptPubkey: ByteVector, remoteScriptPubkey: ByteVector, conf: OnChainFeeConf): Satoshi = {
-      val feeratePerKw = conf.feeEstimator.getFeeratePerKw(conf.feeTargets.mutualCloseBlockTarget).min(commitments.localCommit.spec.feeratePerKw)
+      val feeratePerKw = conf.feeEstimator.getFeeratePerKw(conf.feeTargets.mutualCloseBlockTarget).max(FeeratePerKw.MinimumLightningFeeratePerKw).min(commitments.localCommit.spec.feeratePerKw)
       firstClosingFee(commitments, localScriptPubkey, remoteScriptPubkey, feeratePerKw)
     }
 

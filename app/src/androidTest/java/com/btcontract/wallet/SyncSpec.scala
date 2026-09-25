@@ -44,6 +44,8 @@ class SyncSpec {
     val syncMaster = new SyncMaster(normalStore.listExcludedChannels, Set.empty, data0, LNParams.syncParams.maxNodesToSyncFrom) {
       def onNodeAnnouncement(na: NodeAnnouncement): Unit = println("onNodeAnnouncement")
 
+      def onSyncFailed: Unit = println("Sync failed, no usable peers left")
+
       def onChunkSyncComplete(pure: PureRoutingData): Unit = {
         println(s"Chunk complete, announces=${pure.announces.size}, updates=${pure.updates.size}, excluded=${pure.excluded.size}")
         val a = System.currentTimeMillis
