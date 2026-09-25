@@ -92,6 +92,7 @@ public class InvertedTextProgressbar extends AppCompatImageView {
 
     public InvertedTextProgressbar(Context context) {
         super(context);
+        initComponents(context, null, 0, 0);
     }
 
     public InvertedTextProgressbar(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
@@ -141,17 +142,13 @@ public class InvertedTextProgressbar extends AppCompatImageView {
     protected void onDraw(Canvas canvas) {
         canvas.getClipBounds(mRect);
 
-        if (mPosX == -1) {
-            mPosX = (getWidth() / 2);
-        }
-
-        if (mPosY == -1) {
-            mPosY = (int) ((getHeight() / 2) - ((mTextPaint.descent() + mTextPaint.ascent()) / 2));
-        }
+        // Recompute the center on every draw, view size may change after the first draw.
+        int posX = mPosX == -1 ? getWidth() / 2 : mPosX;
+        int posY = mPosY == -1 ? (int) ((getHeight() / 2) - ((mTextPaint.descent() + mTextPaint.ascent()) / 2)) : mPosY;
 
         // Draw text to overlap.
         if (!mText.isEmpty()) {
-            canvas.drawText(mText, mPosX, mPosY, mTextPaint);
+            canvas.drawText(mText, posX, posY, mTextPaint);
         }
 
         if (mIsAnimating) {
@@ -176,7 +173,7 @@ public class InvertedTextProgressbar extends AppCompatImageView {
             }
         } else if (mMinProgress > -1 && mMaxProgress > mMinProgress &&
                 (mCurrProgress >= mMinProgress && mCurrProgress <= mMaxProgress)) {
-            mRect.right = mRect.width() * mCurrProgress / mMaxProgress; // Regra de 3 simples.
+            mRect.right = mRect.left + mRect.width() * (mCurrProgress - mMinProgress) / (mMaxProgress - mMinProgress); // Regra de 3 simples.
             canvas.clipRect(mRect);
         }
 
@@ -185,7 +182,7 @@ public class InvertedTextProgressbar extends AppCompatImageView {
 
         if (!mText.isEmpty()) {
             // Draw text in position set.
-            canvas.drawText(mText, mPosX, mPosY, mTextInvertedPaint);
+            canvas.drawText(mText, posX, posY, mTextInvertedPaint);
         }
 
         // Request another draw operation until time is up
@@ -200,7 +197,8 @@ public class InvertedTextProgressbar extends AppCompatImageView {
      * @param text The text to draw.
      */
     public void setText(String text) {
-        mText = text;
+        mText = text == null ? "" : text;
+        invalidate();
     }
 
     /**
@@ -227,7 +225,8 @@ public class InvertedTextProgressbar extends AppCompatImageView {
      * @param textPaint The Paint to be set for the overlapped text.
      */
     public void setTextPaint(Paint textPaint) {
-        this.mTextPaint = mTextPaint;
+        this.mTextPaint = textPaint;
+        invalidate();
     }
 
     /**
@@ -246,7 +245,8 @@ public class InvertedTextProgressbar extends AppCompatImageView {
      * overlapping text.
      */
     public void setTextInvertedPaint(Paint textInvertedPaint) {
-        this.mTextInvertedPaint = mTextInvertedPaint;
+        this.mTextInvertedPaint = textInvertedPaint;
+        invalidate();
     }
 
     /**
@@ -260,6 +260,7 @@ public class InvertedTextProgressbar extends AppCompatImageView {
     public void setTextPivot(int x, int y) {
         this.mPosX = x;
         this.mPosY = y;
+        invalidate();
     }
 
     /**
@@ -305,6 +306,7 @@ public class InvertedTextProgressbar extends AppCompatImageView {
      */
     public InvertedTextProgressbar setMaxProgress(int maxProgress) {
         mMaxProgress = maxProgress;
+        invalidate();
         return this;
     }
 
@@ -325,6 +327,7 @@ public class InvertedTextProgressbar extends AppCompatImageView {
      */
     public InvertedTextProgressbar setMinProgress(int minProgress) {
         mMinProgress = minProgress;
+        invalidate();
         return this;
     }
 
@@ -339,6 +342,7 @@ public class InvertedTextProgressbar extends AppCompatImageView {
         if (mTextPaint != null && mTextInvertedPaint != null) {
             mTextPaint.setTextSize(size);
             mTextInvertedPaint.setTextSize(size);
+            invalidate();
         }
     }
 
