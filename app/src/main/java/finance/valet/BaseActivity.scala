@@ -217,6 +217,8 @@ trait BaseActivity extends AppCompatActivity { me =>
         val item = s"<font color=$cardZero>${mnemonicIndex + 1}</font> $mnemonicWord"
         addFlowChip(content.flow, item, R.drawable.border_green, _ => ())
       }
+
+      WalletApp.app.prefs.edit.putBoolean(WalletApp.RECOVERY_PHRASE_VIEWED, true).commit
   }
 
   // Snackbar

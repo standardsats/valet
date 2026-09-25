@@ -1110,6 +1110,8 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
     try checkExternalData(noneRunnable) catch none
     try Rx.ioQueue.foreach(_ => refreshPendingTxStatuses) catch none
     try LNParams.fiatRates.updateNow catch none
+    // Recovery phrase could have been viewed in settings
+    try if (WalletApp.recoveryPhraseViewed) setVis(isVisible = false, walletCards.recoveryPhrase) catch none
     super.onResume
   }
 
@@ -1356,7 +1358,7 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
       if checkedButtonTags.contains(buttonTag)
     } walletCards.toggleGroup.check(itemId)
 
-    walletCards.recoveryPhrase setOnClickListener onButtonTap(viewRecoveryCode)
+    walletCards.recoveryPhrase setOnClickListener onButtonTap(runAnd(viewRecoveryCode)(paymentAdapterDataChanged.run))
     walletCards.fiatUnitPriceAndChange setOnClickListener onButtonTap(LNParams.fiatRates.updateNow)
     walletCards.toggleGroup addOnButtonCheckedListener new OnButtonCheckedListener {
       def onButtonChecked(group: MaterialButtonToggleGroup, checkId: Int, isChecked: Boolean): Unit = {
@@ -1801,7 +1803,7 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
     setVis(isVisible = relayedPreimageInfos.nonEmpty, walletCards.relayedPayments)
     setVis(isVisible = lnUrlPayLinks.nonEmpty, walletCards.payMarketLinks)
     setVis(isVisible = hasItems && !isSearchOn, walletCards.listCaption)
-    setVis(isVisible = !hasItems, walletCards.recoveryPhrase)
+    setVis(isVisible = !hasItems && !WalletApp.recoveryPhraseViewed, walletCards.recoveryPhrase)
     paymentsAdapter.notifyDataSetChanged
   }
 

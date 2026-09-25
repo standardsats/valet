@@ -82,6 +82,7 @@ object WalletApp {
   final val GAP_LIMIT = "gapLimit"
   final val DEFAULT_GAP_LIMIT = 10
   final val HIDE_ZERO_OUTPUTS = "hideZeroOutputs"
+  final val RECOVERY_PHRASE_VIEWED = "recoveryPhraseViewed"
 
   def useAuth: Boolean = AppLock.isEnrolled(app)
   def fiatCode: String = app.prefs.getString(FIAT_CODE, "usd")
@@ -90,6 +91,7 @@ object WalletApp {
   def showCommunity: Boolean = app.prefs.getBoolean(SHOW_COMMUNITY, true)
   def gapLimit: Int = app.prefs.getInt(GAP_LIMIT, DEFAULT_GAP_LIMIT)
   def hideZeroOutputs: Boolean = app.prefs.getBoolean(HIDE_ZERO_OUTPUTS, true)
+  def recoveryPhraseViewed: Boolean = app.prefs.getBoolean(RECOVERY_PHRASE_VIEWED, false)
 
   final val CHECKED_BUTTONS = "checkedButtons"
   def getCheckedButtons(default: Set[String] = Set.empty): mutable.Set[String] = app.prefs.getStringSet(CHECKED_BUTTONS, default.asJava).asScala
