@@ -162,6 +162,11 @@ abstract class PathFinder(val normalBag: NetworkBag, val hostedBag: NetworkBag) 
       listeners.foreach(_ process sync)
       attemptPHCSync
 
+    case (GraphSyncFailed, _) =>
+      // Resync stamps stay unchanged, so the next periodic, startup or forced resync makes a new attempt
+      syncMaster = None
+      listeners.foreach(_ process GraphSyncFailed)
+
     // We always accept and store disabled channels:
     // - to reduce subsequent sync traffic if channel remains disabled
     // - to account for the case when channel suddenly becomes enabled but we don't know
@@ -263,6 +268,8 @@ abstract class PathFinder(val normalBag: NetworkBag, val hostedBag: NetworkBag) 
       override def onChunkSyncComplete(pureRoutingData: PureRoutingData): Unit = me process pureRoutingData
 
       override def onTotalSyncComplete: Unit = me process self
+
+      override def onSyncFailed: Unit = me process GraphSyncFailed
     }
 
     syncMaster = normalSync.asSome
