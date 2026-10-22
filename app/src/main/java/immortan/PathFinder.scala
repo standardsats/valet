@@ -20,6 +20,7 @@ import rx.lang.scala.Subscription
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
+import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
 import scala.util.Random.shuffle
 
@@ -61,6 +62,7 @@ abstract class PathFinder(val normalBag: NetworkBag, val hostedBag: NetworkBag) 
   }
 
   private val RESYNC_PERIOD: Long = 1000L * 3600 * 24 * 4
+  private val SYNC_RETRY_DELAY = 10.minutes
   // We don't load routing data on every startup but when user (or system) actually needs it
   become(Data(channels = Map.empty, hostedChannels = Map.empty, DirectedGraph.empty), WAITING)
 
@@ -161,6 +163,12 @@ abstract class PathFinder(val normalBag: NetworkBag, val hostedBag: NetworkBag) 
       // Notify that normal graph sync is complete
       listeners.foreach(_ process sync)
       attemptPHCSync
+
+    case (GraphSyncFailed, _) =>
+      // Resync stamps stay unchanged, so a delayed CMDResync makes a new attempt: peers may have failed only because the network was down
+      Rx.ioQueue.delay(SYNC_RETRY_DELAY).foreach(_ => me process CMDResync, none)
+      syncMaster = None
+      listeners.foreach(_ process GraphSyncFailed)
 
     // We always accept and store disabled channels:
     // - to reduce subsequent sync traffic if channel remains disabled
@@ -263,6 +271,8 @@ abstract class PathFinder(val normalBag: NetworkBag, val hostedBag: NetworkBag) 
       override def onChunkSyncComplete(pureRoutingData: PureRoutingData): Unit = me process pureRoutingData
 
       override def onTotalSyncComplete: Unit = me process self
+
+      override def onSyncFailed: Unit = me process GraphSyncFailed
     }
 
     syncMaster = normalSync.asSome

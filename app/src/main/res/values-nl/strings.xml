@@ -222,7 +222,6 @@
     <string name="rpa_request_channel">Deel je node-ID met remote peer en houd deze pagina open om een ontvangkanaal te krijgen.</string>
     <string name="rpa_request_hc_usd">USD-fiatkanaal aanvragen</string>
     <string name="rpa_request_hc_eur">EURO-fiatkanaal aanvragen</string>
-    <string name="rpa_request_ln_resync">Verzoek om hersynchronisatie van de LN-grafiek</string>
     <string name="rpa_share_node_id">Deel node-ID</string>
     <string name="rpa_open_nc">Financier nieuw kanaal</string>
 
@@ -441,4 +440,7 @@
 
     <!-- /CPFP/RBF -->
 
+    <string name="settings_sync_chain">Keten synchroniseren</string>
+    <string name="settings_sync_graph">Grafiek synchroniseren</string>
+    <string name="settings_sync_started">Synchronisatie gestart, houd de app open</string>
 </resources>

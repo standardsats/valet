@@ -136,9 +136,14 @@
     <string name="error_btc_no_wallet">Can not proceed because related chain wallet is not found, please add it from app settings.</string>
     <string name="error_btc_broadcast_fail">Could not broadcast a transaction, please make sure that wallet has network connection and then try again.</string>
     <string name="error_could_not_decrypt"><![CDATA[<b>Backup decryption failed</b>.<br><br>Make sure that backup file and recovery phrase are correct and belong to the same wallet.<br><br>Error details<br><b>%1$s</b>]]></string>
+    <string name="error_could_not_read_backup"><![CDATA[<b>Backup file can not be read</b>.<br><br>Error details<br><b>%1$s</b>]]></string>
+    <string name="error_backup_pending"><![CDATA[This backup file is locked by an older version of the app.<br><br>Android will ask for permission to unlock it, after that the restore continues.]]></string>
     <string name="error_wrong_phrase"><![CDATA[<b>Provided phrase is incorrect</b>.<br><br>Error details<br><b>%1$s</b>]]></string>
     <string name="error_old_api_level">Requires API 24+, yours is %1$s</string>
     <string name="error_nothing_useful">Nothing useful is found</string>
+    <string name="error_scan_no_qr">No readable QR code found. Move closer, improve lighting, or turn on the flashlight.</string>
+    <string name="error_camera_unavailable">The camera could not be started. Check camera permission and try again.</string>
+    <string name="error_camera_permission">Camera permission is required to scan. Enable it in app settings and try again.</string>
 
     <string name="error_ln_no_chans"><![CDATA[Can neither send nor receive Lightning payments because no open channels are present.]]></string>
     <string name="error_ln_waiting"><![CDATA[Can neither send nor receive Lightning payments because no channel is open yet.]]></string>
@@ -226,7 +231,6 @@
     <string name="rpa_request_channel">Share your node ID with remote peer and keep this page open to get an incoming channel.</string>
     <string name="rpa_request_hc_usd">Request USD fiat channel</string>
     <string name="rpa_request_hc_eur">Request EUR fiat channel</string>
-    <string name="rpa_request_ln_resync">Request LN graph resync</string>
     <string name="rpa_share_node_id">Share node ID</string>
     <string name="rpa_open_nc">Fund new channel</string>
     <string name="rpa_spinner_preparing">Preparing\u2026</string>
@@ -280,6 +284,10 @@
     <string name="settings_backup_location">Where to store local backup</string>
     <string name="settings_backup_location_too_old">Android version is too old to select directory</string>
     <string name="settings_choose_directory">Choose directory</string>
+
+    <string name="settings_sync_chain">Sync Chain</string>
+    <string name="settings_sync_graph">Sync Graph</string>
+    <string name="settings_sync_started">Sync started, keep the app open</string>
 
     <!-- /Settings activity -->
 

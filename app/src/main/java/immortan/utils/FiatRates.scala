@@ -5,6 +5,8 @@ import immortan.crypto.{CanBeShutDown, Tools}
 import immortan.{DataBag, LNParams}
 import rx.lang.scala.{Observable, Subscription}
 
+import scala.util.Try
+
 
 object FiatRates {
   type BlockchainInfoItemMap = Map[String, BlockchainInfoItem]
@@ -13,7 +15,10 @@ object FiatRates {
 }
 
 class FiatRates(bag: DataBag) extends CanBeShutDown {
-  override def becomeShutDown: Unit = listeners = Set.empty
+  override def becomeShutDown: Unit = {
+    listeners = Set.empty
+    subscription.unsubscribe
+  }
 
   val customFiatSymbols: Map[String, String] = Map("rub" -> "\u20BD", "usd" -> "$", "inr" -> "₹", "gbp" -> "£", "cny" -> "CN¥", "jpy" -> "¥", "brl" -> "R$", "eur" -> "€", "krw" -> "₩",
     "cym" -> "￠", "lvl" -> "ℒ\uD835\uDCC8", "svc" -> "₡", "frf" -> "₣", "brl" -> "R$", "sos" -> "Sh.So.")
@@ -25,11 +30,21 @@ class FiatRates(bag: DataBag) extends CanBeShutDown {
     "frf" -> "French franc", "svc" -> "Salvadoran colón", "esd" -> "Salvadoran dollar", "sps" -> "Salvadoran peso", "eip" -> "Punt na hÉireann", "brl" -> "Brazilian Real", "sos" -> "Somali Shilling")
 
   def reloadData: Tools.Fiat2Btc = focused.map(_.toLowerCase) match {
+    // Rates replace all stored rates, so AUD adds a CoinSpot price on top of common rates, which also have an AUD fallback
+    case Some("aud") => reloadCommonRates ++ Try("aud" -> reloadCoinSpotAud).toOption
     case Some("sos") => to[Bitpay](LNParams.connectionProvider.get("https://bitpay.com/rates").string).data.map { case BitpayItem(code, rate) => code.toLowerCase -> rate }.toMap
-    case _ => fr.acinq.eclair.secureRandom nextInt 2 match {
-      case 0 => to[CoinGecko](LNParams.connectionProvider.get("https://api.coingecko.com/api/v3/exchange_rates").string).rates.map { case (code, item) => code.toLowerCase -> item.value }
-      case _ => to[FiatRates.BlockchainInfoItemMap](LNParams.connectionProvider.get("https://blockchain.info/ticker").string).map { case (code, item) => code.toLowerCase -> item.last }
-    }
+    case _ => reloadCommonRates
+  }
+
+  private def reloadCommonRates: Tools.Fiat2Btc = fr.acinq.eclair.secureRandom nextInt 2 match {
+    case 0 => to[CoinGecko](LNParams.connectionProvider.get("https://api.coingecko.com/api/v3/exchange_rates").string).rates.map { case (code, item) => code.toLowerCase -> item.value }
+    case _ => to[FiatRates.BlockchainInfoItemMap](LNParams.connectionProvider.get("https://blockchain.info/ticker").string).map { case (code, item) => code.toLowerCase -> item.last }
+  }
+
+  private def reloadCoinSpotAud: Double = {
+    val price = to[CoinSpotLatest](LNParams.connectionProvider.get("https://www.coinspot.com.au/pubapi/v2/latest/btc").string).prices.last.toDouble
+    require(price > 0 && !price.isInfinite)
+    price
   }
 
   def enrichFiats(fs: Tools.Fiat2Btc): Tools.Fiat2Btc = {
@@ -49,12 +64,6 @@ class FiatRates(bag: DataBag) extends CanBeShutDown {
     fs ++ richFiats
   }
 
-
-  def updateInfo(newRates: Tools.Fiat2Btc): Unit = {
-    info = FiatRatesInfo(newRates, info.rates, System.currentTimeMillis)
-    for (lst <- listeners) lst.onFiatRates(info)
-  }
-
   var listeners: Set[FiatRatesListener] = Set.empty
   var focused: Option[String] = None
   var info: FiatRatesInfo = bag.tryGetFiatRatesInfo getOrElse {
@@ -62,9 +71,15 @@ class FiatRates(bag: DataBag) extends CanBeShutDown {
   }
 
   private[this] val periodSecs = 60 * 30
+  @volatile private[this] var lastAttempt = 0L
+
+  private[this] val reloadWithRetry: Observable[Tools.Fiat2Btc] = Rx.retry(Rx.ioQueue.map { _ =>
+    lastAttempt = System.currentTimeMillis
+    reloadData
+  }, Rx.incSec, 3 to 18 by 3)
+
   private[this] val retryRepeatDelayedCall: Observable[Tools.Fiat2Btc] = {
-    val retry = Rx.retry(Rx.ioQueue.map(_ => reloadData), Rx.incSec, 3 to 18 by 3)
-    val repeat = Rx.repeat(retry, Rx.incSec, periodSecs to Int.MaxValue by periodSecs)
+    val repeat = Rx.repeat(reloadWithRetry, Rx.incSec, periodSecs to Int.MaxValue by periodSecs)
     Rx.initDelay(repeat, info.stamp, periodSecs * 1000L)
   }
 
@@ -75,10 +90,10 @@ class FiatRates(bag: DataBag) extends CanBeShutDown {
 
   val subscription: Subscription = retryRepeatDelayedCall.subscribe(updateRates, Tools.none)
 
-  def updateNow: Unit = {
-    var observable = Rx.retry(Rx.ioQueue.map(_ => reloadData), Rx.incSec, 3 to 18 by 3)
-    observable.foreach(updateRates)
-  }
+  def updateNow: Unit = reloadWithRetry.foreach(updateRates, Tools.none)
+
+  // An attempt that still runs or retries counts as fresh, so a resume does not start a parallel one
+  def updateIfStale: Unit = if (System.currentTimeMillis - math.max(info.stamp, lastAttempt) > 1000L * 60 * 5) updateNow
 }
 
 trait FiatRatesListener {
@@ -88,6 +103,8 @@ trait FiatRatesListener {
 case class CoinGeckoItem(value: Double)
 case class BlockchainInfoItem(last: Double)
 case class BitpayItem(code: String, rate: Double)
+case class CoinSpotPrice(last: String)
+case class CoinSpotLatest(prices: CoinSpotPrice)
 
 case class Bitpay(data: FiatRates.BitpayItemList)
 case class CoinGecko(rates: FiatRates.CoinGeckoItemMap)

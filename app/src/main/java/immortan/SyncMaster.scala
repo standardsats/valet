@@ -72,6 +72,7 @@ case class CMDChunkComplete(sync: SyncWorker, data: SyncWorkerGossipData)
 case class SyncDisconnected(sync: SyncWorker, removePeer: Boolean)
 case class CMDGossipComplete(sync: SyncWorker)
 case class SyncPeerOperational(worker: CommsTower.Worker, gossipQueriesSupport: GossipQueriesSupport)
+case object GraphSyncFailed
 
 // This entirely relies on fact that peer sends ChannelAnnouncement messages first, then ChannelUpdate messages
 
@@ -134,10 +135,12 @@ case class SyncWorker(master: CanBeRepliedTo, keyPair: KeyPair, remoteInfo: Remo
     override def onMessage(worker: CommsTower.Worker, remoteMessage: LightningMessage): Unit = process(remoteMessage)
 
     override def onDisconnect(worker: CommsTower.Worker): Unit = {
-      val hasBasicQueriesSupport = worker.theirInit.forall(init => gossipQueriesSupport(init) != NoGossipQueries)
+      // Only a peer which became operational with gossip queries is worth another attempt in this sync,
+      // an unreachable, incompatible or gossip-less peer would fail in exactly the same way again
+      val removePeer = connectedWorker.isEmpty
       val supportDescription: String = worker.theirInit.map(init => gossipQueriesSupport(init).toString).getOrElse("no init received, connection likely never completed")
-      LNParams.logBag.put("graph-sync-peer-disconnect", s"${remoteInfo.alias} ${remoteInfo.nodeId} support=$supportDescription removePeer=${!hasBasicQueriesSupport}")
-      master process SyncDisconnected(me, removePeer = !hasBasicQueriesSupport)
+      LNParams.logBag.put("graph-sync-peer-disconnect", s"${remoteInfo.alias} ${remoteInfo.nodeId} support=$supportDescription removePeer=$removePeer")
+      master process SyncDisconnected(me, removePeer)
       CommsTower.listeners(worker.pair) -= listener
     }
   }
@@ -244,7 +247,8 @@ sealed trait SyncMasterData extends { me =>
   }
 
   def withoutSync(sd: SyncDisconnected): SyncMasterData = me
-    .modify(_.extInfos).usingIf(sd.removePeer)(_ - sd.sync.remoteInfo)
+    .modify(_.baseInfos).usingIf(sd.removePeer)(_.filterNot(_.nodeId == sd.sync.remoteInfo.nodeId))
+    .modify(_.extInfos).usingIf(sd.removePeer)(_.filterNot(_.nodeId == sd.sync.remoteInfo.nodeId))
     .modify(_.activeSyncs).using(_ - sd.sync)
 
   def baseInfos: Set[RemoteNodeInfo]
@@ -274,6 +278,7 @@ abstract class SyncMaster(excluded: ShortChanIdSet, requestNodeAnnounce: ShortCh
   def onChunkSyncComplete(pure: PureRoutingData): Unit
   def onNodeAnnouncement(na: NodeAnnouncement): Unit
   def onTotalSyncComplete: Unit
+  def onSyncFailed: Unit
 
   def hasCapacityIssues(update: ChannelUpdate): Boolean = update.htlcMaximumMsat.forall(cap => cap < LNParams.syncParams.minCapacity || cap <= update.htlcMinimumMsat)
   def provenButShouldBeExcluded(update: ChannelUpdate): Boolean = provenShortIds.contains(update.shortChannelId) && hasCapacityIssues(update)
@@ -290,12 +295,18 @@ abstract class SyncMaster(excluded: ShortChanIdSet, requestNodeAnnounce: ShortCh
       List.fill(maxConnections)(CMDAddSync).foreach(process)
       become(setupData, SHORT_ID_SYNC)
 
+    case (_: SyncMasterShortIdData, null, SHORT_ID_SYNC) => failSync(Set.empty)
+
     case (CMDAddSync, data1: SyncMasterShortIdData, SHORT_ID_SYNC) if data1.activeSyncs.size < maxConnections && data1.unusedSyncs.nonEmpty =>
       // We are asked to create a new worker AND we don't have enough workers yet: create a new one and instruct it to sync right away
 
       val newSyncWorker = data.getNewSync(me)
       become(data1.copy(activeSyncs = data1.activeSyncs + newSyncWorker), SHORT_ID_SYNC)
       newSyncWorker process SyncWorkerShortIdsData(ranges = Nil, from = 0)
+
+    case (CMDAddSync, data1: SyncMasterShortIdData, SHORT_ID_SYNC) if data1.activeSyncs.size < maxConnections =>
+      // No usable peers are left, so enough channel ranges can never be collected
+      failSync(data1.activeSyncs)
 
     case (sd: SyncDisconnected, data1: SyncMasterShortIdData, SHORT_ID_SYNC) =>
       become(data1.copy(ranges = data1.ranges - sd.sync.pair.them).withoutSync(sd), SHORT_ID_SYNC)
@@ -339,13 +350,17 @@ abstract class SyncMaster(excluded: ShortChanIdSet, requestNodeAnnounce: ShortCh
 
     // GOSSIP_SYNC
 
-    case (workerData: SyncWorkerGossipData, data1: SyncMasterGossipData, GOSSIP_SYNC) if data1.activeSyncs.size < maxConnections =>
+    case (workerData: SyncWorkerGossipData, data1: SyncMasterGossipData, GOSSIP_SYNC) if data1.activeSyncs.size < maxConnections && data1.unusedSyncs.nonEmpty =>
       // Turns out one of the workers has disconnected while getting gossip, create one with unused remote nodeId and track its progress
       // Important: we retain pending queries from previous sync worker, that's why we need worker data here
 
       val newSyncWorker = data1.getNewSync(me)
       become(data1.copy(activeSyncs = data1.activeSyncs + newSyncWorker), GOSSIP_SYNC)
       newSyncWorker process SyncWorkerGossipData(me, workerData.queries)
+
+    case (_: SyncWorkerGossipData, data1: SyncMasterGossipData, GOSSIP_SYNC) if data1.activeSyncs.size < maxConnections =>
+      // No usable peers are left to take over pending queries of a disconnected worker
+      failSync(data1.activeSyncs)
 
     case (sd: SyncDisconnected, data1: SyncMasterGossipData, GOSSIP_SYNC) =>
       Rx.ioQueue.delay(5.seconds).foreach(_ => me process sd.sync.data)
@@ -383,6 +398,15 @@ abstract class SyncMaster(excluded: ShortChanIdSet, requestNodeAnnounce: ShortCh
       }
 
     case _ =>
+  }
+
+  def failSync(activeSyncs: Set[SyncWorker]): Unit = {
+    LNParams.logBag.put("graph-sync-failed", s"no usable peers left, stopping ${activeSyncs.size} active workers")
+    for (sync <- activeSyncs) sync process CMDShutdown
+    become(null, SHUT_DOWN)
+    confirmedChanAnnounces.clear
+    confirmedChanUpdates.clear
+    onSyncFailed
   }
 
   def getPureNormalNetworkData: PureRoutingData = {
@@ -468,7 +492,7 @@ abstract class PHCSyncMaster(routerData: Data) extends StateMachine[SyncMasterDa
       become(freshData = setupData, PHC_SYNC)
       me process CMDAddSync
 
-    case (CMDAddSync, data1: SyncMasterPHCData, PHC_SYNC) if data1.activeSyncs.isEmpty =>
+    case (CMDAddSync, data1: SyncMasterPHCData, PHC_SYNC) if data1.activeSyncs.isEmpty && data1.unusedSyncs.nonEmpty =>
       // We are asked to create a new worker AND we don't have a worker yet: create one
       // for now PHC sync happens with a single remote peer
 
@@ -476,11 +500,15 @@ abstract class PHCSyncMaster(routerData: Data) extends StateMachine[SyncMasterDa
       become(data1.copy(activeSyncs = data1.activeSyncs + newSyncWorker), PHC_SYNC)
       newSyncWorker process SyncWorkerPHCData(me, updates = Set.empty)
 
+    case (CMDAddSync, data1: SyncMasterPHCData, PHC_SYNC) if data1.activeSyncs.isEmpty =>
+      // No usable peers are left
+      become(null, SHUT_DOWN)
+
     case (sd: SyncDisconnected, data1: SyncMasterPHCData, PHC_SYNC) if data1.attemptsLeft > 0 =>
       become(data1.copy(attemptsLeft = data1.attemptsLeft - 1).withoutSync(sd), PHC_SYNC)
       Rx.ioQueue.delay(5.seconds).foreach(_ => me process CMDAddSync)
 
-    case (_: SyncWorker, _, PHC_SYNC) =>
+    case (_: SyncDisconnected, _, PHC_SYNC) =>
       // No more reconnection attempts left
       become(null, SHUT_DOWN)
 

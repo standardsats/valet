@@ -41,7 +41,7 @@ abstract class NCFunderOpenHandler(info: RemoteNodeInfo, fundingAmount: Satoshi,
           theirInit.features
         )
 
-      val initialFeeratePerKw = LNParams.feeRates.info.onChainFeeConf.feeEstimator.getFeeratePerKw(LNParams.feeRates.info.onChainFeeConf.feeTargets.commitmentBlockTarget)
+      val initialFeeratePerKw = LNParams.feeRates.info.commitmentFeeratePerKw
       val cmd = INPUT_INIT_FUNDER(info.safeAlias, tempChannelId, fundingAmount, 0L.msat, fundingFeeratePerKw, initialFeeratePerKw, localFunderParams, theirInit, 0.toByte, channelFeatures)
       freshChannel process cmd
     }

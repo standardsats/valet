@@ -61,12 +61,12 @@
             <com.ornach.nobobutton.NoboButton
                 app:nb_text="@string/rpa_open_nc"
                 android:onClick="fundNewChannel"
-                android:layout_marginTop="25dp"
+                android:layout_marginTop="@dimen/chip_default_padding_edge"
                 style="@style/GreenButton"/>
 
             <TextView
                 style="@style/BoundedView"
-                android:layout_marginTop="25dp"
+                android:layout_marginTop="@dimen/chip_default_padding_edge"
                 android:text="@string/rpa_request_channel"/>
 
             <com.ornach.nobobutton.NoboButton
@@ -78,14 +78,14 @@
             <com.ornach.nobobutton.NoboButton
                 app:nb_text="@string/rpa_request_hc_usd"
                 android:id="@+id/optionHostedChannelUsd"
-                android:layout_marginTop="@dimen/large_button_margin"
+                android:layout_marginTop="@dimen/chip_default_padding_edge"
                 android:onClick="requestHostedChannelUsd"
                 style="@style/GrayButton"/>
 
             <com.ornach.nobobutton.NoboButton
                 app:nb_text="@string/rpa_request_hc_eur"
                 android:id="@+id/optionHostedChannelEur"
-                android:layout_marginTop="@dimen/large_button_margin"
+                android:layout_marginTop="@dimen/chip_default_padding_edge"
                 android:onClick="requestHostedChannelEur"
                 style="@style/GrayButton"/>
 

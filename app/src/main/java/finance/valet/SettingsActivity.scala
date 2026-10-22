@@ -22,7 +22,7 @@ import fr.acinq.eclair.wire.CommonCodecs.nodeaddress
 import fr.acinq.eclair.wire.{Domain, NodeAddress}
 import immortan.crypto.Tools._
 import immortan.utils.{BtcDenomination, SatDenomination}
-import immortan.{ChannelMaster, LNParams}
+import immortan.{ChannelMaster, LNParams, PathFinder}
 
 import scala.util.{Success, Try}
 
@@ -371,6 +371,16 @@ class SettingsActivity extends BaseCheckActivity with HasTypicalChainFee with Ch
     override def updateView: Unit = none
   }
 
+  private def syncChain: Unit = {
+    LNParams.chainWallets.forceResync
+    WalletApp.app.quickToast(settings_sync_started)
+  }
+
+  private def syncGraph: Unit = {
+    LNParams.cm.pf process PathFinder.CMDForceResync
+    WalletApp.app.quickToast(settings_sync_started)
+  }
+
   override def PROCEED(state: Bundle): Unit = {
     setContentView(R.layout.activity_settings)
 
@@ -395,6 +405,9 @@ class SettingsActivity extends BaseCheckActivity with HasTypicalChainFee with Ch
         clearChip setVisibility View.GONE
       })
     }
+
+    addFlowChip(links.flow, getString(settings_sync_chain), R.drawable.border_blue, _ => syncChain)
+    addFlowChip(links.flow, getString(settings_sync_graph), R.drawable.border_blue, _ => syncGraph)
 
     settingsContainer.addView(settingsPageitle.view)
     settingsContainer.addView(storeLocalBackup.view)

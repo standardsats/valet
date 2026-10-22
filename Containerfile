@@ -45,6 +45,4 @@ WORKDIR /app/valet/
 # NOTE: this file is the quick, in-place build path -- it runs as root, in the
 # bind-mounted tree, with the project's own ./gradlew. That is NOT how F-Droid
 # builds, and it inherits whatever .gradle/ the host left in the working tree.
-# For a build that mirrors fdroidserver (vagrant user, login shell, gradlew-fdroid,
-# cleaned tree) use the Dockerfile and tools/fdroid-build.sh instead.
 CMD export SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct) && ./gradlew --no-daemon assembleRelease && ./gradlew --no-daemon bundleRelease
