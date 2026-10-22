@@ -31,6 +31,7 @@ object LocalBackup { me =>
     case Block.LivenetGenesisBlock.hash => "mainnet"
     case Block.Testnet3GenesisBlock.hash => "testnet"
     case Block.Testnet4GenesisBlock.hash => "testnet"
+    case Block.SignetGenesisBlock.hash => "signet"
     case _ => "unknown"
   }
 

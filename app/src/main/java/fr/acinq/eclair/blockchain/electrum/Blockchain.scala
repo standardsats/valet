@@ -31,7 +31,7 @@ case class Blockchain(chainHash: ByteVector32,
 
   import Blockchain._
 
-  require(chainHash == Block.LivenetGenesisBlock.hash || chainHash == Block.Testnet3GenesisBlock.hash || chainHash == Block.RegtestGenesisBlock.hash || chainHash == Block.Testnet4GenesisBlock.hash, s"invalid chain hash $chainHash")
+  require(chainHash == Block.LivenetGenesisBlock.hash || chainHash == Block.Testnet3GenesisBlock.hash || chainHash == Block.RegtestGenesisBlock.hash || chainHash == Block.Testnet4GenesisBlock.hash || chainHash == Block.SignetGenesisBlock.hash, s"invalid chain hash $chainHash")
 
   def tip = bestchain.last
 
@@ -115,10 +115,10 @@ object Blockchain {
   }
 
   /**
-    * Used in tests
+    * Used on chains without checkpoints (regtest, custom signet) and in tests
     */
   def fromGenesisBlock(chainhash: ByteVector32, genesis: BlockHeader): Blockchain = {
-    require(chainhash == Block.RegtestGenesisBlock.hash)
+    require(genesis.hash == chainhash, s"genesis block does not match chain hash $chainhash")
     // the height of the genesis block is 0
     val blockIndex = BlockIndex(genesis, 0, None, decodeCompact(genesis.bits)._1)
     Blockchain(chainhash, Vector(), Map(blockIndex.hash -> blockIndex), Vector(blockIndex))

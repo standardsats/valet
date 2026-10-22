@@ -3,7 +3,7 @@ package immortan
 import java.net.Socket
 import java.util.concurrent.{ConcurrentHashMap, Executors}
 
-import fr.acinq.bitcoin.ByteVector32
+import fr.acinq.bitcoin.{Block, ByteVector32}
 import fr.acinq.bitcoin.Crypto.PublicKey
 import fr.acinq.eclair._
 import fr.acinq.eclair.Features.{ChannelRangeQueries, ChannelRangeQueriesExtended}
@@ -50,15 +50,38 @@ object CommsTower {
   def listen(listeners1: Set[ConnectionListener], pair: KeyPairAndPubKey, info: RemoteNodeInfo): Unit = synchronized {
     // Update and either insert a new worker or fire onOperational on NEW listeners if worker currently exists and online
     // First add listeners, then try to add worker because we may already have a connected worker, but no listeners
+    // Listeners which are already known got onOperational for this connection, a repeat would make channels re-send channel_reestablish
+    val newListeners = listeners1 -- listeners(pair)
     listeners(pair) ++= listeners1
 
     workers.get(pair) match {
-      case Some(worker) => for (init <- worker.theirInit) worker.handleTheirRemoteInitMessage(listeners1, init)
+      case Some(worker) => for (init <- worker.theirInit if newListeners.nonEmpty) worker.handleTheirRemoteInitMessage(newListeners, init)
       case None => workers(pair) = new Worker(pair, info, new Bytes(1024), LNParams.connectionProvider.getSocket)
     }
   }
 
-  def sendMany(messages: Traversable[LightningMessage], pair: KeyPairAndPubKey): Unit = CommsTower.workers.get(pair).foreach(worker => messages foreach worker.handler.process)
+  def sendMany(messages: Traversable[LightningMessage], pair: KeyPairAndPubKey): Unit = CommsTower.workers.get(pair) match {
+    case Some(worker) => for (message <- messages) {
+      trace(direction = "out", pair.them, message)
+      worker.handler process message
+    }
+    case None => for (message <- messages) trace(direction = "out-no-connection", pair.them, message)
+  }
+
+  // Diagnostics on test chains only: channel messages go to logcat (System.out), gossip is left out because there is too much of it
+  def trace(direction: String, nodeId: PublicKey, message: LightningMessage): Unit = if (LNParams.chainHash != Block.LivenetGenesisBlock.hash) message match {
+    case msg: Warning => println(s"CommsTower: $direction $nodeId Warning ${msg.channelId} ${new String(msg.data.toArray, "UTF-8")}")
+    case msg: Fail => println(s"CommsTower: $direction $nodeId Fail ${msg.channelId} ${new String(msg.data.toArray, "UTF-8")}")
+    case msg: HasChannelId => println(s"CommsTower: $direction $nodeId ${msg.getClass.getSimpleName} ${msg.channelId}")
+    case msg: HasTemporaryChannelId => println(s"CommsTower: $direction $nodeId ${msg.getClass.getSimpleName} temporary ${msg.temporaryChannelId}")
+    case msg: UnknownMessage => println(s"CommsTower: $direction $nodeId UnknownMessage tag=${msg.tag}")
+    case _: Init => println(s"CommsTower: $direction $nodeId Init")
+    case _ =>
+  }
+
+  // A message which fails to decode is dropped, its tag and the codec error are the only trace of it
+  def traceUndecodable(nodeId: PublicKey, data: ByteVector, err: scodec.Err): Unit = if (LNParams.chainHash != Block.LivenetGenesisBlock.hash)
+    println(s"CommsTower: in $nodeId Undecodable tag=${data.take(2).toInt(signed = false)} length=${data.size} ${err.messageWithContext}")
   // Add or remove listeners to a connection where our nodeId is stable, not a randomly generated one (one which makes us seen as a constant peer by remote)
   def listenNative(listeners1: Set[ConnectionListener], remoteInfo: RemoteNodeInfo): Unit = listen(listeners1, remoteInfo.nodeSpecificPair, remoteInfo)
   def rmListenerNative(info: RemoteNodeInfo, listener: ConnectionListener): Unit = listeners(info.nodeSpecificPair) -= listener
@@ -93,7 +116,12 @@ object CommsTower {
 
           // UnknownMessage is typically a wrapper for non-standard message
           // BUT it may wrap standard messages, too, so call `onMessage` on those
-          lightningMessageCodecWithFallback.decode(data.bits).require.value match {
+          val decoded = lightningMessageCodecWithFallback.decode(data.bits)
+          decoded.toEither.left.foreach(err => traceUndecodable(info.nodeId, data, err))
+          val message = decoded.require.value
+          trace(direction = "in", info.nodeId, message)
+
+          message match {
             case message: Init => handleTheirRemoteInitMessage(ourListeners, remoteInit = message)
             case message: Ping => handler process Pong(ByteVector fromValidHex "00" * message.pongLength)
 
@@ -140,6 +168,7 @@ object CommsTower {
     thread onComplete { result =>
       // Will also run after forget
       if (!disconnectRequested) result.failed.foreach(err => LNParams.logBag.put(s"comms-tower-disconnect ${info.nodeId}", err.toString))
+      if (!disconnectRequested && result.isSuccess) LNParams.logBag.put(s"comms-tower-disconnect ${info.nodeId}", s"closed by peer, init received=${theirInit.isDefined}")
       try pinging.unsubscribe catch none
       listeners(pair).foreach(_ onDisconnect me)
       // Once disconnected, worker gets removed

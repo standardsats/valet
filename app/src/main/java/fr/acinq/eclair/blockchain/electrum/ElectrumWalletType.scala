@@ -1,6 +1,6 @@
 package fr.acinq.eclair.blockchain.electrum
 
-import fr.acinq.bitcoin.Crypto.PublicKey
+import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey}
 import fr.acinq.bitcoin.DeterministicWallet._
 import fr.acinq.bitcoin._
 import fr.acinq.eclair.blockchain.EclairWallet
@@ -28,25 +28,25 @@ object ElectrumWalletType {
   }
 
   def xPriv32(master: ExtendedPrivateKey, chainHash: ByteVector32): AccountAndXPrivKey = chainHash match {
-    case Block.RegtestGenesisBlock.hash | Block.Testnet3GenesisBlock.hash | Block.Testnet4GenesisBlock.hash => AccountAndXPrivKey(derivePrivateKey(master, hardened(1L) :: 0L :: Nil), master)
+    case Block.RegtestGenesisBlock.hash | Block.Testnet3GenesisBlock.hash | Block.Testnet4GenesisBlock.hash | Block.SignetGenesisBlock.hash => AccountAndXPrivKey(derivePrivateKey(master, hardened(1L) :: 0L :: Nil), master)
     case Block.LivenetGenesisBlock.hash => AccountAndXPrivKey(derivePrivateKey(master, hardened(0L) :: 0L :: Nil), master)
     case _ => throw new RuntimeException
   }
 
   def xPriv44(master: ExtendedPrivateKey, chainHash: ByteVector32): AccountAndXPrivKey = chainHash match {
-    case Block.RegtestGenesisBlock.hash | Block.Testnet3GenesisBlock.hash | Block.Testnet4GenesisBlock.hash => AccountAndXPrivKey(derivePrivateKey(master, hardened(44L) :: hardened(1L) :: hardened(0L) :: Nil), master)
+    case Block.RegtestGenesisBlock.hash | Block.Testnet3GenesisBlock.hash | Block.Testnet4GenesisBlock.hash | Block.SignetGenesisBlock.hash => AccountAndXPrivKey(derivePrivateKey(master, hardened(44L) :: hardened(1L) :: hardened(0L) :: Nil), master)
     case Block.LivenetGenesisBlock.hash => AccountAndXPrivKey(derivePrivateKey(master, hardened(44L) :: hardened(0L) :: hardened(0L) :: Nil), master)
     case _ => throw new RuntimeException
   }
 
   def xPriv49(master: ExtendedPrivateKey, chainHash: ByteVector32): AccountAndXPrivKey = chainHash match {
-    case Block.RegtestGenesisBlock.hash | Block.Testnet3GenesisBlock.hash | Block.Testnet4GenesisBlock.hash => AccountAndXPrivKey(derivePrivateKey(master, hardened(49L) :: hardened(1L) :: hardened(0L) :: Nil), master)
+    case Block.RegtestGenesisBlock.hash | Block.Testnet3GenesisBlock.hash | Block.Testnet4GenesisBlock.hash | Block.SignetGenesisBlock.hash => AccountAndXPrivKey(derivePrivateKey(master, hardened(49L) :: hardened(1L) :: hardened(0L) :: Nil), master)
     case Block.LivenetGenesisBlock.hash => AccountAndXPrivKey(derivePrivateKey(master, hardened(49L) :: hardened(0L) :: hardened(0L) :: Nil), master)
     case _ => throw new RuntimeException
   }
 
   def xPriv84(master: ExtendedPrivateKey, chainHash: ByteVector32): AccountAndXPrivKey = chainHash match {
-    case Block.RegtestGenesisBlock.hash | Block.Testnet3GenesisBlock.hash | Block.Testnet4GenesisBlock.hash => AccountAndXPrivKey(derivePrivateKey(master, hardened(84L) :: hardened(1L) :: hardened(0L) :: Nil), master)
+    case Block.RegtestGenesisBlock.hash | Block.Testnet3GenesisBlock.hash | Block.Testnet4GenesisBlock.hash | Block.SignetGenesisBlock.hash => AccountAndXPrivKey(derivePrivateKey(master, hardened(84L) :: hardened(1L) :: hardened(0L) :: Nil), master)
     case Block.LivenetGenesisBlock.hash => AccountAndXPrivKey(derivePrivateKey(master, hardened(84L) :: hardened(0L) :: hardened(0L) :: Nil), master)
     case _ => throw new RuntimeException
   }
@@ -76,6 +76,12 @@ abstract class ElectrumWalletType {
   def writePublicKeyScriptHash(key: PublicKey): ByteVector = {
     val scriptProgram = computePublicKeyScript(key)
     Script.write(scriptProgram)
+  }
+
+  // Channels use one of our wallet keys as a static payment basepoint, its private key is needed to sweep an anchor channel's to_remote output
+  def privateKeyFor(publicKey: PublicKey, maxIndex: Long): Option[PrivateKey] = secrets.flatMap { accountAndXPriv =>
+    val keys = (0L until maxIndex).iterator.flatMap(idx => derivePublicKey(accountMaster, idx) :: derivePublicKey(changeMaster, idx) :: Nil)
+    keys.find(_.publicKey == publicKey).map(key => derivePrivateKey(accountAndXPriv.master, key.path).privateKey)
   }
 }
 

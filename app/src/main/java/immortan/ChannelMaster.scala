@@ -22,6 +22,7 @@ import immortan.fsm._
 import immortan.utils.{PaymentRequestExt, Rx}
 import rx.lang.scala.Subject
 
+import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.util.Try
@@ -72,6 +73,9 @@ class ChannelMaster(val payBag: PaymentBag, val chanBag: ChannelBag, val dataBag
   val initResolveMemo: LoadingCache[UpdateAddHtlcExt, IncomingResolution] = memoize(initResolve)
   val getPreimageMemo: LoadingCache[ByteVector32, PreimageTry] = memoize(payBag.getPreimage)
   val opm: OutgoingPaymentMaster = new OutgoingPaymentMaster(me)
+
+  val reconnectFailures: TrieMap[PublicKey, Int] = TrieMap.empty
+  val reconnectScheduled: TrieMap[PublicKey, Boolean] = TrieMap.empty
 
   val localPaymentListeners: mutable.Set[OutgoingPaymentListener] = {
     val defListener: OutgoingPaymentListener = new OutgoingPaymentListener {
@@ -158,8 +162,10 @@ class ChannelMaster(val payBag: PaymentBag, val chanBag: ChannelBag, val dataBag
   // CONNECTION LISTENER
 
   // Note that this may be sent multiple times after chain wallet reconnects
-  override def onOperational(worker: CommsTower.Worker, theirInit: Init): Unit =
+  override def onOperational(worker: CommsTower.Worker, theirInit: Init): Unit = {
     allFromNode(worker.info.nodeId).foreach(_.chan process CMD_SOCKET_ONLINE)
+    reconnectFailures -= worker.info.nodeId
+  }
 
   override def onMessage(worker: CommsTower.Worker, message: LightningMessage): Unit = message match {
     case msg: ChannelUpdate => allFromNode(worker.info.nodeId).foreach(_.chan process msg)
@@ -175,7 +181,19 @@ class ChannelMaster(val payBag: PaymentBag, val chanBag: ChannelBag, val dataBag
   override def onDisconnect(worker: CommsTower.Worker): Unit = {
     allFromNode(worker.info.nodeId).foreach(_.chan process CMD_SOCKET_OFFLINE)
     opm process TrampolinePeerDisconnected(worker.info.nodeId)
-    Rx.ioQueue.delay(5.seconds).foreach(_ => initConnect)
+    scheduleReconnect(worker.info.nodeId)
+  }
+
+  // One timer per failing peer, its delay doubles on each failure from 5 seconds up to 5 minutes
+  // initConnect skips a peer while its timer runs, so attempts do not pile up on each new block
+  def scheduleReconnect(nodeId: PublicKey): Unit = if (reconnectScheduled.putIfAbsent(nodeId, true).isEmpty) {
+    val failures = reconnectFailures.getOrElse(nodeId, 0)
+    reconnectFailures(nodeId) = failures + 1
+
+    Rx.ioQueue.delay(5.seconds * (1L << math.min(failures, 6)) min 5.minutes).foreach(_ => {
+      reconnectScheduled -= nodeId
+      initConnect
+    }, none)
   }
 
   // CHANNEL MANAGEMENT
@@ -191,7 +209,7 @@ class ChannelMaster(val payBag: PaymentBag, val chanBag: ChannelBag, val dataBag
   def initConnect: Unit =
     all.values.flatMap(Channel.chanAndCommitsOpt).foreach { cnc =>
       // Connect to all peers with channels, including CLOSED ones
-      CommsTower.listenNative(Set(me), cnc.commits.remoteInfo)
+      if (!reconnectScheduled.contains(cnc.commits.remoteInfo.nodeId)) CommsTower.listenNative(Set(me), cnc.commits.remoteInfo)
     }
 
   // Marks as failed those payments which did not make it into channels before an app has been restarted
@@ -303,6 +321,9 @@ class ChannelMaster(val payBag: PaymentBag, val chanBag: ChannelBag, val dataBag
   // These are executed in Channel context
 
   override def onException: PartialFunction[Malfunction, Unit] = {
+    case (error: RemoteErrorException, _, data: HasNormalCommitments) =>
+      LNParams.logBag.put(s"channel-remote-error ${data.commitments.remoteInfo.nodeId}", error.details)
+
     case (error: ExpiredHtlcInNormalChannel, chan: ChannelNormal, _: HasNormalCommitments) =>
       LNParams.logBag.put("channel-force-close-expired-htlc", error.stackTraceAsString)
       chan doProcess CMD_CLOSE(scriptPubKey = None, force = true)
@@ -314,6 +335,9 @@ class ChannelMaster(val payBag: PaymentBag, val chanBag: ChannelBag, val dataBag
     case (error: ChannelTransitionFail, chan: ChannelHosted, hc: HostedCommits) =>
       LNParams.logBag.put("hosted-channel-suspend", error.stackTraceAsString)
       chan.localSuspend(hc, ErrorCodes.ERR_HOSTED_MANUAL_SUSPEND)
+
+    case (error, _, _: DATA_WAIT_FOR_FUNDING_CONFIRMED | _: DATA_WAIT_FOR_FUNDING_LOCKED) =>
+      LNParams.logBag.put("channel-waiting-error", error.stackTraceAsString)
   }
 
   override def onBecome: PartialFunction[Transition, Unit] = {

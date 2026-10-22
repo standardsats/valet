@@ -77,10 +77,8 @@ object FundingLockedTlv {
     discriminated[FundingLockedTlv]
       .by(varint)
       .\(UInt64(1)) { case v: ShortChannelIdAlias => v }(
-        // BOLT-2 short_channel_id is u64. Use uint64overflow (rejects values with the
-        // high bit set on both encode and decode) so we never emit a "negative" alias
-        // that a UInt64-tracking peer would see as ~2^63 + n.
-        variableSizeBytesLong(varintoverflow, uint64overflow).as[ShortChannelIdAlias]
+        // Preserve all 64 bits like other SCIDs: LND aliases set the high bit.
+        variableSizeBytesLong(varintoverflow, int64).as[ShortChannelIdAlias]
       )
   )
 }

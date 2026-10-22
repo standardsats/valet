@@ -322,7 +322,23 @@ object Helpers {
 
       val successTxs = htlcTxes.collect { case success: ClaimHtlcSuccessTx => success.tx }
       val timeoutTxs = htlcTxes.collect { case timeout: ClaimHtlcTimeoutTx => timeout.tx }
-      RemoteCommitPublished(tx, claimMainOutputTx = None, successTxs, timeoutTxs)
+      RemoteCommitPublished(tx, claimRemoteMainOutput(cs, tx, feeEstimator), successTxs, timeoutTxs)
+    }
+
+    // Without anchors our main output in their commit pays our wallet key directly and the wallet picks it up
+    // With anchors it is a P2WSH with a 1-block CSV which only we can spend, so it has to be swept into our wallet
+    def claimRemoteMainOutput(cs: NormalCommits, commitTx: Transaction, feeEstimator: FeeEstimator): Option[Transaction] = cs.channelFeatures.commitmentFormat match {
+      case DefaultCommitmentFormat => None
+      case format =>
+        val paymentBasepoint = cs.localParams.walletStaticPaymentBasepoint
+        val feeratePerKw = feeEstimator.getFeeratePerKw(LNParams.feeRates.info.onChainFeeConf.feeTargets.claimMainBlockTarget)
+        val claimTx = Transactions.makeClaimRemoteDelayedOutputTx(commitTx, cs.localParams.dustLimit, paymentBasepoint, cs.localParams.defaultFinalScriptPubKey, feeratePerKw)
+        def paymentKey = LNParams.chainWallets.wallets.iterator.flatMap(_.ewt.privateKeyFor(paymentBasepoint, maxIndex = 5000L)).toStream.headOption
+
+        for {
+          info <- claimTx.right.toOption
+          privateKey <- paymentKey
+        } yield Transactions.addSigs(info, Transactions.sign(info, privateKey, TxOwner.Local, format)).tx
     }
 
     def claimRevokedRemoteCommitTxOutputs(cs: NormalCommits, commitTx: Transaction, db: ChannelBag, feeEstimator: FeeEstimator): Option[RevokedCommitPublished] = {
@@ -364,7 +380,7 @@ object Helpers {
         val punishMain = for (info <- mainPenaltyTx) yield info.tx
         val punishHtlcs = for (info <- htlcPenaltyTxs) yield info.tx
 
-        RevokedCommitPublished(commitTx, claimMainOutputTx = None,
+        RevokedCommitPublished(commitTx, claimRemoteMainOutput(cs, commitTx, feeEstimator),
           punishMain, punishHtlcs, claimHtlcDelayedPenaltyTxs = Nil)
       }
     }
