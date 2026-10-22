@@ -59,6 +59,11 @@ android {
             applicationIdSuffix '.testnet3'
             versionCode 110
         }
+        signet {
+            dimension 'chain'
+            applicationIdSuffix '.signet'
+            versionCode 110
+        }
         regtest {
             dimension 'chain'
             applicationIdSuffix '.regtest'
@@ -163,6 +168,8 @@ dependencies {
 
     // Android tests
     testImplementation libs.junit
+    // JVM unit tests cannot load the Android native secp256k1 library
+    testImplementation libs.secp256k1.kmp.jni.jvm
     androidTestImplementation libs.androidx.junit
     androidTestImplementation libs.espresso.core
 }

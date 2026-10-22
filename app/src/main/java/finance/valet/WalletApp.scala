@@ -56,6 +56,9 @@ object WalletApp {
   val txDescriptions = mutable.Map.empty[ByteVector32, TxDescription]
   var currentChainNode: Option[InetSocketAddress] = None
 
+  // A custom signet has the same genesis block as Mutinynet, so a setting tells them apart. It needs a custom Electrum server.
+  var onCustomSignet: Boolean = false
+
   final val dbFileNameMisc = "misc.db"
   final val dbFileNameGraph = "graph.db"
   final val dbFileNameEssential = "essential.db"
@@ -83,6 +86,8 @@ object WalletApp {
   final val DEFAULT_GAP_LIMIT = 10
   final val HIDE_ZERO_OUTPUTS = "hideZeroOutputs"
   final val RECOVERY_PHRASE_VIEWED = "recoveryPhraseViewed"
+  final val CUSTOM_SIGNET = "customSignet"
+  final val HEADERS_CUSTOM_SIGNET = "headersCustomSignet"
 
   def useAuth: Boolean = AppLock.isEnrolled(app)
   def fiatCode: String = app.prefs.getString(FIAT_CODE, "usd")
@@ -92,6 +97,7 @@ object WalletApp {
   def gapLimit: Int = app.prefs.getInt(GAP_LIMIT, DEFAULT_GAP_LIMIT)
   def hideZeroOutputs: Boolean = app.prefs.getBoolean(HIDE_ZERO_OUTPUTS, true)
   def recoveryPhraseViewed: Boolean = app.prefs.getBoolean(RECOVERY_PHRASE_VIEWED, false)
+  def customSignet: Boolean = app.prefs.getBoolean(CUSTOM_SIGNET, false)
 
   final val CHECKED_BUTTONS = "checkedButtons"
   def getCheckedButtons(default: Set[String] = Set.empty): mutable.Set[String] = app.prefs.getStringSet(CHECKED_BUTTONS, default.asJava).asScala
@@ -155,11 +161,16 @@ object WalletApp {
     // In case these are needed early
     LNParams.logBag = new SQLiteLog(miscInterface)
 
+    onCustomSignet = BuildConfig.FLAVOR == "signet" && customSignet && customElectrumAddress.isSuccess
+
     val (hash, params) = {
       BuildConfig.FLAVOR match {
         case "mainnet" => (Block.LivenetGenesisBlock.hash, new SyncParams)
         case "tnet3" => (Block.Testnet3GenesisBlock.hash, new TestNet3SyncParams)
         case "tnet4" => (Block.Testnet4GenesisBlock.hash, new TestNet4SyncParams)
+        // Gossip peers of a custom signet are not known, as on regtest
+        case "signet" if onCustomSignet => (Block.SignetGenesisBlock.hash, new RegtestSyncParams)
+        case "signet" => (Block.SignetGenesisBlock.hash, new SignetSyncParams)
         case "regtest" => (Block.RegtestGenesisBlock.hash, new RegtestSyncParams)
       }
     }
@@ -211,6 +222,7 @@ object WalletApp {
       case Block.LivenetGenesisBlock.hash => ElectrumClientPool.readServerAddresses(app.getAssets open "servers_mainnet.json")
       case Block.Testnet3GenesisBlock.hash => ElectrumClientPool.readServerAddresses(app.getAssets open "servers_testnet3.json")
       case Block.Testnet4GenesisBlock.hash => ElectrumClientPool.readServerAddresses(app.getAssets open "servers_testnet4.json")
+      case Block.SignetGenesisBlock.hash => ElectrumClientPool.readServerAddresses(app.getAssets open "servers_signet.json")
       case Block.RegtestGenesisBlock.hash => ElectrumClientPool.readServerAddresses(app.getAssets open "servers_regtest.json")
       case _ => throw new RuntimeException
     }
@@ -219,6 +231,9 @@ object WalletApp {
       case Block.LivenetGenesisBlock.hash => CheckPoint.load(app.getAssets open "checkpoints_mainnet.json")
       case Block.Testnet3GenesisBlock.hash => CheckPoint.load(app.getAssets open "checkpoints_testnet3.json")
       case Block.Testnet4GenesisBlock.hash => CheckPoint.load(app.getAssets open "checkpoints_testnet4.json")
+      // No checkpoints make ElectrumChainSync scan a custom signet from its genesis block
+      case Block.SignetGenesisBlock.hash if onCustomSignet => Vector.empty
+      case Block.SignetGenesisBlock.hash => CheckPoint.load(app.getAssets open "checkpoints_signet.json")
       case Block.RegtestGenesisBlock.hash => Vector.empty
       case _ => throw new RuntimeException
     }
@@ -226,6 +241,23 @@ object WalletApp {
     LNParams.cm = new ChannelMaster(payBag, chanBag, extDataBag, pf)
 
     val params = WalletParameters(extDataBag, chainWalletBag, txDataBag, dustLimit = 546L.sat, gapLimit = WalletApp.gapLimit)
+
+    // Headers, wallet histories and graph of Mutinynet are not valid on a custom signet, and the reverse
+    if (onCustomSignet != app.prefs.getBoolean(HEADERS_CUSTOM_SIGNET, false)) {
+      extDataBag.db txWrap {
+        extDataBag.removeAllHeaders
+        chainWalletBag.resetAllData(params.emptyPersistentDataBytes)
+        txDataBag.removeAll
+      }
+
+      graphInterface txWrap {
+        normalBag.clearDataTables
+        hostedBag.clearDataTables
+      }
+
+      app.prefs.edit.putBoolean(HEADERS_CUSTOM_SIGNET, onCustomSignet).remove(LAST_TOTAL_GOSSIP_SYNC).remove(LAST_NORMAL_GOSSIP_SYNC).commit
+    }
+
     val electrumPool = LNParams.loggedActor(Props(classOf[ElectrumClientPool], LNParams.blockCount, LNParams.chainHash, LNParams.ec), "connection-pool")
     val sync = LNParams.loggedActor(Props(classOf[ElectrumChainSync], electrumPool, params.headerDb, LNParams.chainHash), "chain-sync")
     val watcher = LNParams.loggedActor(Props(classOf[ElectrumWatcher], LNParams.blockCount, electrumPool), "channel-watcher")

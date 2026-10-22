@@ -24,6 +24,8 @@ class SQLiteChainWallet(val db: DBInterface) extends WalletDb {
 
   def updateLabel(label: String, pub: PublicKey): Unit = db.change(ChainWalletTable.updLabelSql, label, pub.toString)
 
+  def resetAllData(data: ByteVector): Unit = db.change(ChainWalletTable.resetAllDataSql, data.toArray)
+
   def listWallets: Iterable[CompleteChainWalletInfo] = db.select(ChainWalletTable.selectSql).iterable { rc =>
     CompleteChainWalletInfo(to[ChainWalletInfo](rc string ChainWalletTable.info), rc byteVec ChainWalletTable.data,
       Satoshi(rc long ChainWalletTable.lastBalance), rc string ChainWalletTable.label, isCoinControlOn = false)

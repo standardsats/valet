@@ -63,6 +63,7 @@ class SettingsActivity extends BaseCheckActivity with HasTypicalChainFee with Ch
     backupLocation.updateView
     chainWallets.updateView
     electrum.updateView
+    customSignet.updateView
     setFiat.updateView
     setBtc.updateView
     setGapLimit.updateView
@@ -259,6 +260,19 @@ class SettingsActivity extends BaseCheckActivity with HasTypicalChainFee with Ch
     }
   }
 
+  lazy private[this] val customSignet = new SettingsHolder(me) {
+    override def updateView: Unit = settingsCheck.setChecked(WalletApp.customSignet)
+
+    settingsTitle.setText(settings_custom_signet)
+    settingsInfo.setText(settings_custom_signet_info)
+
+    view setOnClickListener onButtonTap {
+      putBoolAndUpdateView(WalletApp.CUSTOM_SIGNET, !WalletApp.customSignet)
+      def onOk(snack: Snackbar): Unit = runAnd(snack.dismiss)(WalletApp.restart)
+      snack(settingsContainer, getString(settings_custom_electrum_restart_notice).html, R.string.dialog_ok, onOk)
+    }
+  }
+
   lazy private[this] val setFiat = new SettingsHolder(me) {
     settingsTitle.setText(settings_fiat_currency)
     setVis(isVisible = false, settingsCheck)
@@ -415,6 +429,7 @@ class SettingsActivity extends BaseCheckActivity with HasTypicalChainFee with Ch
     settingsContainer.addView(chainWallets.view)
     settingsContainer.addView(addHardware.view)
     settingsContainer.addView(electrum.view)
+    if (BuildConfig.FLAVOR == "signet") settingsContainer.addView(customSignet.view)
     settingsContainer.addView(setFiat.view)
     settingsContainer.addView(setBtc.view)
     settingsContainer.addView(setGapLimit.view)

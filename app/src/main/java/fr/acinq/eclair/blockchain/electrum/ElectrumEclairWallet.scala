@@ -23,7 +23,7 @@ case class ElectrumEclairWallet(walletRef: ActorRef, ewt: ElectrumWalletType, in
 
   private def emptyUtxo(pubKeyScript: ByteVector): TxOut = TxOut(Satoshi(0L), pubKeyScript)
 
-  private def isInChain(error: fr.acinq.eclair.blockchain.bitcoind.rpc.Error): Boolean = error.message.toLowerCase.contains("already in block chain")
+  private def isInChain(error: fr.acinq.eclair.blockchain.bitcoind.rpc.Error): Boolean = ElectrumWatcher.isInChain(error.message)
 
   override def getData: Future[GetDataResponse] = (walletRef ? GetData).mapTo[GetDataResponse]
 
