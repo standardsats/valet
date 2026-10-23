@@ -30,7 +30,7 @@ podman run -v $PWD:/app/valet:z valet
 ```
 
 The container runs `./gradlew assembleRelease && ./gradlew bundleRelease`, producing
-an APK for every product flavor (`mainnet`, `tnet3`, `tnet4`, `regtest`) under
+an APK for every product flavor (`mainnet`, `tnet3`, `tnet4`, `signet`, `regtest`) under
 `app/build/outputs/apk/<flavor>/release/`, named `<applicationId>_<versionCode>.apk`
 (e.g. `finance.valet_111.apk` for mainnet), plus `.aab` bundles under
 `app/build/outputs/bundle/release/`.

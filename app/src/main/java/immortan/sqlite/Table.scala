@@ -161,6 +161,8 @@ object ChainWalletTable extends Table {
 
   val updLabelSql = s"UPDATE $table SET $label = ? WHERE $xPub = ?"
 
+  val resetAllDataSql = s"UPDATE $table SET $data = ?, $lastBalance = 0"
+
   val selectSql = s"SELECT * FROM $table ORDER BY $id ASC"
 
   val killSql = s"DELETE FROM $table WHERE $xPub = ?"
@@ -278,6 +280,10 @@ object TxTable extends Table {
 
   val killByPubSql = s"DELETE FROM $table WHERE $pub = ?"
 
+  val killAllSql = s"DELETE FROM $table"
+
+  val killAllVirtualSql = s"DELETE FROM $fts$table"
+
   def createStatements: Seq[String] = {
     val createTable = s"""CREATE TABLE IF NOT EXISTS $table(
       $IDAUTOINC, $rawTx TEXT NOT NULL, $txid TEXT NOT NULL $UNIQUE, $pub TEXT NOT NULL, $depth INTEGER NOT NULL, $receivedSat INTEGER NOT NULL,
@@ -334,6 +340,8 @@ object ElectrumHeadersTable extends Table {
   val selectHeadersSql = s"SELECT * FROM $table WHERE $height >= ? ORDER BY $height LIMIT ?"
 
   val selectTipSql = s"SELECT * FROM $table INNER JOIN (SELECT MAX($height) AS maxHeight FROM $table) t1 ON $height = t1.maxHeight"
+
+  val killAllSql = s"DELETE FROM $table"
 
   def createStatements: Seq[String] = s"CREATE TABLE IF NOT EXISTS $table($IDAUTOINC, $height INTEGER NOT NULL $UNIQUE, $blockHash TEXT NOT NULL, $header BLOB NOT NULL)" :: Nil
 }

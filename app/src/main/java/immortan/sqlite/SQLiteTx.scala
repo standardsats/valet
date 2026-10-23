@@ -52,6 +52,12 @@ class SQLiteTx(val db: DBInterface) {
     ChannelMaster.next(ChannelMaster.txDbStream)
   }
 
+  def removeAll: Unit = {
+    db.change(TxTable.killAllSql)
+    db.change(TxTable.killAllVirtualSql)
+    ChannelMaster.next(ChannelMaster.txDbStream)
+  }
+
   def txSummary: Try[TxSummary] =
     db.select(TxTable.selectSummarySql).headTry { rc =>
       TxSummary(fees = Satoshi(rc long 0), received = Satoshi(rc long 1), sent = Satoshi(rc long 2), count = rc long 3)

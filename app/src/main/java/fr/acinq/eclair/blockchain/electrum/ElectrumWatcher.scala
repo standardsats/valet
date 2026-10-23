@@ -181,7 +181,7 @@ class ElectrumWatcher(blockCount: AtomicLong, client: ActorRef) extends Actor wi
     case ElectrumClient.BroadcastTransactionResponse(tx, error_opt) =>
       error_opt match {
         case None => log.info(s"broadcast succeeded for txid=${tx.txid} tx={}", tx)
-        case Some(error) if error.message.contains("transaction already in block chain") => log.info(s"broadcast ignored for txid=${tx.txid} tx={} (tx was already in blockchain)", tx)
+        case Some(error) if ElectrumWatcher.isInChain(error.message) => log.info(s"broadcast ignored for txid=${tx.txid} tx={} (tx was already in blockchain)", tx)
         case Some(error) => log.error(s"broadcast failed for txid=${tx.txid} tx=$tx with error=$error")
       }
       context become running(height, tip, watches, scriptHashStatus, block2tx, sent diff Seq(tx))
@@ -198,6 +198,12 @@ class ElectrumWatcher(blockCount: AtomicLong, client: ActorRef) extends Actor wi
 }
 
 object ElectrumWatcher {
+  // Older Bitcoin Core says "Transaction already in block chain", newer says "Transaction outputs already in utxo set"
+  def isInChain(errorMessage: String): Boolean = {
+    val message = errorMessage.toLowerCase
+    message.contains("already in block chain") || message.contains("already in utxo set")
+  }
+
   // A (blockHeight, txIndex) tuple that is extracted from the input source
   def makeDummyShortChannelId(txid: ByteVector32): (Int, Int) = {
     val txIndex = txid.bits.sliceToInt(0, 16, signed = false)

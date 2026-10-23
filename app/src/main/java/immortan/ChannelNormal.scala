@@ -167,6 +167,7 @@ abstract class ChannelNormal(bag: ChannelBag) extends Channel {
       // AWAITING CONFIRMATION
 
       case (wait: DATA_WAIT_FOR_FUNDING_CONFIRMED, event: WatchEventConfirmed, SLEEPING | WAIT_FUNDING_DONE) =>
+        LNParams.logBag.put("channel-funding-confirmed", s"${event.txConfirmedAt.tx.txid} at height=${event.txConfirmedAt.blockHeight} in state=$state")
         if (Try(wait checkSpend event.txConfirmedAt.tx).isFailure) StoreBecomeSend(DATA_CLOSING(wait.commitments, System.currentTimeMillis), CLOSING) else {
           // Derive a stable alias from channelId first 8 bytes (option_scid_alias: we MUST include alias TLV)
           val ourAlias = ChannelNormal.stableAlias(wait.channelId)
@@ -191,9 +192,16 @@ abstract class ChannelNormal(bag: ChannelBag) extends Channel {
           extParams = wait.commitments.extParams ++ aliasParams)
         StoreBecomeSend(DATA_NORMAL(commits1, wait.shortChannelId), OPEN)
 
+
+      // LND sends its channel_update right after Init on each connection, so it can arrive before its channel_ready
+      case (wait: DATA_WAIT_FOR_FUNDING_LOCKED, update: ChannelUpdate, SLEEPING | WAIT_FUNDING_DONE)
+        if wait.commitments.updateOpt.forall(_.core != update.core) &&
+          (update.shortChannelId == wait.shortChannelId || update.shortChannelId == ChannelNormal.stableAlias(wait.channelId)) =>
+        StoreBecomeSend(wait withNewCommits wait.commitments.copy(updateOpt = update.asSome), state)
+
       // MAIN LOOP
 
-      case (some: HasNormalCommitments, WatchEventSpent(BITCOIN_FUNDING_SPENT, tx), OPEN | SLEEPING | CLOSING) =>
+      case (some: HasNormalCommitments, WatchEventSpent(BITCOIN_FUNDING_SPENT, tx), OPEN | SLEEPING | CLOSING | WAIT_FUNDING_DONE) =>
         // Catch all possible closings in one go, account for us receiving various closing txs multiple times
 
         some match {
@@ -464,7 +472,9 @@ abstract class ChannelNormal(bag: ChannelBag) extends Channel {
         BECOME(wait, CLOSING)
 
 
-      case (data1: HasNormalCommitments, CMD_SOCKET_ONLINE, SLEEPING | WAIT_FUNDING_DONE) =>
+      // Only after a reconnect: initConnect runs on each new block and repeats CMD_SOCKET_ONLINE for live connections,
+      // BOLT 2 allows channel_reestablish only after a reconnect and some peers fail or force-close a channel otherwise
+      case (data1: HasNormalCommitments, CMD_SOCKET_ONLINE, SLEEPING) =>
         val myCurrentPoint = data1.commitments.localParams.keys.commitmentPoint(data1.commitments.localCommit.index)
         val yourLastSecret = data1.commitments.remotePerCommitmentSecrets.lastIndex.flatMap(data1.commitments.remotePerCommitmentSecrets.getHash).getOrElse(ByteVector32.Zeroes)
         val reestablish = ChannelReestablish(data1.channelId, data1.commitments.localCommit.index + 1, data1.commitments.remoteCommit.index, PrivateKey(yourLastSecret), myCurrentPoint)
@@ -674,6 +684,12 @@ abstract class ChannelNormal(bag: ChannelBag) extends Channel {
         throw RemoteErrorException(ErrorExt extractDescription remote)
 
 
+      // ChannelMaster forwards each ChannelUpdate from a peer (gossip too) to all its channels, a waiting channel skips those for other channels
+      case (wait @ (_: DATA_WAIT_FOR_FUNDING_CONFIRMED | _: DATA_WAIT_FOR_FUNDING_LOCKED), msg: LightningMessage, _) if !msg.isInstanceOf[ChannelUpdate] =>
+        // A dropped message may keep a channel from opening, so it is worth a trace
+        LNParams.logBag.put(s"channel-ignored-message ${wait.getClass.getSimpleName}", s"${msg.getClass.getSimpleName} in state=$state")
+
+
       case _ =>
     }
 
@@ -776,9 +792,11 @@ abstract class ChannelNormal(bag: ChannelBag) extends Channel {
   }
 
   private def handleRemoteSpentFuture(commitTx: Transaction, commits: NormalCommits): Unit = {
-    val remoteCommitPublished = RemoteCommitPublished(commitTx, claimMainOutputTx = None, claimHtlcSuccessTxs = Nil, claimHtlcTimeoutTxs = Nil)
+    val claimMainOutputTx = Closing.claimRemoteMainOutput(commits, commitTx, LNParams.feeRates.info.onChainFeeConf.feeEstimator)
+    val remoteCommitPublished = RemoteCommitPublished(commitTx, claimMainOutputTx, claimHtlcSuccessTxs = Nil, claimHtlcTimeoutTxs = Nil)
     val closing = DATA_CLOSING(commits, System.currentTimeMillis, futureRemoteCommitPublished = remoteCommitPublished.asSome)
     StoreBecomeSend(closing, CLOSING)
+    doPublish(remoteCommitPublished)
   }
 
   private def handleRemoteSpentOther(tx: Transaction, data1: HasNormalCommitments): Unit = {

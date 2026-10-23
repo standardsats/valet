@@ -24,20 +24,6 @@
                 style="@style/FillingView"/>
 
             <TextView
-                android:clickable="true"
-                android:focusable="true"
-                style="@style/ChipTextGray"
-                android:onClick="bringCommunityLink"
-                android:textSize="@dimen/text_size_12"
-                android:background="@drawable/border_blue"
-                android:layout_toStartOf="@id/offlineIndicator"
-                android:layout_centerVertical="true"
-                android:layout_marginEnd="6dp"
-                android:text="&#9993; COMMUNITY"
-                android:id="@+id/communityTeaser"
-                android:visibility="gone"/>
-
-            <TextView
                 style="@style/ChipTextGray"
                 android:layout_toStartOf="@id/chainSyncIndicator"
                 android:textSize="@dimen/text_size_12"
@@ -75,13 +61,31 @@
 
             <TextView
                 style="@style/ChipTextGray"
-                android:layout_toStartOf="@id/settingsButton"
+                android:layout_toStartOf="@id/communityTeaser"
                 android:textSize="@dimen/text_size_12"
                 android:layout_centerVertical="true"
                 android:id="@+id/torIndicator"
                 android:layout_marginEnd="2dp"
                 android:visibility="gone"
                 android:text="TOR"/>
+
+            <TextView
+                android:clickable="true"
+                android:focusable="true"
+                style="@style/ChipTextGray"
+                android:onClick="bringCommunityLink"
+                android:textSize="@dimen/text_size_12"
+                android:background="@drawable/border_blue"
+                android:layout_toStartOf="@id/settingsButton"
+                android:layout_centerVertical="true"
+                android:layout_marginStart="4dp"
+                android:layout_marginEnd="2dp"
+                android:drawableStart="@drawable/baseline_send_14"
+                android:drawablePadding="4sp"
+                android:gravity="center_vertical"
+                android:text="TELEGRAM"
+                android:id="@+id/communityTeaser"
+                android:visibility="gone"/>
 
             <ImageButton
                 android:padding="6dp"

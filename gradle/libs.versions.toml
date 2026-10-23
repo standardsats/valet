@@ -53,6 +53,7 @@ applock = { module = "com.guardanis:applock", version.ref = "applock" }
 
 scala-library = { module = "org.scala-lang:scala-library", version.ref = "scala" }
 secp256k1-kmp-jni-android = { module = "fr.acinq.secp256k1:secp256k1-kmp-jni-android", version.ref = "secp256k1KmpJniAndroid" }
+secp256k1-kmp-jni-jvm = { module = "fr.acinq.secp256k1:secp256k1-kmp-jni-jvm", version.ref = "secp256k1KmpJniAndroid" }
 scala-parser-combinators = { module = "org.scala-lang.modules:scala-parser-combinators_2.11", version.ref = "scalaParserCombinators" }
 quicklens = { module = "com.softwaremill.quicklens:quicklens_2.11", version.ref = "quicklens" }
 akka-actor = { module = "com.typesafe.akka:akka-actor_2.11", version.ref = "akkaActor" }

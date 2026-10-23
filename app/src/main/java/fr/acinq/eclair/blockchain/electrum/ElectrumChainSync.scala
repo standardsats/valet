@@ -17,12 +17,17 @@ object ElectrumChainSync {
 
 class ElectrumChainSync(client: ActorRef, headerDb: HeaderDb, chainHash: ByteVector32) extends FSM[ElectrumWallet.State, Blockchain] {
 
-  def loadChain: Blockchain = if (chainHash != Block.RegtestGenesisBlock.hash) {
-    // In case if anything at all goes wrong we just use an initial blockchain and resync it from checkpoint
-    val blockchain = Blockchain.fromCheckpoints(checkpoints = CheckPoint.load(chainHash, headerDb), chainhash = chainHash)
-    val headers = headerDb.getHeaders(startHeight = blockchain.checkpoints.size * RETARGETING_PERIOD, maxCount = Int.MaxValue)
-    Try apply Blockchain.addHeadersChunk(blockchain, blockchain.checkpoints.size * RETARGETING_PERIOD, headers) getOrElse blockchain
-  } else Blockchain.fromGenesisBlock(Block.RegtestGenesisBlock.hash, Block.RegtestGenesisBlock.header)
+  // Regtest and a custom signet have no checkpoints, so they are scanned from the genesis block on each start
+  def loadChain: Blockchain = chainHash match {
+    case Block.RegtestGenesisBlock.hash => Blockchain.fromGenesisBlock(chainHash, Block.RegtestGenesisBlock.header)
+    case Block.SignetGenesisBlock.hash if CheckPoint.loadFromChainHash(chainHash).isEmpty => Blockchain.fromGenesisBlock(chainHash, Block.SignetGenesisBlock.header)
+
+    case _ =>
+      // In case if anything at all goes wrong we just use an initial blockchain and resync it from checkpoint
+      val blockchain = Blockchain.fromCheckpoints(checkpoints = CheckPoint.load(chainHash, headerDb), chainhash = chainHash)
+      val headers = headerDb.getHeaders(startHeight = blockchain.checkpoints.size * RETARGETING_PERIOD, maxCount = Int.MaxValue)
+      Try apply Blockchain.addHeadersChunk(blockchain, blockchain.checkpoints.size * RETARGETING_PERIOD, headers) getOrElse blockchain
+  }
 
   client ! ElectrumClient.AddStatusListener(self)
 
@@ -68,7 +73,8 @@ class ElectrumChainSync(client: ActorRef, headerDb: HeaderDb, chainHash: ByteVec
           val (blockchain2, chunks) = Blockchain.optimize(blockchain1)
           client ! ElectrumClient.GetHeaders(blockchain2.tip.height + 1, RETARGETING_PERIOD)
           log.info(s"Got new headers chunk at ${blockchain2.tip.height}, requesting next chunk")
-          headerDb.addHeaders(chunks.map(_.header), chunks.head.height)
+          // A chain which is scanned from genesis has nothing to persist while it is shorter than MAX_REORG
+          if (chunks.nonEmpty) headerDb.addHeaders(chunks.map(_.header), chunks.head.height)
           goto(SYNCING) using blockchain2
 
         case Failure(error) =>
@@ -89,7 +95,7 @@ class ElectrumChainSync(client: ActorRef, headerDb: HeaderDb, chainHash: ByteVec
       blockchain1Try match {
         case Success(blockchain1) if difficultyOk =>
           val (blockchain2, chunks) = Blockchain.optimize(blockchain1)
-          headerDb.addHeaders(chunks.map(_.header), chunks.head.height)
+          if (chunks.nonEmpty) headerDb.addHeaders(chunks.map(_.header), chunks.head.height)
           log.info(s"Got new chain tip ${header.blockId} at $height")
           context.system.eventStream publish blockchain2
           stay using blockchain2

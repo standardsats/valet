@@ -31,6 +31,9 @@ object SyncMaster {
   final val CMDGetGossip = "cmd-get-gossip"
   final val CMDShutdown = "cmd-shut-down"
 
+  // A sync worker which gets no reply to its queries for this long has stalled
+  final val PROGRESS_TIMEOUT = 60.seconds
+
   type PositionSet = Set[java.lang.Integer]
   type ConfirmedBySet = Set[PublicKey]
   type ShortChanIdSet = Set[Long]
@@ -71,6 +74,7 @@ case class CMDShortIdsComplete(sync: SyncWorker, data: SyncWorkerShortIdsData)
 case class CMDChunkComplete(sync: SyncWorker, data: SyncWorkerGossipData)
 case class SyncDisconnected(sync: SyncWorker, removePeer: Boolean)
 case class CMDGossipComplete(sync: SyncWorker)
+case class CMDCheckProgress(repliesReceived: Long)
 case class SyncPeerOperational(worker: CommsTower.Worker, gossipQueriesSupport: GossipQueriesSupport)
 case object GraphSyncFailed
 
@@ -113,6 +117,9 @@ case class SyncWorker(master: CanBeRepliedTo, keyPair: KeyPair, remoteInfo: Remo
 
   val pair: KeyPairAndPubKey = KeyPairAndPubKey(keyPair, remoteInfo.nodeId)
   @volatile private[this] var connectedWorker: Option[CommsTower.Worker] = None
+  // A peer can answer pings and still ignore our gossip queries, so only replies show progress
+  @volatile private[this] var repliesReceived: Long = 0L
+  @volatile private[this] var stalled: Boolean = false
 
   def gossipQueriesSupport(init: Init): GossipQueriesSupport = GossipQueriesSupport.from(init)
 
@@ -132,12 +139,18 @@ case class SyncWorker(master: CanBeRepliedTo, keyPair: KeyPair, remoteInfo: Remo
         }
     }
     override def onHostedMessage(worker: CommsTower.Worker, remoteMessage: HostedChannelMessage): Unit = process(remoteMessage)
-    override def onMessage(worker: CommsTower.Worker, remoteMessage: LightningMessage): Unit = process(remoteMessage)
+    override def onMessage(worker: CommsTower.Worker, remoteMessage: LightningMessage): Unit = {
+      remoteMessage match {
+        case _: ReplyChannelRange | _: ReplyShortChannelIdsEnd | _: ChannelAnnouncement | _: ChannelUpdate | _: NodeAnnouncement => repliesReceived += 1
+        case _ => // Pongs and other messages are not replies to our queries
+      }
+      process(remoteMessage)
+    }
 
     override def onDisconnect(worker: CommsTower.Worker): Unit = {
-      // Only a peer which became operational with gossip queries is worth another attempt in this sync,
-      // an unreachable, incompatible or gossip-less peer would fail in exactly the same way again
-      val removePeer = connectedWorker.isEmpty
+      // Only a peer which became operational with gossip queries and kept answering them is worth another attempt in this sync,
+      // an unreachable, incompatible, gossip-less or stalled peer would fail in exactly the same way again
+      val removePeer = connectedWorker.isEmpty || stalled
       val supportDescription: String = worker.theirInit.map(init => gossipQueriesSupport(init).toString).getOrElse("no init received, connection likely never completed")
       LNParams.logBag.put("graph-sync-peer-disconnect", s"${remoteInfo.alias} ${remoteInfo.nodeId} support=$supportDescription removePeer=$removePeer")
       master process SyncDisconnected(me, removePeer)
@@ -156,12 +169,15 @@ case class SyncWorker(master: CanBeRepliedTo, keyPair: KeyPair, remoteInfo: Remo
 
     case (data1: SyncWorkerShortIdsData, null, WAITING) =>
       become(data1, SHORT_ID_SYNC)
+      checkProgressLater
       for {
         worker <- connectedWorker
         init <- worker.theirInit
       } me process SyncPeerOperational(worker, gossipQueriesSupport(init))
 
     case (data1: SyncWorkerGossipData, _, WAITING | SHORT_ID_SYNC) =>
+      // A worker which comes from SHORT_ID_SYNC already has its progress checks
+      if (state == WAITING) checkProgressLater
       become(data1, GOSSIP_SYNC)
       connectedWorker.foreach(me process _)
 
@@ -224,11 +240,28 @@ case class SyncWorker(master: CanBeRepliedTo, keyPair: KeyPair, remoteInfo: Remo
       master process completeSyncData
       me process CMDShutdown
 
+    case (CMDCheckProgress(received), _, SHORT_ID_SYNC | GOSSIP_SYNC) if CommsTower.workers.contains(pair) =>
+      val awaitsReplies = data match {
+        case shortIdsData: SyncWorkerShortIdsData => !shortIdsData.ranges.exists(_.syncComplete == 1)
+        case _ => true
+      }
+
+      if (awaitsReplies && received == repliesReceived) {
+        LNParams.logBag.put("graph-sync-peer-timeout", s"${remoteInfo.alias} ${remoteInfo.nodeId} no replies for $PROGRESS_TIMEOUT, replies=$received")
+        stalled = true
+        CommsTower.workers.get(pair).foreach(_.disconnect)
+      } else checkProgressLater
+
     case (CMDShutdown, _, _) =>
       become(freshData = null, SHUT_DOWN)
       CommsTower forget pair
 
     case _ =>
+  }
+
+  def checkProgressLater: Unit = {
+    val received = repliesReceived
+    Rx.ioQueue.delay(PROGRESS_TIMEOUT).foreach(_ => me process CMDCheckProgress(received), none)
   }
 }
 
