@@ -928,10 +928,24 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
       }
     }
 
+    // Recent payments allow the Telegram badge, it also needs WalletApp.showCommunity
+    var communityTeaserAllowed: Boolean = false
+
     def updateLnSyncProgress(total: Int, left: Int): Unit = UITask {
       lnSyncIndicator.setMaxProgress(total).setMinProgress(0).setProgress(total - left)
-      setVis(isVisible = true, lnSyncIndicator)
+      setStatusVis(isVisible = true, lnSyncIndicator)
     }.run
+
+    def setStatusVis(isVisible: Boolean, statusBadge: View): Unit = {
+      setVis(isVisible, statusBadge)
+      updateCommunityTeaser
+    }
+
+    def updateCommunityTeaser: Unit = {
+      // Telegram badge has the lowest priority: with two status badges there is no space for it
+      val statusBadges = List(offlineIndicator, chainSyncIndicator, lnSyncIndicator, torIndicator).count(_.getVisibility == View.VISIBLE)
+      setVis(communityTeaserAllowed && WalletApp.showCommunity && statusBadges < 2, communityTeaser)
+    }
 
     def resetChainCards(ext1: WalletExt): Unit = {
       // Remove all existing cards and place new ones
@@ -1018,19 +1032,19 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
   private val chainListener = new WalletEventsListener {
     override def onChainMasterSelected(event: InetSocketAddress): Unit = UITask {
       TransitionManager.beginDelayedTransition(walletCards.defaultHeader)
-      setVis(isVisible = false, walletCards.offlineIndicator)
+      walletCards.setStatusVis(isVisible = false, walletCards.offlineIndicator)
     }.run
 
     override def onChainDisconnected: Unit = UITask {
-      setVis(isVisible = true, walletCards.offlineIndicator)
+      walletCards.setStatusVis(isVisible = true, walletCards.offlineIndicator)
     }.run
 
     override def onChainSyncStarted(localTip: Long, remoteTip: Long): Unit = UITask {
-      setVis(isVisible = remoteTip - localTip > 2016 * 4, walletCards.chainSyncIndicator)
+      walletCards.setStatusVis(isVisible = remoteTip - localTip > 2016 * 4, walletCards.chainSyncIndicator)
     }.run
 
     override def onChainSyncEnded(localTip: Long): Unit = UITask {
-      setVis(isVisible = false, walletCards.chainSyncIndicator)
+      walletCards.setStatusVis(isVisible = false, walletCards.chainSyncIndicator)
     }.run
 
     override def onWalletReady(event: WalletReady): Unit = {
@@ -1136,7 +1150,7 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
     case na: NodeAnnouncement => for (info <- na.toRemoteInfo) LNParams.cm.all.values.foreach(_ process info)
     case PathFinder.CMDResync => walletCards.updateLnSyncProgress(total = 1000, left = 1000)
     case prd: PureRoutingData => walletCards.updateLnSyncProgress(prd.queriesTotal, prd.queriesLeft)
-    case _: SyncMaster | GraphSyncFailed => UITask(walletCards.lnSyncIndicator setVisibility View.GONE).run
+    case _: SyncMaster | GraphSyncFailed => UITask(walletCards.setStatusVis(isVisible = false, walletCards.lnSyncIndicator)).run
     case _ => // Do nothing
   }
 
@@ -1380,9 +1394,10 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
 
     runInFutureProcessOnUI(loadRecent, none) { _ =>
       // We invite user to the community if: the invite has not been followed before, LN payments were successful, user has been using an app for certain period
-      setVis(WalletApp.showCommunity && paymentInfos.forall(_.status == PaymentStatus.SUCCEEDED) && allInfos.size > 4 && allInfos.size < 8, walletCards.communityTeaser)
+      walletCards.communityTeaserAllowed = paymentInfos.forall(_.status == PaymentStatus.SUCCEEDED) && allInfos.size > 4 && allInfos.size < 8
       // User may kill an activity but not an app and on getting back there won't be a chain listener event, so check connectivity once again here
       setVisMany(WalletApp.ensureTor -> walletCards.torIndicator, WalletApp.currentChainNode.isEmpty -> walletCards.offlineIndicator)
+      walletCards.updateCommunityTeaser
       walletCards.searchField addTextChangedListener onTextChange(searchWorker.addWork)
       runAnd(updateLnCaches)(paymentAdapterDataChanged.run)
       markAsFailedOnce
