@@ -2,7 +2,7 @@ package fr.acinq.eclair.blockchain
 
 import akka.actor.ActorRef
 import fr.acinq.bitcoin.Crypto.PublicKey
-import fr.acinq.bitcoin.{ByteVector32, Script, ScriptWitness, Transaction}
+import fr.acinq.bitcoin.{ByteVector32, Satoshi, Script, ScriptWitness, Transaction}
 import fr.acinq.eclair.channel.BitcoinEvent
 import scodec.bits.ByteVector
 
@@ -27,12 +27,13 @@ object WatchConfirmed {
   }
 }
 
-final case class WatchSpent(replyTo: ActorRef, txId: ByteVector32, outputIndex: Int, publicKeyScript: ByteVector, event: BitcoinEvent, hints: Set[ByteVector32] = Set.empty) extends Watch
+// The amount is necessary to check the signatures of a spending tx
+final case class WatchSpent(replyTo: ActorRef, txId: ByteVector32, outputIndex: Int, publicKeyScript: ByteVector, amount: Satoshi, event: BitcoinEvent, hints: Set[ByteVector32] = Set.empty) extends Watch
 
 object WatchSpent {
-  // if we have the entire transaction, we can get the publicKeyScript from the relevant output
+  // if we have the entire transaction, we can get the publicKeyScript and amount from the relevant output
   def apply(replyTo: ActorRef, tx: Transaction, outputIndex: Int, event: BitcoinEvent): WatchSpent =
-    WatchSpent(replyTo, tx.txid, outputIndex, tx.txOut(outputIndex).publicKeyScript, event)
+    WatchSpent(replyTo, tx.txid, outputIndex, tx.txOut(outputIndex).publicKeyScript, tx.txOut(outputIndex).amount, event)
 }
 
 trait WatchEvent {

@@ -1,5 +1,6 @@
 package fr.acinq.eclair.blockchain.electrum
 
+import java.io.ByteArrayInputStream
 import java.net.{InetSocketAddress, SocketAddress}
 import java.util
 
@@ -312,16 +313,17 @@ object ElectrumClient {
 
   case class GetMerkle(txid: ByteVector32, height: Int, override val contextOpt: Option[Any] = None) extends Request
   case class GetMerkleResponse(txid: ByteVector32, merkle: List[ByteVector32], blockHeight: Int, pos: Int, override val contextOpt: Option[Any] = None) extends Response {
-    lazy val root: ByteVector32 = {
+    // Inner nodes are 64-byte concatenations of two hashes which are hashed into a parent on the way to the root
+    lazy val (root, innerNodes) = {
       @tailrec
-      def loop(pos: Int, hashes: Seq[ByteVector32] = Nil): ByteVector32 = {
-        if (hashes.length == 1) hashes.head
+      def loop(pos: Int, hashes: Seq[ByteVector32], nodes: List[ByteVector]): (ByteVector32, List[ByteVector]) = {
+        if (hashes.length == 1) (hashes.head, nodes)
         else {
-          val h = if (pos % 2 == 1) Crypto.hash256(hashes(1) ++ hashes.head) else Crypto.hash256(hashes.head ++ hashes(1))
-          loop(pos / 2, h +: hashes.drop(2))
+          val node = if (pos % 2 == 1) hashes(1) ++ hashes.head else hashes.head ++ hashes(1)
+          loop(pos / 2, Crypto.hash256(node) +: hashes.drop(2), node :: nodes)
         }
       }
-      loop(pos, txid.reverse +: merkle.map(b => b.reverse))
+      loop(pos, txid.reverse +: merkle.map(b => b.reverse), Nil)
     }
   }
 
@@ -506,9 +508,11 @@ object ElectrumClient {
           val JArray(hashes) = json.result \ "merkle"
           val leaves = hashes collect { case JString(value) => ByteVector32.fromValidHex(value) }
           GetTransactionIdFromPositionResponse(ByteVector32.fromValidHex(tx_hash), height, tx_pos, leaves)
-        case GetTransaction(_, context_opt) =>
+        case GetTransaction(txid, context_opt) =>
           val JString(hex) = json.result
-          GetTransactionResponse(Transaction.read(hex), context_opt)
+          val tx = Transaction.read(hex)
+          require(tx.txid == txid, s"response txid ${tx.txid} does not match request txid $txid")
+          GetTransactionResponse(tx, context_opt)
         case AddressSubscription(address, _) => json.result match {
           case JString(status) => AddressSubscriptionResponse(address, status)
           case _ => AddressSubscriptionResponse(address, "")
@@ -536,13 +540,23 @@ object ElectrumClient {
           val bin = ByteVector.fromValidHex(hex).toArray
           val blockHeaders = bin.grouped(80).map(BlockHeader.read).toList
           GetHeadersResponse(start_height, blockHeaders, max)
-        case GetMerkle(txid, _, context_opt) =>
+        case GetMerkle(txid, height, context_opt) =>
           val JArray(hashes) = json.result \ "merkle"
           val leaves = hashes collect { case JString(value) => ByteVector32.fromValidHex(value) }
           val blockHeight = intField(json.result, "block_height")
           val JInt(pos) = json.result \ "pos"
-          GetMerkleResponse(txid, leaves, blockHeight, pos.toInt, context_opt)
+          val response = GetMerkleResponse(txid, leaves, blockHeight, pos.toInt, context_opt)
+          require(blockHeight == height, s"response height $blockHeight does not match request height $height for txid $txid")
+          require(!response.innerNodes.exists(readsAsTransaction), s"merkle proof for txid $txid has an inner node which reads as a transaction")
+          response
       }
     }
   }
+
+  // A 64-byte inner node which also reads as a complete transaction can hide a fake leaf (CVE-2017-12842)
+  def readsAsTransaction(bytes: ByteVector): Boolean = Try {
+    val input = new ByteArrayInputStream(bytes.toArray)
+    Transaction.read(input, Protocol.PROTOCOL_VERSION)
+    input.available == 0
+  } getOrElse false
 }
