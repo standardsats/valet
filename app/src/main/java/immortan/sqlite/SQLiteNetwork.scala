@@ -141,4 +141,7 @@ class SQLiteNetwork(val db: DBInterface, val updateTable: ChannelUpdateTable, va
     db.change(announceTable.killAllSql)
     db.change(updateTable.killAllSql)
   }
+
+  // Short channel ids of one chain mean other channels on another chain
+  def clearExcludedTable: Unit = db.change(excludedTable.killAllSql)
 }

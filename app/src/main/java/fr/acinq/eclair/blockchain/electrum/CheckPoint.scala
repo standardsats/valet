@@ -44,8 +44,10 @@ object CheckPoint {
     checkpoints.toVector
   }
 
-  def load(chainHash: ByteVector32, headerDb: HeaderDb): Vector[CheckPoint] = {
-    val checkpoints = CheckPoint.loadFromChainHash(chainHash)
+  def load(chainHash: ByteVector32, headerDb: HeaderDb): Vector[CheckPoint] = extend(CheckPoint.loadFromChainHash(chainHash), headerDb)
+
+  // Adds a checkpoint for each full retargeting period of saved headers after the given checkpoints
+  def extend(checkpoints: Vector[CheckPoint], headerDb: HeaderDb): Vector[CheckPoint] = {
     val checkpoints1 = headerDb.getTip match {
       case Some((height, _)) =>
         val newcheckpoints = for {h <- checkpoints.size * RETARGETING_PERIOD - 1 + RETARGETING_PERIOD to height - RETARGETING_PERIOD by RETARGETING_PERIOD} yield {

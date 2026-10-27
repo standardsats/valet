@@ -647,10 +647,10 @@ abstract class ChannelNormal(bag: ChannelBag) extends Channel {
         val rcp1NextOpt = for {
           rcp <- closing.nextRemoteCommitPublished
           nextRemoteCommit <- commits1.remoteNextCommitInfo.left.toOption.map(_.nextRemoteCommit)
-        } yield Closing.claimRemoteCommitTxOutputs(commits1, nextRemoteCommit, rcp.commitTx, conf.feeEstimator)
+        } yield Closing.withNewHtlcClaims(rcp, Closing.claimRemoteCommitTxOutputs(commits1, nextRemoteCommit, rcp.commitTx, conf.feeEstimator))
 
         val lcp1Opt = for (lcp <- closing.localCommitPublished) yield Closing.claimCurrentLocalCommitTxOutputs(commits1, lcp.commitTx, conf)
-        val rcp1Opt = for (rcp <- closing.remoteCommitPublished) yield Closing.claimRemoteCommitTxOutputs(commits1, commits1.remoteCommit, rcp.commitTx, conf.feeEstimator)
+        val rcp1Opt = for (rcp <- closing.remoteCommitPublished) yield Closing.withNewHtlcClaims(rcp, Closing.claimRemoteCommitTxOutputs(commits1, commits1.remoteCommit, rcp.commitTx, conf.feeEstimator))
         val closing1 = closing.copy(commitments = commits1, localCommitPublished = lcp1Opt, remoteCommitPublished = rcp1Opt, nextRemoteCommitPublished = rcp1NextOpt)
         StoreBecomeSend(closing1, CLOSING, ourFulfillMsg)
         rcp1NextOpt.foreach(doPublish)

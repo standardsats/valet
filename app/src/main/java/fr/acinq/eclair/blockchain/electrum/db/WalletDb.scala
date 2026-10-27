@@ -15,6 +15,7 @@ trait HeaderDb {
   def getHeader(blockHash: ByteVector32): Option[HeightAndHeader]
   def getHeaders(startHeight: Int, maxCount: Int): Seq[BlockHeader]
   def getTip: Option[HeightAndHeader]
+  def removeAllHeaders: Unit
 }
 
 sealed trait ChainWalletInfo {

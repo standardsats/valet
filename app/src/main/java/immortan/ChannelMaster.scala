@@ -54,6 +54,10 @@ object ChannelMaster {
   final val NO_PREIMAGE = ByteVector32.One
   final val NO_SECRET = ByteVector32.Zeroes
 
+  // A channel which waits this long for the peer's channel_reestablish on a live connection gets a new connection, at most MAX_FORCED_RECONNECTS times per app run
+  final val REESTABLISH_TIMEOUT = 60.seconds
+  final val MAX_FORCED_RECONNECTS = 3
+
   def dangerousHCRevealed(allRevealed: Map[ByteVector32, RevealedLocalFulfills], tip: Long, hash: ByteVector32): Iterable[LocalFulfill] = {
     // Of all incoming payments inside of HCs for which we have revealed a preimage, find those which are dangerously close to expiration, but not expired yet, but not hopelessly close
     allRevealed.getOrElse(hash, Iterable.empty).filter(tip >= _.theirAdd.cltvExpiry.underlying - LNParams.hcFulfillSafetyBlocks).filter(tip <= _.theirAdd.cltvExpiry.underlying - 3)
@@ -76,6 +80,8 @@ class ChannelMaster(val payBag: PaymentBag, val chanBag: ChannelBag, val dataBag
 
   val reconnectFailures: TrieMap[PublicKey, Int] = TrieMap.empty
   val reconnectScheduled: TrieMap[PublicKey, Boolean] = TrieMap.empty
+  val reestablishWaitSince: TrieMap[ByteVector32, Long] = TrieMap.empty
+  val forcedReconnects: TrieMap[ByteVector32, Int] = TrieMap.empty
 
   val localPaymentListeners: mutable.Set[OutgoingPaymentListener] = {
     val defListener: OutgoingPaymentListener = new OutgoingPaymentListener {
@@ -161,9 +167,11 @@ class ChannelMaster(val payBag: PaymentBag, val chanBag: ChannelBag, val dataBag
 
   // CONNECTION LISTENER
 
-  // Note that this may be sent multiple times after chain wallet reconnects
+  // CommsTower sends this once per connection, channels send channel_reestablish again and their wait for an answer starts again
   override def onOperational(worker: CommsTower.Worker, theirInit: Init): Unit = {
-    allFromNode(worker.info.nodeId).foreach(_.chan process CMD_SOCKET_ONLINE)
+    val chans = allFromNode(worker.info.nodeId)
+    reestablishWaitSince --= chans.map(_.commits.channelId)
+    chans.foreach(_.chan process CMD_SOCKET_ONLINE)
     reconnectFailures -= worker.info.nodeId
   }
 
@@ -210,7 +218,27 @@ class ChannelMaster(val payBag: PaymentBag, val chanBag: ChannelBag, val dataBag
     all.values.flatMap(Channel.chanAndCommitsOpt).foreach { cnc =>
       // Connect to all peers with channels, including CLOSED ones
       if (!reconnectScheduled.contains(cnc.commits.remoteInfo.nodeId)) CommsTower.listenNative(Set(me), cnc.commits.remoteInfo)
+      reconnectIfReestablishUnanswered(cnc)
     }
+
+  // BOLT 2 allows a new channel_reestablish only after a reconnect, so a peer which does not answer ours gets a new connection
+  def reconnectIfReestablishUnanswered(cnc: ChanAndCommits): Unit = {
+    val channelId = cnc.commits.channelId
+    val liveWorker = CommsTower.workers.get(cnc.commits.remoteInfo.nodeSpecificPair).filter(_.theirInit.isDefined)
+    val waitsForReestablish = liveWorker.isDefined && cnc.chan.state == SLEEPING && cnc.commits.isInstanceOf[NormalCommits]
+
+    if (!waitsForReestablish) reestablishWaitSince -= channelId else {
+      val waitMillis = System.currentTimeMillis - reestablishWaitSince.getOrElseUpdate(channelId, System.currentTimeMillis)
+      val attempts = forcedReconnects.getOrElse(channelId, 0)
+
+      if (waitMillis > REESTABLISH_TIMEOUT.toMillis && attempts < MAX_FORCED_RECONNECTS) {
+        LNParams.logBag.put(s"channel-reestablish-timeout ${cnc.commits.remoteInfo.nodeId}", s"channel=$channelId attempt=${attempts + 1}")
+        forcedReconnects(channelId) = attempts + 1
+        reestablishWaitSince -= channelId
+        liveWorker.foreach(_.disconnect)
+      }
+    }
+  }
 
   // Marks as failed those payments which did not make it into channels before an app has been restarted
   def markAsFailed(paymentInfos: Iterable[PaymentInfo], inFlightOutgoing: Map[FullPaymentTag, OutgoingAdds] = Map.empty): Unit = paymentInfos

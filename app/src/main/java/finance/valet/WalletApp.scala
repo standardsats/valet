@@ -57,6 +57,7 @@ object WalletApp {
   var currentChainNode: Option[InetSocketAddress] = None
 
   // A custom signet has the same genesis block as Mutinynet, so a setting tells them apart. It needs a custom Electrum server.
+  // Set in makeOperational: channels on the device can keep the app on the chain of the local data
   var onCustomSignet: Boolean = false
 
   final val dbFileNameMisc = "misc.db"
@@ -87,7 +88,12 @@ object WalletApp {
   final val HIDE_ZERO_OUTPUTS = "hideZeroOutputs"
   final val RECOVERY_PHRASE_VIEWED = "recoveryPhraseViewed"
   final val CUSTOM_SIGNET = "customSignet"
-  final val HEADERS_CUSTOM_SIGNET = "headersCustomSignet"
+  // Signet chain of the local chain data and channels: MUTINYNET_ID, or CUSTOM_SIGNET_ID_PREFIX with the Electrum server of a custom signet
+  final val SIGNET_CHAIN_DATA = "signetChainData"
+  final val MUTINYNET_ID = "mutinynet"
+  final val CUSTOM_SIGNET_ID_PREFIX = "custom:"
+  // Replaced by SIGNET_CHAIN_DATA, read only to migrate
+  private[this] final val HEADERS_CUSTOM_SIGNET = "headersCustomSignet"
 
   def useAuth: Boolean = AppLock.isEnrolled(app)
   def fiatCode: String = app.prefs.getString(FIAT_CODE, "usd")
@@ -108,9 +114,40 @@ object WalletApp {
     if (denom == SatDenomination.sign) SatDenomination else BtcDenomination
   }
 
-  def customElectrumAddress: Try[NodeAddress] = Try {
-    val rawAddress = app.prefs.getString(CUSTOM_ELECTRUM_ADDRESS, new String)
-    nodeaddress.decode(BitVector fromValidHex rawAddress).require.value
+  def customElectrumHex: String = app.prefs.getString(CUSTOM_ELECTRUM_ADDRESS, new String)
+
+  def electrumAddress(rawAddress: String): Try[NodeAddress] = Try(nodeaddress.decode(BitVector fromValidHex rawAddress).require.value)
+
+  def customElectrumAddress: Try[NodeAddress] = electrumAddress(customElectrumHex)
+
+  def isSignetFlavor: Boolean = BuildConfig.FLAVOR == "signet"
+
+  def signetIdFor(customSignet: Boolean, electrumHex: String): String =
+    if (customSignet && electrumAddress(electrumHex).isSuccess) CUSTOM_SIGNET_ID_PREFIX + electrumHex else MUTINYNET_ID
+
+  def selectedSignetId: String = signetIdFor(customSignet, customElectrumHex)
+
+  def storedSignetId: String = {
+    val migratedId = if (app.prefs.getBoolean(HEADERS_CUSTOM_SIGNET, false)) CUSTOM_SIGNET_ID_PREFIX + customElectrumHex else MUTINYNET_ID
+    app.prefs.getString(SIGNET_CHAIN_DATA, migratedId)
+  }
+
+  // Closed channels are deleted from the database, so any record is a channel which needs its chain
+  def channelsExist: Boolean = LNParams.cm.chanBag.all.nonEmpty
+
+  // Gives an error message if new settings would move channels to another signet chain, or select a custom signet without its Electrum server
+  def signetSwitchProblem(customSignet1: Boolean, electrumHex1: String): Option[Int] =
+    if (!isSignetFlavor) None
+    else if (customSignet1 && electrumAddress(electrumHex1).isFailure) Some(settings_custom_signet_no_electrum)
+    else if (signetIdFor(customSignet1, electrumHex1) != storedSignetId && channelsExist) Some(settings_custom_signet_close_channels)
+    else None
+
+  // Puts back the settings of the chain which the local data and channels belong to
+  def restoreSignetSettings(signetId: String): Unit = {
+    val editor = app.prefs.edit
+    if (signetId startsWith CUSTOM_SIGNET_ID_PREFIX) editor.putBoolean(CUSTOM_SIGNET, true).putString(CUSTOM_ELECTRUM_ADDRESS, signetId drop CUSTOM_SIGNET_ID_PREFIX.length)
+    else editor.putBoolean(CUSTOM_SIGNET, false).remove(CUSTOM_ELECTRUM_ADDRESS)
+    editor.commit
   }
 
   def customBackupLocation: Option[Uri] = {
@@ -161,15 +198,12 @@ object WalletApp {
     // In case these are needed early
     LNParams.logBag = new SQLiteLog(miscInterface)
 
-    onCustomSignet = BuildConfig.FLAVOR == "signet" && customSignet && customElectrumAddress.isSuccess
-
     val (hash, params) = {
       BuildConfig.FLAVOR match {
         case "mainnet" => (Block.LivenetGenesisBlock.hash, new SyncParams)
         case "tnet3" => (Block.Testnet3GenesisBlock.hash, new TestNet3SyncParams)
         case "tnet4" => (Block.Testnet4GenesisBlock.hash, new TestNet4SyncParams)
-        // Gossip peers of a custom signet are not known, as on regtest
-        case "signet" if onCustomSignet => (Block.SignetGenesisBlock.hash, new RegtestSyncParams)
+        // Mutinynet, makeOperational changes this for a custom signet
         case "signet" => (Block.SignetGenesisBlock.hash, new SignetSyncParams)
         case "regtest" => (Block.RegtestGenesisBlock.hash, new RegtestSyncParams)
       }
@@ -186,7 +220,6 @@ object WalletApp {
     require(isAlive, "Application is not alive, hence can not become operational")
     val essentialInterface = new DBInterfaceSQLiteAndroidEssential(app, dbFileNameEssential)
     val graphInterface = new DBInterfaceSQLiteAndroidGraph(app, dbFileNameGraph)
-    val currentCustomElectrum: Try[NodeAddress] = customElectrumAddress
     // The mnemonic must not linger in process memory for the whole app lifetime: it stays
     // in the (encrypted) database and is re-loaded on demand when the user views it
     LNParams.secret = secret.copy(mnemonic = List.empty)
@@ -201,6 +234,17 @@ object WalletApp {
         super.put(data)
       }
     }
+
+    // Channels belong to the signet chain of the local data, the user must close them before a switch to another signet chain
+    if (isSignetFlavor && selectedSignetId != storedSignetId && chanBag.all.nonEmpty) {
+      LNParams.logBag.put("signet-switch-refused", s"channels exist, stay on $storedSignetId, not $selectedSignetId")
+      restoreSignetSettings(storedSignetId)
+    }
+
+    onCustomSignet = isSignetFlavor && selectedSignetId.startsWith(CUSTOM_SIGNET_ID_PREFIX)
+    // Gossip peers of a custom signet are not known, as on regtest
+    if (onCustomSignet) LNParams.syncParams = new RegtestSyncParams
+    val currentCustomElectrum: Try[NodeAddress] = customElectrumAddress
 
     extDataBag.db txWrap {
       LNParams.feeRates = new FeeRates(extDataBag)
@@ -231,7 +275,7 @@ object WalletApp {
       case Block.LivenetGenesisBlock.hash => CheckPoint.load(app.getAssets open "checkpoints_mainnet.json")
       case Block.Testnet3GenesisBlock.hash => CheckPoint.load(app.getAssets open "checkpoints_testnet3.json")
       case Block.Testnet4GenesisBlock.hash => CheckPoint.load(app.getAssets open "checkpoints_testnet4.json")
-      // No checkpoints make ElectrumChainSync scan a custom signet from its genesis block
+      // No checkpoints in assets: ElectrumChainSync builds a custom signet from its genesis block and the saved headers
       case Block.SignetGenesisBlock.hash if onCustomSignet => Vector.empty
       case Block.SignetGenesisBlock.hash => CheckPoint.load(app.getAssets open "checkpoints_signet.json")
       case Block.RegtestGenesisBlock.hash => Vector.empty
@@ -242,20 +286,29 @@ object WalletApp {
 
     val params = WalletParameters(extDataBag, chainWalletBag, txDataBag, dustLimit = 546L.sat, gapLimit = WalletApp.gapLimit)
 
-    // Headers, wallet histories and graph of Mutinynet are not valid on a custom signet, and the reverse
-    if (onCustomSignet != app.prefs.getBoolean(HEADERS_CUSTOM_SIGNET, false)) {
-      extDataBag.db txWrap {
-        extDataBag.removeAllHeaders
-        chainWalletBag.resetAllData(params.emptyPersistentDataBytes)
-        txDataBag.removeAll
+    // Headers, wallet histories and graph of one signet chain (Mutinynet or a custom signet with its Electrum server) are not valid on another one
+    if (isSignetFlavor) {
+      val signetId = selectedSignetId
+      val editor = app.prefs.edit.putString(SIGNET_CHAIN_DATA, signetId).remove(HEADERS_CUSTOM_SIGNET)
+
+      if (signetId != storedSignetId) {
+        extDataBag.db txWrap {
+          extDataBag.removeAllHeaders
+          chainWalletBag.resetAllData(params.emptyPersistentDataBytes)
+          txDataBag.removeAll
+        }
+
+        graphInterface txWrap {
+          normalBag.clearDataTables
+          normalBag.clearExcludedTable
+          hostedBag.clearDataTables
+          hostedBag.clearExcludedTable
+        }
+
+        editor.remove(LAST_TOTAL_GOSSIP_SYNC).remove(LAST_NORMAL_GOSSIP_SYNC)
       }
 
-      graphInterface txWrap {
-        normalBag.clearDataTables
-        hostedBag.clearDataTables
-      }
-
-      app.prefs.edit.putBoolean(HEADERS_CUSTOM_SIGNET, onCustomSignet).remove(LAST_TOTAL_GOSSIP_SYNC).remove(LAST_NORMAL_GOSSIP_SYNC).commit
+      editor.commit
     }
 
     val electrumPool = LNParams.loggedActor(Props(classOf[ElectrumClientPool], LNParams.blockCount, LNParams.chainHash, LNParams.ec), "connection-pool")

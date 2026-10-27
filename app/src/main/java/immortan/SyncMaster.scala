@@ -33,6 +33,8 @@ object SyncMaster {
 
   // A sync worker which gets no reply to its queries for this long has stalled
   final val PROGRESS_TIMEOUT = 60.seconds
+  // Reply count of a check which must not find a stall: no real count is negative
+  final val NO_REPLIES_EXPECTED = -1L
 
   type PositionSet = Set[java.lang.Integer]
   type ConfirmedBySet = Set[PublicKey]
@@ -169,7 +171,7 @@ case class SyncWorker(master: CanBeRepliedTo, keyPair: KeyPair, remoteInfo: Remo
 
     case (data1: SyncWorkerShortIdsData, null, WAITING) =>
       become(data1, SHORT_ID_SYNC)
-      checkProgressLater
+      checkProgressLater(repliesReceived)
       for {
         worker <- connectedWorker
         init <- worker.theirInit
@@ -177,7 +179,7 @@ case class SyncWorker(master: CanBeRepliedTo, keyPair: KeyPair, remoteInfo: Remo
 
     case (data1: SyncWorkerGossipData, _, WAITING | SHORT_ID_SYNC) =>
       // A worker which comes from SHORT_ID_SYNC already has its progress checks
-      if (state == WAITING) checkProgressLater
+      if (state == WAITING) checkProgressLater(repliesReceived)
       become(data1, GOSSIP_SYNC)
       connectedWorker.foreach(me process _)
 
@@ -250,7 +252,9 @@ case class SyncWorker(master: CanBeRepliedTo, keyPair: KeyPair, remoteInfo: Remo
         LNParams.logBag.put("graph-sync-peer-timeout", s"${remoteInfo.alias} ${remoteInfo.nodeId} no replies for $PROGRESS_TIMEOUT, replies=$received")
         stalled = true
         CommsTower.workers.get(pair).foreach(_.disconnect)
-      } else checkProgressLater
+      } else if (awaitsReplies) checkProgressLater(repliesReceived)
+      // A worker which waits for the master may get new queries just before the next check, that check only starts a full new period
+      else checkProgressLater(NO_REPLIES_EXPECTED)
 
     case (CMDShutdown, _, _) =>
       become(freshData = null, SHUT_DOWN)
@@ -259,10 +263,8 @@ case class SyncWorker(master: CanBeRepliedTo, keyPair: KeyPair, remoteInfo: Remo
     case _ =>
   }
 
-  def checkProgressLater: Unit = {
-    val received = repliesReceived
+  def checkProgressLater(received: Long): Unit =
     Rx.ioQueue.delay(PROGRESS_TIMEOUT).foreach(_ => me process CMDCheckProgress(received), none)
-  }
 }
 
 sealed trait SyncMasterData extends { me =>

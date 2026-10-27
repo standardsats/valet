@@ -2,8 +2,10 @@ package fr.acinq.eclair
 
 import fr.acinq.bitcoin.DeterministicWallet._
 import fr.acinq.bitcoin.{Block, ByteVector32, OutPoint, Satoshi, Script, Transaction, TxIn, TxOut}
-import fr.acinq.eclair.blockchain.EclairWallet
+import fr.acinq.eclair.blockchain.{EclairWallet, TxConfirmedAt}
 import fr.acinq.eclair.blockchain.electrum.ElectrumWalletType
+import fr.acinq.eclair.channel.Helpers.Closing
+import fr.acinq.eclair.channel.RemoteCommitPublished
 import fr.acinq.eclair.blockchain.fee.FeeratePerKw
 import fr.acinq.eclair.transactions.Scripts.toRemoteDelayed
 import fr.acinq.eclair.transactions.Transactions
@@ -44,5 +46,22 @@ class AnchorSweepSpec {
     assertEquals(1L, signed.tx.txIn.head.sequence)
     assertEquals(walletScript, signed.tx.txOut.head.publicKeyScript)
     assertTrue(signed.tx.txOut.head.amount < toRemote.amount)
+  }
+
+  @Test
+  def newPreimageKeepsPublishedMainClaim: Unit = {
+    def tx(lockTime: Long) = Transaction(version = 2, txIn = TxIn(OutPoint(ByteVector32.Zeroes, 0), ByteVector.empty, 0L) :: Nil, txOut = Nil, lockTime = lockTime)
+    val (commitTx, publishedClaim, recomputedClaim, htlcSuccess) = (tx(0), tx(1), tx(2), tx(3))
+    val spent = Map(OutPoint(commitTx, 1) -> TxConfirmedAt(blockHeight = 100, publishedClaim))
+
+    val published = RemoteCommitPublished(commitTx, Some(publishedClaim), claimHtlcSuccessTxs = Nil, claimHtlcTimeoutTxs = Nil, irrevocablySpent = spent)
+    val recomputed = RemoteCommitPublished(commitTx, Some(recomputedClaim), claimHtlcSuccessTxs = htlcSuccess :: Nil, claimHtlcTimeoutTxs = Nil)
+    val merged = Closing.withNewHtlcClaims(published, recomputed)
+
+    assertEquals(Some(publishedClaim), merged.claimMainOutputTx)
+    assertEquals(spent, merged.irrevocablySpent)
+    assertEquals(htlcSuccess :: Nil, merged.claimHtlcSuccessTxs)
+    // No claim before (no key then): the new claim is used
+    assertEquals(Some(recomputedClaim), Closing.withNewHtlcClaims(published.copy(claimMainOutputTx = None), recomputed).claimMainOutputTx)
   }
 }

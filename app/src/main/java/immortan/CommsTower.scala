@@ -3,7 +3,7 @@ package immortan
 import java.net.Socket
 import java.util.concurrent.{ConcurrentHashMap, Executors}
 
-import fr.acinq.bitcoin.{Block, ByteVector32}
+import fr.acinq.bitcoin.ByteVector32
 import fr.acinq.bitcoin.Crypto.PublicKey
 import fr.acinq.eclair._
 import fr.acinq.eclair.Features.{ChannelRangeQueries, ChannelRangeQueriesExtended}
@@ -69,7 +69,7 @@ object CommsTower {
   }
 
   // Diagnostics on test chains only: channel messages go to logcat (System.out), gossip is left out because there is too much of it
-  def trace(direction: String, nodeId: PublicKey, message: LightningMessage): Unit = if (LNParams.chainHash != Block.LivenetGenesisBlock.hash) message match {
+  def trace(direction: String, nodeId: PublicKey, message: LightningMessage): Unit = if (!LNParams.isMainnet) message match {
     case msg: Warning => println(s"CommsTower: $direction $nodeId Warning ${msg.channelId} ${new String(msg.data.toArray, "UTF-8")}")
     case msg: Fail => println(s"CommsTower: $direction $nodeId Fail ${msg.channelId} ${new String(msg.data.toArray, "UTF-8")}")
     case msg: HasChannelId => println(s"CommsTower: $direction $nodeId ${msg.getClass.getSimpleName} ${msg.channelId}")
@@ -80,7 +80,7 @@ object CommsTower {
   }
 
   // A message which fails to decode is dropped, its tag and the codec error are the only trace of it
-  def traceUndecodable(nodeId: PublicKey, data: ByteVector, err: scodec.Err): Unit = if (LNParams.chainHash != Block.LivenetGenesisBlock.hash)
+  def traceUndecodable(nodeId: PublicKey, data: ByteVector, err: scodec.Err): Unit = if (!LNParams.isMainnet)
     println(s"CommsTower: in $nodeId Undecodable tag=${data.take(2).toInt(signed = false)} length=${data.size} ${err.messageWithContext}")
   // Add or remove listeners to a connection where our nodeId is stable, not a randomly generated one (one which makes us seen as a constant peer by remote)
   def listenNative(listeners1: Set[ConnectionListener], remoteInfo: RemoteNodeInfo): Unit = listen(listeners1, remoteInfo.nodeSpecificPair, remoteInfo)
@@ -168,7 +168,8 @@ object CommsTower {
     thread onComplete { result =>
       // Will also run after forget
       if (!disconnectRequested) result.failed.foreach(err => LNParams.logBag.put(s"comms-tower-disconnect ${info.nodeId}", err.toString))
-      if (!disconnectRequested && result.isSuccess) LNParams.logBag.put(s"comms-tower-disconnect ${info.nodeId}", s"closed by peer, init received=${theirInit.isDefined}")
+      // Diagnostics on test chains only, like trace: on mainnet peers close connections too often
+      if (!disconnectRequested && result.isSuccess && !LNParams.isMainnet) LNParams.logBag.put(s"comms-tower-disconnect ${info.nodeId}", s"closed by peer, init received=${theirInit.isDefined}")
       try pinging.unsubscribe catch none
       listeners(pair).foreach(_ onDisconnect me)
       // Once disconnected, worker gets removed

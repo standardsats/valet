@@ -7,6 +7,7 @@ import fr.acinq.eclair.blockchain.EclairWallet
 import immortan.crypto.Tools.Any2Some
 import scodec.bits.ByteVector
 
+import scala.collection.concurrent.TrieMap
 import scala.util.Try
 
 
@@ -78,8 +79,13 @@ abstract class ElectrumWalletType {
     Script.write(scriptProgram)
   }
 
+  private[this] val privateKeys = TrieMap.empty[(PublicKey, Long), Option[PrivateKey]]
+
   // Channels use one of our wallet keys as a static payment basepoint, its private key is needed to sweep an anchor channel's to_remote output
-  def privateKeyFor(publicKey: PublicKey, maxIndex: Long): Option[PrivateKey] = secrets.flatMap { accountAndXPriv =>
+  // A search derives up to 2 * maxIndex keys, so each result (also a miss) is kept for the next claim of the same channel
+  def privateKeyFor(publicKey: PublicKey, maxIndex: Long): Option[PrivateKey] = privateKeys.getOrElseUpdate(publicKey -> maxIndex, findPrivateKey(publicKey, maxIndex))
+
+  private def findPrivateKey(publicKey: PublicKey, maxIndex: Long): Option[PrivateKey] = secrets.flatMap { accountAndXPriv =>
     val keys = (0L until maxIndex).iterator.flatMap(idx => derivePublicKey(accountMaster, idx) :: derivePublicKey(changeMaster, idx) :: Nil)
     keys.find(_.publicKey == publicKey).map(key => derivePrivateKey(accountAndXPriv.master, key.path).privateKey)
   }
