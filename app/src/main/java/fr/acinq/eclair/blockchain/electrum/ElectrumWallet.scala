@@ -33,6 +33,16 @@ class ElectrumWallet(client: ActorRef, chainSync: ActorRef, params: WalletParame
     data1
   }
 
+  // A reorg may replace a block with our tx (also while we were offline): its proof goes, and its history and proof are asked for again
+  def withChain(data: ElectrumData, blockchain1: Blockchain): ElectrumData = {
+    val staleTxids = data.proofs.collect { case (txid, proof) if blockchain1.getHeader(proof.blockHeight).exists(_.hashMerkleRoot != proof.root) => txid }.toSet
+    val staleScriptHashes = data.history.collect { case (scriptHash, items) if items.exists(staleTxids contains _.txHash) => scriptHash }.toSet
+    for (scriptHash <- staleScriptHashes) client ! ElectrumClient.GetScriptHashHistory(scriptHash)
+
+    val data1 = data.copy(blockchain = blockchain1, proofs = data.proofs -- staleTxids, pendingHistoryRequests = data.pendingHistoryRequests ++ staleScriptHashes)
+    if (staleTxids.isEmpty) data1 else data1.withOverridingTxids
+  }
+
   context.system.eventStream.subscribe(channel = classOf[Blockchain], subscriber = self)
 
   client ! ElectrumClient.AddStatusListener(self)
@@ -55,13 +65,12 @@ class ElectrumWallet(client: ActorRef, chainSync: ActorRef, params: WalletParame
     case Event(blockchain1: Blockchain, data) =>
       for (scriptHash <- data.accountKeyMap.keys) client ! ElectrumClient.ScriptHashSubscription(scriptHash, self)
       for (scriptHash <- data.changeKeyMap.keys) client ! ElectrumClient.ScriptHashSubscription(scriptHash, self)
-      val data1 = data.copy(blockchain = blockchain1)
-      goto(RUNNING) using persistAndNotify(data1)
+      goto(RUNNING) using persistAndNotify(withChain(data, blockchain1))
   }
 
   when(RUNNING) {
     case Event(blockchain1: Blockchain, data) =>
-      val data1 = data.copy(blockchain = blockchain1)
+      val data1 = withChain(data, blockchain1)
       data1.pendingMerkleResponses.foreach(self.!)
       stay using persistAndNotify(data1)
 
@@ -114,9 +123,10 @@ class ElectrumWallet(client: ActorRef, chainSync: ActorRef, params: WalletParame
       val pendingHeadersRequests1 = collection.mutable.HashSet.empty[GetHeaders]
       pendingHeadersRequests1 ++= data.pendingHeadersRequests
 
+      // Only a proven item stays when a server does not list it: an item which a reorg removed has no proof
       val shadowItems = for {
         existingItems <- data.history.get(scriptHash).toList
-        item <- existingItems if !items.exists(_.txHash == item.txHash) && data.wasConfirmed(item)
+        item <- existingItems if !items.exists(_.txHash == item.txHash) && data.proofs.contains(item.txHash)
       } yield item
 
       val items1 = items ++ shadowItems
@@ -152,7 +162,10 @@ class ElectrumWallet(client: ActorRef, chainSync: ActorRef, params: WalletParame
         pendingHistoryRequests = data.pendingHistoryRequests - scriptHash,
         pendingTransactionRequests = pendingTransactionRequests1,
         pendingHeadersRequests = pendingHeadersRequests1.toSet)
-      stay using persistAndNotify(data1)
+
+      // A tx which leaves a history (replaced or dropped from mempool) or comes back may change which of conflicting txs wins
+      val txidsChanged = data.history.getOrElse(scriptHash, Nil).map(_.txHash).toSet != items1.map(_.txHash).toSet
+      stay using persistAndNotify(if (txidsChanged) data1.withOverridingTxids else data1)
 
     case Event(GetTransactionResponse(tx, contextOpt), data) =>
       val clearedExcludedOutPoints: List[OutPoint] = data.excludedOutPoints diff tx.txIn.map(_.outPoint)
@@ -172,14 +185,15 @@ class ElectrumWallet(client: ActorRef, chainSync: ActorRef, params: WalletParame
 
     case Event(response @ GetMerkleResponse(txid, _, height, _, _), data) =>
       val request = GetHeaders(height / RETARGETING_PERIOD * RETARGETING_PERIOD, RETARGETING_PERIOD)
+      val data0 = data.copy(pendingMerkleResponses = data.pendingMerkleResponses - response)
 
       data.blockchain.getHeader(height) orElse params.headerDb.getHeader(height) match {
         case Some(existingHeader) if existingHeader.hashMerkleRoot == response.root && data.isTxKnown(txid) =>
-          val data1 = data.copy(proofs = data.proofs.updated(txid, response), pendingMerkleResponses = data.pendingMerkleResponses - response)
+          val data1 = data0.copy(proofs = data.proofs.updated(txid, response))
           stay using persistAndNotify(data1.withOverridingTxids)
 
         case Some(existingHeader) if existingHeader.hashMerkleRoot == response.root =>
-          stay
+          stay using data0
 
         case None if data.pendingHeadersRequests.contains(request) =>
           stay using data.copy(pendingMerkleResponses = data.pendingMerkleResponses + response)
@@ -191,7 +205,9 @@ class ElectrumWallet(client: ActorRef, chainSync: ActorRef, params: WalletParame
 
         case _ =>
           // Something is wrong with this client, better disconnect from it
-          stay using data.copy(transactions = data.transactions - txid) replying PoisonPill
+          // A response which waited for its header comes from this wallet itself, its client can not be told apart then
+          if (sender != self) sender ! PoisonPill
+          stay using data0.copy(transactions = data.transactions - txid)
       }
 
     case Event(bc: ElectrumClient.BroadcastTransaction, _) =>
@@ -212,7 +228,9 @@ class ElectrumWallet(client: ActorRef, chainSync: ActorRef, params: WalletParame
 
       val depth = data.depth(tx.txid)
       val stamp = data.timestamp(tx.txid, params.headerDb)
-      val isDoubleSpent = doubleSpendTrials.contains(true)
+      // A replacing tx may not touch this wallet at all (a payer sends coins back to self), then only a missing history item tells
+      val isDropped = stateName == RUNNING && data.isUnlisted(tx.txid)
+      val isDoubleSpent = doubleSpendTrials.contains(true) || isDropped
       stay replying IsDoubleSpentResponse(tx, depth, stamp, isDoubleSpent)
 
     case Event(GetCurrentReceiveAddresses, data) =>
@@ -409,6 +427,11 @@ case class ElectrumData(ewt: ElectrumWalletType, blockchain: Blockchain,
 
   def isTxKnown(txid: ByteVector32): Boolean = transactions.contains(txid) || pendingTransactionRequests.contains(txid) || pendingTransactions.exists(_.txid == txid)
 
+  lazy val historyTxids: Set[ByteVector32] = history.values.flatten.map(_.txHash).toSet
+
+  // An unconfirmed tx which no up-to-date history lists is not in a server mempool anymore
+  def isUnlisted(txid: ByteVector32): Boolean = pendingHistoryRequests.isEmpty && !proofs.contains(txid) && !historyTxids.contains(txid)
+
   def isMine(txIn: TxIn): Boolean = ewt.extractPubKeySpentFrom(txIn).map(ewt.writePublicKeyScriptHash).exists(publicScriptMap.contains)
 
   def timestamp(txid: ByteVector32, headerDb: HeaderDb): Long = {
@@ -542,8 +565,10 @@ case class ElectrumData(ewt: ElectrumWalletType, blockchain: Blockchain,
   }
 
   def withOverridingTxids: ElectrumData = {
-    def changeKeyDepth(tx: Transaction) = if (proofs contains tx.txid) Long.MaxValue else tx.txOut.map(_.publicKeyScript).flatMap(publicScriptChangeMap.get).map(_.path.lastChildNumber).headOption.getOrElse(Long.MinValue)
-    def computeOverride(txs: Iterable[Transaction] = Nil) = Stream.continually(txs maxBy changeKeyDepth) zip txs collect { case (latterTx, formerTx) if latterTx != formerTx => formerTx.txid -> latterTx.txid }
+    def changeKeyDepth(tx: Transaction) = tx.txOut.map(_.publicKeyScript).flatMap(publicScriptChangeMap.get).map(_.path.lastChildNumber).headOption.getOrElse(Long.MinValue)
+    // A confirmed tx wins, then a tx which a server still lists (only one of conflicting txs can be in mempool), then a tx with a later change key
+    def rank(tx: Transaction) = (proofs contains tx.txid, historyTxids contains tx.txid, changeKeyDepth(tx))
+    def computeOverride(txs: Iterable[Transaction] = Nil) = Stream.continually(txs maxBy rank) zip txs collect { case (latterTx, formerTx) if latterTx != formerTx => formerTx.txid -> latterTx.txid }
     val overrides = transactions.values.map(Stream continually _).flatMap(txStream => txStream.head.txIn zip txStream).groupBy(_._1.outPoint).values.map(_.secondItems).flatMap(computeOverride)
     copy(overriddenPendingTxids = overrides.toMap)
   }

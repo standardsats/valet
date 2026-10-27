@@ -43,7 +43,7 @@ object ChannelNormal {
 abstract class ChannelNormal(bag: ChannelBag) extends Channel {
   def watchConfirmedSpent(cs: NormalCommits, watchConfirmed: Boolean, watchSpent: Boolean): Unit = {
     if (watchConfirmed) LNParams.chainWallets.watcher ! WatchConfirmed(receiver, cs.commitInput.outPoint.txid, cs.commitInput.txOut.publicKeyScript, LNParams.minDepthBlocks, BITCOIN_FUNDING_DEPTHOK)
-    if (watchSpent) LNParams.chainWallets.watcher ! WatchSpent(receiver, cs.commitInput.outPoint.txid, cs.commitInput.outPoint.index.toInt, cs.commitInput.txOut.publicKeyScript, BITCOIN_FUNDING_SPENT)
+    if (watchSpent) LNParams.chainWallets.watcher ! WatchSpent(receiver, cs.commitInput.outPoint.txid, cs.commitInput.outPoint.index.toInt, cs.commitInput.txOut.publicKeyScript, cs.commitInput.txOut.amount, BITCOIN_FUNDING_SPENT)
   }
 
   def doProcess(change: Any): Unit =

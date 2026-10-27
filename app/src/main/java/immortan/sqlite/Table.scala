@@ -266,7 +266,8 @@ object TxTable extends Table {
   // Electrum may rediscover history in a different order after recovery, so
   // display transactions by their confirmed timestamp, not insertion order.
   val selectRecentSql = s"SELECT * FROM $table ORDER BY $seenAt DESC, $id DESC LIMIT ?"
-  val selectPendingSql = s"SELECT * FROM $table WHERE $depth < ? AND $doubleSpent = 0 ORDER BY $seenAt ASC, $id ASC"
+  // A tx which left mempool is marked as double-spent, but it may come back or confirm: so double-spent txs are checked too
+  val selectPendingSql = s"SELECT * FROM $table WHERE $depth < ? ORDER BY $seenAt ASC, $id ASC"
 
   val selectSummarySql = s"SELECT SUM($feeSat), SUM($receivedSat), SUM($sentSat), COUNT($id) FROM $table WHERE $doubleSpent = 0"
 

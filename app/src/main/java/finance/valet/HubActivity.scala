@@ -29,6 +29,7 @@ import com.ornach.nobobutton.NoboButton
 import com.softwaremill.quicklens._
 import fr.acinq.bitcoin._
 import fr.acinq.eclair._
+import fr.acinq.eclair.blockchain.EclairWallet
 import fr.acinq.eclair.blockchain.electrum.ElectrumWallet.{GenerateTxResponse, RBFResponse, WalletReady}
 import fr.acinq.eclair.blockchain.electrum.{ElectrumEclairWallet, ElectrumWallet}
 import fr.acinq.eclair.blockchain.fee.{FeeratePerByte, FeeratePerKw}
@@ -667,7 +668,9 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
 
         case info: TxInfo =>
           val amount = if (info.isIncoming) info.receivedSat.toMilliSatoshi else info.sentSat.toMilliSatoshi
-          val canRBF = !info.isIncoming && !info.isDoubleSpent && info.depth < 1 && info.description.rbf.isEmpty && info.description.cpfpOf.isEmpty
+          // Same rule as in wallet: a tx which does not signal RBF (a channel funding tx) can not be replaced
+          val signalsRBF = info.tx.txIn.forall(_.sequence <= EclairWallet.OPT_IN_FULL_RBF)
+          val canRBF = !info.isIncoming && !info.isDoubleSpent && info.depth < 1 && info.description.rbf.isEmpty && info.description.cpfpOf.isEmpty && signalsRBF
           val canCPFP = info.isIncoming && !info.isDoubleSpent && info.depth < 1 && info.description.rbf.isEmpty && info.description.canBeCPFPd
           val isFromSigningWallet = LNParams.chainWallets.findByPubKey(info.pubKey).exists(_.isSigning)
           val isRbfCancel = info.description.rbf.exists(_.mode == TxDescription.RBF_CANCEL)

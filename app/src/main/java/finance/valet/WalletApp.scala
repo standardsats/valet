@@ -313,7 +313,7 @@ object WalletApp {
 
     val electrumPool = LNParams.loggedActor(Props(classOf[ElectrumClientPool], LNParams.blockCount, LNParams.chainHash, LNParams.ec), "connection-pool")
     val sync = LNParams.loggedActor(Props(classOf[ElectrumChainSync], electrumPool, params.headerDb, LNParams.chainHash), "chain-sync")
-    val watcher = LNParams.loggedActor(Props(classOf[ElectrumWatcher], LNParams.blockCount, electrumPool), "channel-watcher")
+    val watcher = LNParams.loggedActor(Props(new ElectrumWatcher(LNParams.blockCount, electrumPool, sync, params.headerDb)), "channel-watcher")
     val catcher = LNParams.loggedActor(Props(new WalletEventsCatcher), "events-catcher")
 
     val walletExt: WalletExt =
