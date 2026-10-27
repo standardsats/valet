@@ -325,6 +325,11 @@ object Helpers {
       RemoteCommitPublished(tx, claimRemoteMainOutput(cs, tx, feeEstimator), successTxs, timeoutTxs)
     }
 
+    // A preimage which arrives after a force-close changes only the HTLC claims: the claim of our main output can be in the chain already,
+    // a new claim with another feerate would have another txid and would never confirm, and confirmed spends stay valid
+    def withNewHtlcClaims(published: RemoteCommitPublished, recomputed: RemoteCommitPublished): RemoteCommitPublished =
+      recomputed.copy(claimMainOutputTx = published.claimMainOutputTx orElse recomputed.claimMainOutputTx, irrevocablySpent = published.irrevocablySpent)
+
     // Without anchors our main output in their commit pays our wallet key directly and the wallet picks it up
     // With anchors it is a P2WSH with a 1-block CSV which only we can spend, so it has to be swept into our wallet
     def claimRemoteMainOutput(cs: NormalCommits, commitTx: Transaction, feeEstimator: FeeEstimator): Option[Transaction] = cs.channelFeatures.commitmentFormat match {
@@ -333,12 +338,18 @@ object Helpers {
         val paymentBasepoint = cs.localParams.walletStaticPaymentBasepoint
         val feeratePerKw = feeEstimator.getFeeratePerKw(LNParams.feeRates.info.onChainFeeConf.feeTargets.claimMainBlockTarget)
         val claimTx = Transactions.makeClaimRemoteDelayedOutputTx(commitTx, cs.localParams.dustLimit, paymentBasepoint, cs.localParams.defaultFinalScriptPubKey, feeratePerKw)
-        def paymentKey = LNParams.chainWallets.wallets.iterator.flatMap(_.ewt.privateKeyFor(paymentBasepoint, maxIndex = 5000L)).toStream.headOption
 
-        for {
-          info <- claimTx.right.toOption
-          privateKey <- paymentKey
-        } yield Transactions.addSigs(info, Transactions.sign(info, privateKey, TxOwner.Local, format)).tx
+        def paymentKey: Option[PrivateKey] = {
+          // The built-in wallet gives the basepoint to new channels, so it is searched first
+          val (builtIn, others) = LNParams.chainWallets.wallets.partition(_.isBuiltIn)
+          (builtIn ++ others).iterator.flatMap(_.ewt.privateKeyFor(paymentBasepoint, maxIndex = 5000L)).toStream.headOption
+        }
+
+        claimTx.right.toOption.flatMap { info =>
+          val signedClaimOpt = for (privateKey <- paymentKey) yield Transactions.addSigs(info, Transactions.sign(info, privateKey, TxOwner.Local, format)).tx
+          if (signedClaimOpt.isEmpty) LNParams.logBag.put("anchor-sweep-no-key", s"channel=${cs.channelId} basepoint=$paymentBasepoint output=${info.input.outPoint}")
+          signedClaimOpt
+        }
     }
 
     def claimRevokedRemoteCommitTxOutputs(cs: NormalCommits, commitTx: Transaction, db: ChannelBag, feeEstimator: FeeEstimator): Option[RevokedCommitPublished] = {

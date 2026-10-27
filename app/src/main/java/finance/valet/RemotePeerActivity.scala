@@ -15,7 +15,7 @@ import fr.acinq.eclair._
 import fr.acinq.eclair.blockchain.electrum.ElectrumEclairWallet
 import fr.acinq.eclair.blockchain.electrum.ElectrumWallet.GenerateTxResponse
 import fr.acinq.eclair.blockchain.fee.{FeeratePerByte, FeeratePerKw}
-import fr.acinq.eclair.channel.{Commitments, DATA_WAIT_FOR_FUNDING_CONFIRMED, DATA_WAIT_FOR_FUNDING_INTERNAL}
+import fr.acinq.eclair.channel.{CMD_SOCKET_OFFLINE, Commitments, DATA_WAIT_FOR_FUNDING_CONFIRMED, DATA_WAIT_FOR_FUNDING_INTERNAL}
 import fr.acinq.eclair.transactions.Scripts
 import fr.acinq.eclair.wire._
 import immortan.Ticker.{EUR_TICKER, USD_TICKER}
@@ -41,6 +41,10 @@ object RemotePeerActivity {
     LNParams.cm.all += Tuple2(cs.channelId, freshChannel)
     // This removes all previous channel listeners
     freshChannel.listeners = Set(LNParams.cm)
+    // The open handler stops to listen before this point: if the connection dropped meanwhile, the channel must sleep,
+    // or it would not send channel_reestablish after the reconnect
+    val isOnline = CommsTower.workers.get(cs.remoteInfo.nodeSpecificPair).exists(_.theirInit.isDefined)
+    if (!isOnline) freshChannel process CMD_SOCKET_OFFLINE
     LNParams.cm.initConnect
 
     // Update view on hub activity and finalize local stuff

@@ -1,7 +1,7 @@
 package fr.acinq.eclair.blockchain.electrum
 
 import akka.actor.{ActorRef, FSM, PoisonPill}
-import fr.acinq.bitcoin.{Block, ByteVector32}
+import fr.acinq.bitcoin.{Block, BlockHeader, ByteVector32}
 import fr.acinq.eclair.blockchain.electrum.Blockchain.RETARGETING_PERIOD
 import fr.acinq.eclair.blockchain.electrum.ElectrumClient.GetHeaders
 import fr.acinq.eclair.blockchain.electrum.ElectrumWallet.{DISCONNECTED, RUNNING, SYNCING, WAITING_FOR_TIP}
@@ -13,25 +13,49 @@ import scala.util.{Failure, Success, Try}
 object ElectrumChainSync {
   case class ChainSyncStarted(localTip: Long, remoteTip: Long)
   case class ChainSyncEnded(localTip: Long)
+
+  val genesisHeaders: Map[ByteVector32, BlockHeader] = List(Block.LivenetGenesisBlock, Block.Testnet3GenesisBlock,
+    Block.Testnet4GenesisBlock, Block.SignetGenesisBlock, Block.RegtestGenesisBlock).map(block => block.hash -> block.header).toMap
+
+  def genesisChain(chainHash: ByteVector32): Blockchain = Blockchain.fromGenesisBlock(chainHash, genesisHeaders(chainHash))
+
+  // Saved headers make new checkpoints and the tip, so a start does not download them again
+  // A chain without checkpoints in assets (regtest, a custom signet) starts from its genesis block until it has saved headers
+  // If anything at all goes wrong, the chain starts from the checkpoints in assets or from the genesis block
+  def loadChain(chainHash: ByteVector32, assetCheckpoints: Vector[CheckPoint], headerDb: HeaderDb): Blockchain = {
+    val checkpoints = Try(CheckPoint.extend(assetCheckpoints, headerDb)) getOrElse assetCheckpoints
+
+    if (checkpoints.isEmpty) {
+      val headers = headerDb.getHeaders(startHeight = 1, maxCount = Int.MaxValue)
+      Try apply Blockchain.addHeaders(genesisChain(chainHash), 1, headers) getOrElse genesisChain(chainHash)
+    } else {
+      val blockchain = Blockchain.fromCheckpoints(checkpoints = checkpoints, chainhash = chainHash)
+      val headers = headerDb.getHeaders(startHeight = checkpoints.size * RETARGETING_PERIOD, maxCount = Int.MaxValue)
+      Try apply Blockchain.addHeadersChunk(blockchain, checkpoints.size * RETARGETING_PERIOD, headers) getOrElse blockchain
+    }
+  }
 }
 
 class ElectrumChainSync(client: ActorRef, headerDb: HeaderDb, chainHash: ByteVector32) extends FSM[ElectrumWallet.State, Blockchain] {
 
-  // Regtest and a custom signet have no checkpoints, so they are scanned from the genesis block on each start
-  def loadChain: Blockchain = chainHash match {
-    case Block.RegtestGenesisBlock.hash => Blockchain.fromGenesisBlock(chainHash, Block.RegtestGenesisBlock.header)
-    case Block.SignetGenesisBlock.hash if CheckPoint.loadFromChainHash(chainHash).isEmpty => Blockchain.fromGenesisBlock(chainHash, Block.SignetGenesisBlock.header)
+  // Read once: Mutinynet has a large checkpoints file
+  val assetCheckpoints: Vector[CheckPoint] = CheckPoint.loadFromChainHash(chainHash)
 
-    case _ =>
-      // In case if anything at all goes wrong we just use an initial blockchain and resync it from checkpoint
-      val blockchain = Blockchain.fromCheckpoints(checkpoints = CheckPoint.load(chainHash, headerDb), chainhash = chainHash)
-      val headers = headerDb.getHeaders(startHeight = blockchain.checkpoints.size * RETARGETING_PERIOD, maxCount = Int.MaxValue)
-      Try apply Blockchain.addHeadersChunk(blockchain, blockchain.checkpoints.size * RETARGETING_PERIOD, headers) getOrElse blockchain
+  // Regtest or a custom signet can be reset by its operator, then the saved headers belong to an old chain
+  // Only the server tells the chain, so the saved headers go and the chain starts again from the genesis block
+  def mayRestartFromGenesis(blockchain: Blockchain): Boolean = assetCheckpoints.isEmpty && (blockchain.checkpoints.nonEmpty || blockchain.height > 0)
+
+  def restartFromGenesis(remoteHeight: Int): State = {
+    log.warning(s"Saved headers do not match the server chain at height $remoteHeight, chain starts again from genesis")
+    headerDb.removeAllHeaders
+    context.system.eventStream publish ElectrumChainSync.ChainSyncStarted(localTip = 0L, remoteHeight)
+    client ! ElectrumClient.GetHeaders(1, RETARGETING_PERIOD)
+    goto(SYNCING) using ElectrumChainSync.genesisChain(chainHash)
   }
 
   client ! ElectrumClient.AddStatusListener(self)
 
-  startWith(DISCONNECTED, loadChain)
+  startWith(DISCONNECTED, ElectrumChainSync.loadChain(chainHash, assetCheckpoints, headerDb))
 
   when(DISCONNECTED) {
     case Event(_: ElectrumClient.ElectrumReady, blockchain) =>
@@ -40,8 +64,15 @@ class ElectrumChainSync(client: ActorRef, headerDb: HeaderDb, chainHash: ByteVec
   }
 
   when(WAITING_FOR_TIP) {
+    case Event(response: ElectrumClient.HeaderSubscriptionResponse, blockchain) if response.height < blockchain.height && mayRestartFromGenesis(blockchain) =>
+      restartFromGenesis(response.height)
+
     case Event(response: ElectrumClient.HeaderSubscriptionResponse, blockchain) if response.height < blockchain.height =>
       goto(DISCONNECTED) replying PoisonPill
+
+    case Event(response: ElectrumClient.HeaderSubscriptionResponse, blockchain) if mayRestartFromGenesis(blockchain) && blockchain.bestchain.nonEmpty &&
+      response.height == blockchain.height && response.header != blockchain.tip.header =>
+      restartFromGenesis(response.height)
 
     case Event(response: ElectrumClient.HeaderSubscriptionResponse, blockchain) if blockchain.bestchain.isEmpty =>
       context.system.eventStream publish ElectrumChainSync.ChainSyncStarted(blockchain.height, response.height)
@@ -76,6 +107,9 @@ class ElectrumChainSync(client: ActorRef, headerDb: HeaderDb, chainHash: ByteVec
           // A chain which is scanned from genesis has nothing to persist while it is shorter than MAX_REORG
           if (chunks.nonEmpty) headerDb.addHeaders(chunks.map(_.header), chunks.head.height)
           goto(SYNCING) using blockchain2
+
+        case Failure(_) if mayRestartFromGenesis(blockchain) =>
+          restartFromGenesis(start + headers.size - 1)
 
         case Failure(error) =>
           log.error("Electrum peer sent bad headers", error)

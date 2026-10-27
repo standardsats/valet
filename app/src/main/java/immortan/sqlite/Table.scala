@@ -129,6 +129,8 @@ abstract class ExcludedChannelTable(val table: String) extends Table {
 
   val killOldSql = s"DELETE FROM $table WHERE $until < ?"
 
+  val killAllSql = s"DELETE FROM $table"
+
   def createStatements: Seq[String] = {
     val createTable = s"CREATE TABLE IF NOT EXISTS $table($IDAUTOINC, $shortChannelId INTEGER NOT NULL $UNIQUE, $until INTEGER NOT NULL)"
     // Excluded channels expire to give them second chance (e.g. channels with one update, channels without max sendable amount)
@@ -388,6 +390,11 @@ object LogTable extends Table {
   val countSql = s"SELECT COUNT(*) FROM $table"
 
   val clearSql = s"DELETE FROM $table"
+
+  // The log keeps only its newest records, diagnostics on each connection and channel message must not fill the device
+  final val MAX_RECORDS = 2000
+
+  val trimSql = s"DELETE FROM $table WHERE $id <= (SELECT MAX($id) FROM $table) - $MAX_RECORDS"
 
   def createStatements: Seq[String] = s"""CREATE TABLE IF NOT EXISTS $table($IDAUTOINC, $stamp INTEGER NOT NULL, $tag STRING NOT NULL, $content STRING NOT NULL)""" :: Nil
 }

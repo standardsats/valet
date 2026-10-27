@@ -63,7 +63,7 @@ class SettingsActivity extends BaseCheckActivity with HasTypicalChainFee with Ch
     backupLocation.updateView
     chainWallets.updateView
     electrum.updateView
-    customSignet.updateView
+    if (WalletApp.isSignetFlavor) customSignet.updateView
     setFiat.updateView
     setBtc.updateView
     setGapLimit.updateView
@@ -236,13 +236,20 @@ class SettingsActivity extends BaseCheckActivity with HasTypicalChainFee with Ch
       def proceed: Unit = {
         val input = extraInput.getText.toString.trim
         def saveAddress(address: String) = WalletApp.app.prefs.edit.putString(WalletApp.CUSTOM_ELECTRUM_ADDRESS, address)
-        if (input.nonEmpty) runInFutureProcessOnUI(saveUnsafeElectrumAddress, onFail)(_ => warnAndUpdateView)
-        else runAnd(saveAddress(new String).commit)(warnAndUpdateView)
+        if (input.nonEmpty) runInFutureProcessOnUI(encodeUnsafeElectrumAddress, onFail)(saveIfSignetAllows)
+        else saveIfSignetAllows(new String)
 
-        def saveUnsafeElectrumAddress: Unit = {
+        def encodeUnsafeElectrumAddress: String = {
           val hostOrIP ~ port = input.splitAt(input lastIndexOf ':')
           val nodeAddress = NodeAddress.fromParts(hostOrIP, port.tail.toInt, Domain)
-          saveAddress(nodeaddress.encode(nodeAddress).require.toHex).commit
+          nodeaddress.encode(nodeAddress).require.toHex
+        }
+
+        // With a custom signet on, the Electrum server selects the chain
+        def saveIfSignetAllows(address: String): Unit = WalletApp.signetSwitchProblem(WalletApp.customSignet, address) match {
+          case Some(problemRes) => onFail(me getString problemRes)
+          case None if isSignetSwitch(WalletApp.customSignet, address) => confirmSignetSwitch(saveAddress(address).commit)
+          case None => runAnd(saveAddress(address).commit)(warnAndUpdateView)
         }
 
         def warnAndUpdateView: Unit = {
@@ -261,16 +268,33 @@ class SettingsActivity extends BaseCheckActivity with HasTypicalChainFee with Ch
   }
 
   lazy private[this] val customSignet = new SettingsHolder(me) {
-    override def updateView: Unit = settingsCheck.setChecked(WalletApp.customSignet)
+    override def updateView: Unit = {
+      val waitsForElectrum = WalletApp.customSignet && WalletApp.customElectrumAddress.isFailure
+      settingsInfo.setText(if (waitsForElectrum) settings_custom_signet_no_electrum else settings_custom_signet_info)
+      settingsCheck.setChecked(WalletApp.customSignet)
+    }
 
     settingsTitle.setText(settings_custom_signet)
-    settingsInfo.setText(settings_custom_signet_info)
 
     view setOnClickListener onButtonTap {
-      putBoolAndUpdateView(WalletApp.CUSTOM_SIGNET, !WalletApp.customSignet)
-      def onOk(snack: Snackbar): Unit = runAnd(snack.dismiss)(WalletApp.restart)
-      snack(settingsContainer, getString(settings_custom_electrum_restart_notice).html, R.string.dialog_ok, onOk)
+      val customSignet1 = !WalletApp.customSignet
+      def save: Unit = WalletApp.app.prefs.edit.putBoolean(WalletApp.CUSTOM_SIGNET, customSignet1).commit
+
+      WalletApp.signetSwitchProblem(customSignet1, WalletApp.customElectrumHex) match {
+        case Some(problemRes) => onFail(me getString problemRes)
+        case None if isSignetSwitch(customSignet1, WalletApp.customElectrumHex) => confirmSignetSwitch(save)
+        case None => runAnd(save)(updateView)
+      }
     }
+  }
+
+  def isSignetSwitch(customSignet1: Boolean, electrumHex1: String): Boolean =
+    WalletApp.isSignetFlavor && WalletApp.signetIdFor(customSignet1, electrumHex1) != WalletApp.storedSignetId
+
+  // The app restarts right away: a channel which opens before the restart would belong to the old chain
+  def confirmSignetSwitch(change: => Unit): Unit = {
+    val builder = titleBodyAsViewBuilder(null, getString(settings_custom_signet_restart).asDefView)
+    mkCheckForm(alert => runAnd(alert.dismiss) { change; WalletApp.restart }, none, builder, dialog_ok, dialog_cancel)
   }
 
   lazy private[this] val setFiat = new SettingsHolder(me) {
@@ -429,7 +453,7 @@ class SettingsActivity extends BaseCheckActivity with HasTypicalChainFee with Ch
     settingsContainer.addView(chainWallets.view)
     settingsContainer.addView(addHardware.view)
     settingsContainer.addView(electrum.view)
-    if (BuildConfig.FLAVOR == "signet") settingsContainer.addView(customSignet.view)
+    if (WalletApp.isSignetFlavor) settingsContainer.addView(customSignet.view)
     settingsContainer.addView(setFiat.view)
     settingsContainer.addView(setBtc.view)
     settingsContainer.addView(setGapLimit.view)

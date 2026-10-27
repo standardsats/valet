@@ -148,7 +148,7 @@ class SQLiteData(val db: DBInterface) extends HeaderDb with DataBag {
       BlockHeader.read(rc bytes ElectrumHeadersTable.header)
     }.toList
 
-  def removeAllHeaders: Unit = db.change(ElectrumHeadersTable.killAllSql)
+  override def removeAllHeaders: Unit = db.change(ElectrumHeadersTable.killAllSql)
 
   override def getTip: Option[HeightAndHeader] =
     db.select(ElectrumHeadersTable.selectTipSql).headTry { rc =>

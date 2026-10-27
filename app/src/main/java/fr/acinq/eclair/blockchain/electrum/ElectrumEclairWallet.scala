@@ -23,8 +23,6 @@ case class ElectrumEclairWallet(walletRef: ActorRef, ewt: ElectrumWalletType, in
 
   private def emptyUtxo(pubKeyScript: ByteVector): TxOut = TxOut(Satoshi(0L), pubKeyScript)
 
-  private def isInChain(error: fr.acinq.eclair.blockchain.bitcoind.rpc.Error): Boolean = ElectrumWatcher.isInChain(error.message)
-
   override def getData: Future[GetDataResponse] = (walletRef ? GetData).mapTo[GetDataResponse]
 
   override def getReceiveAddresses: Future[GetCurrentReceiveAddressesResponse] = (walletRef ? GetCurrentReceiveAddresses).mapTo[GetCurrentReceiveAddressesResponse]
@@ -42,7 +40,7 @@ case class ElectrumEclairWallet(walletRef: ActorRef, ewt: ElectrumWalletType, in
   override def broadcast(tx: Transaction): Future[Boolean] = {
     walletRef ? BroadcastTransaction(tx) flatMap {
       case ElectrumClient.BroadcastTransactionResponse(_, None) => Future(true)
-      case res: ElectrumClient.BroadcastTransactionResponse if res.error.exists(isInChain) => Future(true)
+      case res: ElectrumClient.BroadcastTransactionResponse if res.error.exists(error => ElectrumWatcher.isInChain(error.message)) => Future(true)
 
       case res: ElectrumClient.BroadcastTransactionResponse if res.error.isDefined =>
         logBag.put(s"chain-broadcast-fail ${tx.txid}", res.error.get.message)
