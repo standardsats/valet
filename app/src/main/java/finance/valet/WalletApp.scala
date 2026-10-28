@@ -171,6 +171,7 @@ object WalletApp {
     try LNParams.fiatRates.becomeShutDown catch none
     try LNParams.feeRates.becomeShutDown catch none
     try LNParams.cm.becomeShutDown catch none
+    try LNParams.connectionProvider.close catch none
     // Make non-alive and non-operational`
     LNParams.secret = null
     txDataBag = null
@@ -212,13 +213,15 @@ object WalletApp {
 
     LNParams.chainHash = hash
     LNParams.routerConf = RouterConf(initRouteMaxLength = 10, LNParams.maxCltvExpiryDelta)
-    LNParams.connectionProvider = if (ensureTor) new TorConnectionProvider(app) else new ClearnetConnectionProvider
     LNParams.ourInit = LNParams.createInit
     LNParams.syncParams = params
   }
 
   def makeOperational(secret: WalletSecret): Unit = {
     require(isAlive, "Application is not alive, hence can not become operational")
+    // Setup may change the network choice after makeAlive, before any wallet traffic starts.
+    require(!ensureTor || Build.VERSION.SDK_INT >= Build.VERSION_CODES.N, "Tor requires Android API 24+")
+    LNParams.connectionProvider = if (ensureTor) new TorConnectionProvider(app) else new ClearnetConnectionProvider
     val essentialInterface = new DBInterfaceSQLiteAndroidEssential(app, dbFileNameEssential)
     val graphInterface = new DBInterfaceSQLiteAndroidGraph(app, dbFileNameGraph)
     // The mnemonic must not linger in process memory for the whole app lifetime: it stays

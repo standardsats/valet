@@ -12,7 +12,7 @@ import immortan.{ChannelMaster, LNParams, RemoteNodeInfo, Ticker}
 import scodec.DecodeResult
 import scodec.bits.ByteVector
 
-import java.net.{Inet4Address, Inet6Address, InetAddress, InetSocketAddress, UnknownHostException}
+import java.net.{Inet4Address, Inet6Address, InetAddress, InetSocketAddress}
 import java.nio.ByteOrder
 import java.nio.charset.StandardCharsets
 
@@ -166,24 +166,11 @@ object NodeAddress {
   val V2Len = 16
   val V3Len = 56
 
-  def fromParts(host: String, port: Int, orElse: (String, Int) => NodeAddress = resolveIp): NodeAddress =
+  // Parsing also runs before the network provider exists; defer DNS until connection time.
+  def fromParts(host: String, port: Int, orElse: (String, Int) => NodeAddress = Domain): NodeAddress =
     if (host.endsWith(onionSuffix) && host.length == V2Len + onionSuffix.length) Tor2(host.dropRight(onionSuffix.length), port)
     else if (host.endsWith(onionSuffix) && host.length == V3Len + onionSuffix.length) Tor3(host.dropRight(onionSuffix.length), port)
     else orElse(host, port)
-
-  def resolveIp(host: String, port: Int): NodeAddress = {
-    def resolve(attemptsLeft: Int): InetAddress = try InetAddress getByName host catch {
-      case _: UnknownHostException if attemptsLeft > 1 =>
-        // ponytail: three synchronous attempts; use an async resolver if this path ever runs on UI.
-        Thread.sleep(1000L)
-        resolve(attemptsLeft - 1)
-    }
-
-    resolve(3) match {
-      case inetV4Address: Inet4Address => IPv4(inetV4Address, port)
-      case inetV6Address: Inet6Address => IPv6(inetV6Address, port)
-    }
-  }
 
   def unresolved(port: Int, host: Int*): NodeAddress =
     InetAddress getByAddress host.toArray.map(_.toByte) match {
@@ -218,7 +205,7 @@ case class Tor3(tor3: String, port: Int) extends OnionAddress {
 
 case class Domain(domain: String, port: Int) extends NodeAddress {
   override def socketAddress: InetSocketAddress =
-    if (LNParams.connectionProvider != null && LNParams.connectionProvider.proxyAddress.isDefined) InetSocketAddress.createUnresolved(domain, port)
+    if (LNParams.connectionProvider != null && LNParams.connectionProvider.usesProxy) InetSocketAddress.createUnresolved(domain, port)
     else new InetSocketAddress(domain, port)
 
   override def toString: String = s"$domain:$port"

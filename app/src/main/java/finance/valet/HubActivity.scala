@@ -1399,7 +1399,7 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
       // We invite user to the community if: the invite has not been followed before, LN payments were successful, user has been using an app for certain period
       walletCards.communityTeaserAllowed = paymentInfos.forall(_.status == PaymentStatus.SUCCEEDED) && allInfos.size > 4 && allInfos.size < 8
       // User may kill an activity but not an app and on getting back there won't be a chain listener event, so check connectivity once again here
-      setVisMany(WalletApp.ensureTor -> walletCards.torIndicator, WalletApp.currentChainNode.isEmpty -> walletCards.offlineIndicator)
+      setVisMany(LNParams.connectionProvider.usesProxy -> walletCards.torIndicator, WalletApp.currentChainNode.isEmpty -> walletCards.offlineIndicator)
       walletCards.updateCommunityTeaser
       walletCards.searchField addTextChangedListener onTextChange(searchWorker.addWork)
       runAnd(updateLnCaches)(paymentAdapterDataChanged.run)

@@ -7,15 +7,19 @@ import immortan.crypto.Tools
 
 
 trait ConnectionProvider {
-  val proxyAddress: Option[InetSocketAddress]
+  def proxyAddress: Option[InetSocketAddress]
 
-  val okHttpClient: OkHttpClient
+  def okHttpClient: OkHttpClient
+
+  def usesProxy: Boolean = proxyAddress.isDefined
 
   def getSocket: Socket
 
   def doWhenReady(action: => Unit): Unit
 
   def notifyAppAvailable: Unit = Tools.none
+
+  def close: Unit = Tools.none
 
   def get(url: String): ResponseBody = {
     val request = (new Request.Builder).url(url).get

@@ -16,7 +16,7 @@ class ChanActivitySpec {
   }
 
   @Test def decodesInformationalPeerFeatures(): Unit = {
-    val advertised = Features[InitFeature](Map.empty, Set(UnknownFeature(51), UnknownFeature(63)))
+    val advertised = Features.empty[InitFeature].copy(unknown = Set(UnknownFeature(51), UnknownFeature(63)))
     val decoded = Features(advertised.toByteVector).initFeatures()
     assert(CommsTower.advertisesFeature(decoded, ChanActivity.ZeroconfFeatureBit))
     assert(CommsTower.advertisesFeature(decoded, ChanActivity.SpliceFeatureBit))
