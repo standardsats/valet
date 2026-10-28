@@ -3,7 +3,7 @@ package fr.acinq.eclair
 import fr.acinq.bitcoin.DeterministicWallet._
 import fr.acinq.bitcoin.{Block, ByteVector32, OutPoint, Satoshi, Script, Transaction, TxIn, TxOut}
 import fr.acinq.eclair.blockchain.{EclairWallet, TxConfirmedAt}
-import fr.acinq.eclair.blockchain.electrum.ElectrumWalletType
+import fr.acinq.eclair.blockchain.electrum.{Blockchain, ElectrumData, ElectrumWalletType}
 import fr.acinq.eclair.channel.Helpers.Closing
 import fr.acinq.eclair.channel.RemoteCommitPublished
 import fr.acinq.eclair.blockchain.fee.FeeratePerKw
@@ -30,14 +30,15 @@ class AnchorSweepSpec {
 
   @Test
   def anchorToRemoteOutputIsSweptWithWalletKey: Unit = {
-    val paymentBasepoint = derivePublicKey(ewt.accountMaster, 2L).publicKey
+    val paymentKey = derivePublicKey(ewt.accountMaster, 5000L)
+    val paymentBasepoint = paymentKey.publicKey
     val anchor = TxOut(Satoshi(330), Script.pay2wsh(hex"51"))
     val toRemote = TxOut(Satoshi(247716L), Script.pay2wsh(toRemoteDelayed(paymentBasepoint)))
     val commitTx = Transaction(version = 2, txIn = TxIn(OutPoint(ByteVector32.Zeroes, 0), ByteVector.empty, 0L) :: Nil, txOut = anchor :: toRemote :: Nil, lockTime = 0)
     val walletScript = Script.write(Script.pay2wpkh(derivePublicKey(ewt.accountMaster, 3L).publicKey))
 
     val info = Transactions.makeClaimRemoteDelayedOutputTx(commitTx, Satoshi(546L), paymentBasepoint, walletScript, FeeratePerKw(Satoshi(2500L))).right.get
-    val privateKey = ewt.privateKeyFor(paymentBasepoint, maxIndex = 100L).get
+    val privateKey = ewt.privateKeyFor(paymentBasepoint, List(paymentKey)).get
     val signed = Transactions.addSigs(info, Transactions.sign(info, privateKey, TxOwner.Local, AnchorOutputsCommitmentFormat))
 
     assertTrue(Transactions.checkSpendable(signed).isSuccess)
@@ -46,6 +47,23 @@ class AnchorSweepSpec {
     assertEquals(1L, signed.tx.txIn.head.sequence)
     assertEquals(walletScript, signed.tx.txOut.head.publicKeyScript)
     assertTrue(signed.tx.txOut.head.amount < toRemote.amount)
+  }
+
+  @Test
+  def olderChannelKeysRemainSearchableOutsideTheCachedWindow: Unit = {
+    val oldKey = derivePublicKey(ewt.accountMaster, 5000L)
+    val recentKey = derivePublicKey(ewt.accountMaster, 6500L)
+    assertEquals(Some(oldKey.publicKey), ewt.privateKeyFor(oldKey.publicKey, List(recentKey)).map(_.publicKey))
+  }
+
+  @Test
+  def persistingCachedKeysKeepsTheirDerivationIndices: Unit = {
+    val accountKey = derivePublicKey(ewt.accountMaster, 6500L)
+    val changeKey = derivePublicKey(ewt.changeMaster, 5100L)
+    val chain = Blockchain.fromGenesisBlock(Block.SignetGenesisBlock.hash, Block.SignetGenesisBlock.header)
+    val data = ElectrumData(ewt, chain, Vector(accountKey), Vector(changeKey), Nil, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty)
+    assertEquals(6501, data.toPersistent.accountKeysCount)
+    assertEquals(5101, data.toPersistent.changeKeysCount)
   }
 
   @Test

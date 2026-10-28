@@ -135,9 +135,10 @@ object WalletApp {
   // Closed channels are deleted from the database, so any record is a channel which needs its chain
   def channelsExist: Boolean = LNParams.cm.chanBag.all.nonEmpty
 
-  // Gives an error message if new settings would move channels to another signet chain, or select a custom signet without its Electrum server
+  // Server changes require zero channels; signet changes must also preserve the chain of any channel records.
   def signetSwitchProblem(customSignet1: Boolean, electrumHex1: String): Option[Int] =
-    if (!isSignetFlavor) None
+    if (electrumHex1 != customElectrumHex && channelsExist) Some(settings_electrum_close_channels)
+    else if (!isSignetFlavor) None
     else if (customSignet1 && electrumAddress(electrumHex1).isFailure) Some(settings_custom_signet_no_electrum)
     else if (signetIdFor(customSignet1, electrumHex1) != storedSignetId && channelsExist) Some(settings_custom_signet_close_channels)
     else None

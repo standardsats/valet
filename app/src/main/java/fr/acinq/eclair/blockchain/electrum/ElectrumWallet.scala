@@ -419,7 +419,9 @@ case class ElectrumData(ewt: ElectrumWalletType, blockchain: Blockchain,
   // Remove status for each script hash for which we have pending requests, this will make us query script hash history for these script hashes again when we reconnect
   def reset: ElectrumData = copy(status = status -- pendingHistoryRequests, pendingHistoryRequests = Set.empty, pendingTransactionRequests = Set.empty, pendingHeadersRequests = Set.empty, lastReadyMessage = None)
 
-  def toPersistent: PersistentData = PersistentData(accountKeys.length, changeKeys.length, status, transactions, overriddenPendingTxids, history, proofs, pendingTransactions, excludedOutPoints)
+  // Startup keeps only the last 1500 keys in memory; their count is not the next derivation index.
+  def toPersistent: PersistentData = PersistentData(accountKeys.lastOption.map(_.path.lastChildNumber.toInt + 1).getOrElse(0),
+    changeKeys.lastOption.map(_.path.lastChildNumber.toInt + 1).getOrElse(0), status, transactions, overriddenPendingTxids, history, proofs, pendingTransactions, excludedOutPoints)
 
   def wasConfirmed(item: TransactionHistoryItem): Boolean = item.height > 0 || proofs.contains(item.txHash)
 

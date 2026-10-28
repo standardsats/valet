@@ -1,12 +1,17 @@
 package fr.acinq.eclair
 
 import fr.acinq.bitcoin.{Block, BlockHeader, ByteVector32}
-import fr.acinq.eclair.blockchain.electrum.ElectrumChainSync
+import akka.actor.{Actor, ActorSystem, Props}
+import fr.acinq.eclair.blockchain.electrum.{ElectrumChainSync, ElectrumClient}
 import fr.acinq.eclair.blockchain.electrum.db.HeaderDb
 import org.junit.Assert.{assertEquals, assertTrue}
 import org.junit.Test
 
 import scala.collection.mutable
+import scala.concurrent.duration._
+import java.net.InetSocketAddress
+import java.util.concurrent.{LinkedBlockingQueue, TimeUnit}
+import java.util.concurrent.atomic.AtomicInteger
 
 class ChainLoadSpec {
   class MemoryHeaderDb extends HeaderDb {
@@ -65,5 +70,44 @@ class ChainLoadSpec {
     val chain = ElectrumChainSync.loadChain(regtestHash, Vector.empty, dbWith(otherChain))
     assertEquals(0, chain.height)
     assertEquals(Block.RegtestGenesisBlock.header, chain.tip.header)
+  }
+
+  @Test
+  def badChunkAfterProgressRestartsOnlyOnce: Unit = {
+    val system = ActorSystem("chain-restart-test")
+    val messages = new LinkedBlockingQueue[Any]
+    val wipes = new AtomicInteger
+    val db = new MemoryHeaderDb {
+      override def removeAllHeaders: Unit = { super.removeAllHeaders; wipes.incrementAndGet(); () }
+    }
+    val client = system.actorOf(Props(new Actor {
+      def receive: Receive = {
+        case _: ElectrumClient.AddStatusListener => ()
+        case message => messages.put(message)
+      }
+      override def postStop(): Unit = { messages.put("disconnected"); () }
+    }))
+    val sync = system.actorOf(Props(new ElectrumChainSync(client, db, regtestHash)))
+    val headers = mine(2)
+    def next(): Any = messages.poll(10, TimeUnit.SECONDS)
+    def beginConnection(): Unit = {
+      sync.tell(ElectrumClient.ElectrumReady(2, headers.last, new InetSocketAddress("127.0.0.1", 50001)), client)
+      assertTrue(next().isInstanceOf[ElectrumClient.HeaderSubscription])
+      sync.tell(ElectrumClient.HeaderSubscriptionResponse(2, headers.last), client)
+    }
+    try {
+      beginConnection()
+      for (_ <- 1 to 2) {
+        assertEquals(ElectrumClient.GetHeaders(1, 2016), next())
+        sync.tell(ElectrumClient.GetHeadersResponse(1, headers.take(1), 2016), client)
+        assertEquals(ElectrumClient.GetHeaders(2, 2016), next())
+        sync.tell(ElectrumClient.GetHeadersResponse(2, List(headers.last.copy(hashPreviousBlock = ByteVector32.One)), 2016), client)
+      }
+      assertEquals("disconnected", next())
+      assertEquals(1, wipes.get())
+    } finally {
+      system.shutdown()
+      system.awaitTermination(10.seconds)
+    }
   }
 }

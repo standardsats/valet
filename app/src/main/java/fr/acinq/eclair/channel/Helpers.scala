@@ -16,6 +16,8 @@ import immortan.crypto.Tools.{Any2Some, newFeerate}
 import immortan.{ChannelBag, LNParams}
 import scodec.bits.ByteVector
 
+import scala.concurrent.Await
+import scala.concurrent.duration._
 import scala.util.Try
 
 
@@ -342,7 +344,10 @@ object Helpers {
         def paymentKey: Option[PrivateKey] = {
           // The built-in wallet gives the basepoint to new channels, so it is searched first
           val (builtIn, others) = LNParams.chainWallets.wallets.partition(_.isBuiltIn)
-          (builtIn ++ others).iterator.flatMap(_.ewt.privateKeyFor(paymentBasepoint, maxIndex = 5000L)).toStream.headOption
+          (builtIn ++ others).iterator.filter(_.isSigning).flatMap { wallet =>
+            val data = Await.result(wallet.getData, 40.seconds).data
+            wallet.ewt.privateKeyFor(paymentBasepoint, data.accountKeys ++ data.changeKeys)
+          }.toStream.headOption
         }
 
         claimTx.right.toOption.flatMap { info =>
