@@ -18,6 +18,8 @@ import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.concurrent._
 import scala.concurrent.duration._
+import scala.util.Try
+import scala.util.control.NonFatal
 
 
 case class KeyPairAndPubKey(keyPair: KeyPair, them: PublicKey)
@@ -48,14 +50,11 @@ object CommsTower {
   def peerSupports(nodeId: PublicKey, mandatoryBit: Int): Boolean = peerInitFeatures.get(nodeId).exists(advertisesFeature(_, mandatoryBit))
 
   def listen(listeners1: Set[ConnectionListener], pair: KeyPairAndPubKey, info: RemoteNodeInfo): Unit = synchronized {
-    // Update and either insert a new worker or fire onOperational on NEW listeners if worker currently exists and online
-    // First add listeners, then try to add worker because we may already have a connected worker, but no listeners
-    // Listeners which are already known got onOperational for this connection, a repeat would make channels re-send channel_reestablish
-    val newListeners = listeners1 -- listeners(pair)
+    // Delivery is tracked by the worker: registering a listener does not mean it has received this connection's Init.
     listeners(pair) ++= listeners1
 
     workers.get(pair) match {
-      case Some(worker) => for (init <- worker.theirInit if newListeners.nonEmpty) worker.handleTheirRemoteInitMessage(newListeners, init)
+      case Some(worker) => for (init <- worker.theirInit) worker.handleTheirRemoteInitMessage(listeners1, init)
       case None => workers(pair) = new Worker(pair, info, new Bytes(1024), LNParams.connectionProvider.getSocket)
     }
   }
@@ -84,7 +83,10 @@ object CommsTower {
     println(s"CommsTower: in $nodeId Undecodable tag=${data.take(2).toInt(signed = false)} length=${data.size} ${err.messageWithContext}")
   // Add or remove listeners to a connection where our nodeId is stable, not a randomly generated one (one which makes us seen as a constant peer by remote)
   def listenNative(listeners1: Set[ConnectionListener], remoteInfo: RemoteNodeInfo): Unit = listen(listeners1, remoteInfo.nodeSpecificPair, remoteInfo)
-  def rmListenerNative(info: RemoteNodeInfo, listener: ConnectionListener): Unit = listeners(info.nodeSpecificPair) -= listener
+  def rmListenerNative(info: RemoteNodeInfo, listener: ConnectionListener): Unit = synchronized {
+    listeners(info.nodeSpecificPair) -= listener
+    workers.get(info.nodeSpecificPair).foreach(_.forgetListener(listener))
+  }
   def disconnectNative(info: RemoteNodeInfo): Unit = workers.get(info.nodeSpecificPair).foreach(_.disconnect)
 
   def forget(keyPairAndPubKey: KeyPairAndPubKey): Unit = {
@@ -97,8 +99,9 @@ object CommsTower {
   class Worker(val pair: KeyPairAndPubKey, val info: RemoteNodeInfo, buffer: Bytes, val sock: Socket) { me =>
     implicit val context: ExecutionContextExecutor = ExecutionContext fromExecutor Executors.newSingleThreadExecutor
 
-    var lastMessage: Long = System.currentTimeMillis
-    var theirInit: Option[Init] = Option.empty
+    @volatile var lastMessage: Long = System.currentTimeMillis
+    @volatile var theirInit: Option[Init] = Option.empty
+    private var notifiedListeners: Listeners = Set.empty
     var pinging: Subscription = _
     @volatile private[this] var disconnectRequested = false
 
@@ -166,14 +169,23 @@ object CommsTower {
     }
 
     thread onComplete { result =>
-      // Will also run after forget
-      if (!disconnectRequested) result.failed.foreach(err => LNParams.logBag.put(s"comms-tower-disconnect ${info.nodeId}", err.toString))
-      // Diagnostics on test chains only, like trace: on mainnet peers close connections too often
-      if (!disconnectRequested && result.isSuccess && !LNParams.isMainnet) LNParams.logBag.put(s"comms-tower-disconnect ${info.nodeId}", s"closed by peer, init received=${theirInit.isDefined}")
-      try pinging.unsubscribe catch none
-      listeners(pair).foreach(_ onDisconnect me)
-      // Once disconnected, worker gets removed
-      workers -= pair
+      try {
+        // Will also run after forget
+        if (!disconnectRequested) result.failed.foreach(err => LNParams.logBag.put(s"comms-tower-disconnect ${info.nodeId}", err.toString))
+        if (!disconnectRequested && result.isSuccess && !LNParams.isMainnet) LNParams.logBag.put(s"comms-tower-disconnect ${info.nodeId}", s"closed by peer, init received=${theirInit.isDefined}")
+      } finally {
+        try pinging.unsubscribe catch none
+        try sock.close catch none
+        CommsTower.synchronized {
+          // Remove this connection before callbacks can reconnect, and never remove a newer worker for the same peer.
+          if (workers.get(pair).contains(me)) {
+            workers -= pair
+            listeners(pair).foreach { listener =>
+              Try(listener.onDisconnect(me)).failed.foreach(err => LNParams.logBag.put("comms-tower-listener-error", err.toString))
+            }
+          }
+        }
+      }
     }
 
     def disconnect: Unit = {
@@ -181,18 +193,24 @@ object CommsTower {
       try sock.close catch none
     }
 
-    def handleTheirRemoteInitMessage(listeners1: Set[ConnectionListener], remoteInit: Init): Unit = {
-      // Use a separate variable for listeners here because a set of listeners provided to this method may be different
-      // Account for a case where they disconnect while we are deciding on their features (do nothing in this case)
-      // Important: always store their init once obtained, it may be used upstream (see sync listener)
+    def forgetListener(listener: ConnectionListener): Unit = CommsTower.synchronized { notifiedListeners -= listener }
+
+    def handleTheirRemoteInitMessage(listeners1: Set[ConnectionListener], remoteInit: Init): Unit = CommsTower.synchronized {
+      // Store Init and decide which listeners still need it under the same lock as registration.
       theirInit = Some(remoteInit)
 
-      if (!thread.isCompleted) {
+      if (!thread.isCompleted && !disconnectRequested) {
         val areFeaturesOK = Features.areCompatible(LNParams.ourInit.features, remoteInit.features)
         if (areFeaturesOK) {
           peerGossipQueries.update(info.nodeId, GossipQueriesSupport.from(remoteInit))
           peerInitFeatures.update(info.nodeId, remoteInit.features)
-          for (lst <- listeners1) lst.onOperational(me, remoteInit)
+          // Init may have captured its listeners just before listen registered another one.
+          val pending = (listeners1 ++ listeners(pair)) -- notifiedListeners
+          notifiedListeners ++= pending
+          try for (lst <- pending) lst.onOperational(me, remoteInit) catch {
+            // A failed callback must not leave a live connection whose remaining listeners will never be notified.
+            case NonFatal(error) => disconnect; throw error
+          }
         }
         else disconnect
       }
