@@ -22,7 +22,9 @@ scala {
 
 android {
     namespace 'finance.valet'
-    compileSdk 36
+    compileSdk {
+        version = release(37) { minorApiLevel = 1 }
+    }
     buildToolsVersion '36.0.0'
 
     defaultConfig {
@@ -108,7 +110,7 @@ android {
     }
 }
 
-// AGP 8.12 requires Gradle to run on a JDK >= 17, but the Scala 2.11.12 compiler
+// AGP 9 requires Gradle to run on a JDK >= 17, but the Scala 2.11.12 compiler
 // predates the module system and does not run there. Fork ScalaCompile onto a JDK 11
 // toolchain; the build therefore needs both JDKs visible to Gradle's toolchain detection.
 tasks.withType(ScalaCompile).configureEach {
@@ -127,6 +129,34 @@ tasks.withType(ScalaCompile).configureEach {
     // configuration time would miss generated sources such as BuildConfig.
     def originalSource = source
     source = { originalSource.files.sort { it.path } }
+}
+
+// scala-android 26 wires app variants only. Keep both JVM and device Scala tests in the build.
+afterEvaluate {
+    [android.unitTestVariants, android.testVariants].each { variants ->
+        variants.all { variant ->
+            def javac = variant.javaCompileProvider.get()
+            def javaDependencies = javac.dependsOn.toList()
+            def scalaTest = tasks.register("compile${variant.name.capitalize()}Scala", ScalaCompile) {
+                source files(variant.sourceSets.collectMany { it.javaDirectories }).asFileTree.matching {
+                    include '**/*.scala', '**/*.java'
+                }
+                destinationDirectory = layout.buildDirectory.dir("classes/scala/${variant.name}")
+                scalaClasspath = configurations.scalaToolchainRuntimeClasspath
+                sourceCompatibility = '1.8'
+                targetCompatibility = '1.8'
+                scalaCompileOptions.incrementalOptions.analysisFile = layout.buildDirectory.file("tmp/scala/${variant.name}/analysis.bin")
+                scalaCompileOptions.incrementalOptions.classfileBackupDir = layout.buildDirectory.file("tmp/scala/${variant.name}/backup")
+                dependsOn javaDependencies
+            }
+            def bytecodeKey = variant.registerPreJavacGeneratedBytecode(files(scalaTest.flatMap { it.destinationDirectory }))
+            scalaTest.configure {
+                classpath = variant.getCompileClasspath(bytecodeKey) + files(android.bootClasspath)
+            }
+            javac.setSource(files())
+            javac.dependsOn scalaTest
+        }
+    }
 }
 
 dependencies {

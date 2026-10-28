@@ -11,7 +11,12 @@
     <uses-permission android:name="android.permission.CAMERA"/>
     <uses-permission android:name="android.permission.NFC"/>
 
-    <uses-sdk tools:overrideLibrary="com.google.zxing.client.android"/>
+    <!-- Protect Tor status broadcasts on Android versions without non-exported receivers. -->
+    <permission android:name="${applicationId}.permission.TOR_STATUS" android:protectionLevel="signature"/>
+    <uses-permission android:name="${applicationId}.permission.TOR_STATUS"/>
+
+    <!-- Tor is optional and guarded at runtime on Android API 24+. -->
+    <uses-sdk tools:overrideLibrary="com.google.zxing.client.android,org.torproject.jni"/>
 
     <supports-screens
         android:resizeable="true"

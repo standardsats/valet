@@ -93,8 +93,8 @@ class ElectrumClientPool(blockCount: AtomicLong, chainHash: ByteVector32)(implic
 
     case Event(Connect, _) =>
       pickAddress(serverAddresses, addresses.values.toSet) foreach { esa =>
-        val resolved = new InetSocketAddress(esa.address.getHostName, esa.address.getPort)
-        val client = context actorOf Props(classOf[ElectrumClient], resolved, esa.ssl, ec)
+        // Keep names unresolved: the client's resolver or SOCKS proxy owns DNS.
+        val client = context actorOf Props(classOf[ElectrumClient], esa.address, esa.ssl, ec)
         client ! ElectrumClient.AddStatusListener(self)
         addresses += Tuple2(client, esa.address)
         context watch client

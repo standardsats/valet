@@ -2,8 +2,8 @@ FROM registry.gitlab.com/fdroid/fdroidserver:buildserver-trixie AS build
 
 # Two JDKs on purpose:
 #   21 -- the buildserver image's own default (its provision script installs
-#         default-jdk-headless and selects the highest version). Gradle 8.13 /
-#         AGP 8.12 and the scala-android plugin run on it, exactly as on
+#         default-jdk-headless and selects the highest version). Gradle 9.6 /
+#         AGP 9.4 and the scala-android plugin run on it, exactly as on
 #         F-Droid's builder.
 #   11 -- the Scala 2.11.12 compiler predates the module system and will not run
 #         on 21, so app/build.gradle forks ScalaCompile onto a JDK 11 toolchain,

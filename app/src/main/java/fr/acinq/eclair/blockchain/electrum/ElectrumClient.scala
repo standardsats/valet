@@ -49,7 +49,7 @@ class ElectrumClient(serverAddress: InetSocketAddress, ssl: SSL)(implicit val ec
     override def initChannel(ch: SocketChannel): Unit = {
       if (ssl == SSL.LOOSE || serverAddress.getPort == 50002) {
         val sslCtx = SslContextBuilder.forClient.trustManager(InsecureTrustManagerFactory.INSTANCE).build
-        ch.pipeline addLast sslCtx.newHandler(ch.alloc, serverAddress.getHostName, serverAddress.getPort)
+        ch.pipeline addLast sslCtx.newHandler(ch.alloc, serverAddress.getHostString, serverAddress.getPort)
       }
 
       // Inbound
@@ -75,7 +75,7 @@ class ElectrumClient(serverAddress: InetSocketAddress, ssl: SSL)(implicit val ec
 
   if (LNParams.connectionProvider.proxyAddress.isDefined) b.resolver(NoopAddressResolverGroup.INSTANCE)
 
-  val channelOpenFuture: ChannelFuture = b.connect(serverAddress.getHostName, serverAddress.getPort)
+  val channelOpenFuture: ChannelFuture = b.connect(serverAddress.getHostString, serverAddress.getPort)
 
   channelOpenFuture addListeners new ChannelFutureListener {
     override def operationComplete(future: ChannelFuture): Unit = {

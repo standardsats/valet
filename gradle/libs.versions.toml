@@ -1,8 +1,8 @@
 [versions]
 # Build toolchain.
-# scalaAndroid 25.x is the AGP 8.x line; 26.x targets AGP 9.0+. Keep these in step.
-agp = "8.12.3"
-scalaAndroid = "25.0417.2204"
+# Tor Android 0.4.9.14 requires SDK 37.1; keep the AGP and Scala plugin lines in step.
+agp = "9.4.0"
+scalaAndroid = "26.0124.2208"
 scala = "2.11.12"
 
 # Android / UI. Deliberately left at their pre-migration versions so this change is
@@ -33,7 +33,7 @@ guava = "33.5.0-android"
 commonsCodec = "1.10"
 netty = "4.1.42.Final"
 okhttp = "4.9.0"
-torAndroid = "0.4.6.9"
+torAndroid = "0.4.9.14"
 jtorctl = "0.4.5.7"
 
 # Test
