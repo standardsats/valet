@@ -5,6 +5,7 @@
     <string name="sources">Bekijk broncode</string>
     <string name="twitter">Volg ons op Twitter</string>
     <string name="manual">Lees de handleiding</string>
+    <string name="community">Hulp van de gemeenschap</string>
 
     <string name="choose_wallet">Kies een portemonnee</string>
     <string name="hardware_wallet">Hardwareportemonnee</string>
@@ -14,7 +15,7 @@
     <string name="bitcoin_wallet">Bitcoin</string>
     <string name="lightning_wallet">Lightning</string>
     <string name="total_balance">Totaalsaldo</string>
-    <string name="hosted_channel">GEHOST KANAAL\nBewaaroplossing</string>
+    <string name="hosted_channel">FIATKANAAL\nOplossing met bewaring door derden</string>
     <string name="typing_hints">Bitcoinadres, factuur, e-mail&#8230;</string>
     <string name="copied_to_clipboard">Gekopieerd naar klembord</string>
     <string name="add_address">Meer verse adressen</string>
@@ -22,31 +23,25 @@
 
     <string name="search_recent">Zoek recente activiteit</string>
     <string name="emergency_mode">Iets ging mis</string>
-    <string name="error_log">Exporteer foutlog</string>
+    <string name="error_log">Logboeken exporteren</string>
+    <string name="error_log_clear">Logboeken wissen</string>
 
-    <string name="setup_title">Portemonnee-intestellingen</string>
+    <string name="setup_title">Portemonnee instellen</string>
+    <string name="network_setup_title">Netwerkinstellingen</string>
     <string name="setup_create_new">Maak nieuwe portemonnee aan</string>
     <string name="setup_restore_existing">Herstel bestaande portemonnee</string>
     <string name="setup_recovery_phrase">Alleen herstelzin</string>
     <string name="setup_backup_file">Back-up + herstelzin</string>
 
-    <string name="delayed_refunding">Vertraagde herfinanciering kanaal</string>
+    <string name="delayed_refunding">Vertraagde terugbetaling uit kanaal</string>
     <string name="delayed_refunding_ext">Wis niet de portemonneedata voordat alle vertraagde gelden zijn vrijgegeven!</string>
-    <string name="setup_create_new_hint">Een volledig verse Bitcoinportemonnee met een nieuwe herstelzin wordt vanaf vanaf het begin gegenereerd.</string>
+    <string name="setup_create_new_hint">Er wordt een nieuwe Bitcoinportemonnee met een nieuwe herstelzin aangemaakt.</string>
     <!-- DO NOT TRANSLATE --> <string name="share_ln_payment">Signed invoice\n%1$s\n\nPayment hash\n%2$s\n\nPayment description\n%3$s\n\nReceiver Node ID\n%4$s\n\nProof of payment\n%5$s\n\nDebug info\n%6$s</string>
     <!-- DO NOT TRANSLATE --> <string name="share_chain_tx">Bitcoin transaction hex\n\n%1$s</string>
 
-    <string name="setup_backup_file_hint">
-        Bied een bestand aan met daarin de Lightningback-up, voer daarna een herstelzin
-        in om de Bitcoinportemonnee volledig te herstellen met Lightningkanalen.
-        Schakel alle andere kopieën van je portemonnee uit voordat je verdergaat.
-    </string>
+    <string name="setup_backup_file_hint">Geef een bestand met een Lightningback-up op en ontsleutel het met de herstelzin om de Bitcoinportemonnee samen met de Lightningkanalen volledig te herstellen.</string>
 
-    <string name="setup_recovery_phrase_hint">
-        Voer een herstelzin in om alleen de Bitcoinportemonnee en gehoste kanalen te herstellen.
-        Lightningkanaalbalans op eerdere apparaten worden teruggestort nadat handmatig
-        contact wordt gemaakt met remote nodes waar je die kanalen mee had.
-    </string>
+    <string name="setup_recovery_phrase_hint">Voer een herstelzin in om alleen de Bitcoinportemonnee en gehoste kanalen te herstellen. Saldi van Lightningkanalen op eerdere apparaten kunnen worden terugbetaald door handmatig verbinding te maken met de externe nodes waarmee je die kanalen had.</string>
 
     <string name="action_backup_present_title"><![CDATA[
         <b>Lightningback-upbestand is aanwezig</b><br><br>Herstelzin zal gebruikt worden
@@ -64,7 +59,7 @@
     <string name="dialog_stamp">Stempel</string>
     <string name="dialog_accept">Accepteer</string>
     <string name="dialog_cancel">Annuleer</string>
-    <string name="dialog_split">Split</string>
+    <string name="dialog_split">Splits</string>
     <string name="dialog_share">Deel</string>
     <string name="dialog_break">Breek</string>
     <string name="dialog_boost">Boost</string>
@@ -95,17 +90,17 @@
     <string name="dialog_insufficient_funds">ontbrekende gelden</string>
     <string name="dialog_sat_vbyte">sat/vB</string>
 
-    <string name="dialog_send_btc_from"><![CDATA[from&#160;<b>%1$s</b>&#160;portemonnee]]></string>
+    <string name="dialog_send_btc_from"><![CDATA[van&#160;portemonnee&#160;<b>%1$s</b>]]></string>
     <string name="dialog_send_btc"><![CDATA[Verzend <b>Bitcoin</b>transactie<br><b>naar adres</b> %1$s%2$s]]></string>
     <string name="dialog_send_btc_many"><![CDATA[Verzend <b>Bitcoin</b>transactie<br><b>naar meerdere adressen</b>]]></string>
     <string name="dialog_send_btc_confirm_amount">Verzendbedrag</string>
     <string name="dialog_send_btc_confirm_fiat">Fiatwaarde</string>
     <string name="dialog_send_btc_confirm_fee">Ketentarief</string>
 
-    <string name="dialog_send_ln"><![CDATA[Verzend <b>Lightning</b>betalong%1$s]]></string>
+    <string name="dialog_send_ln"><![CDATA[Verzend <b>Lightning</b>betaling%1$s]]></string>
     <string name="dialog_split_ln"><![CDATA[Split <b>Lightning</b>betaling%1$s]]></string>
     <string name="dialog_split_ln_tip">Laat iemand een gesplitste factuur scannen,\nTik dan op hetzelfde moment op oké</string>
-    <string name="dialog_ln_expected_fee"><![CDATA[<b>verwachte tarief</b> %1$s]]></string>
+    <string name="dialog_ln_expected_fee"><![CDATA[<b>verwacht tarief</b> %1$s]]></string>
     <string name="dialog_ln_requested"><![CDATA[<b>verzocht</b>&#160;%1$s]]></string>
     <string name="dialog_ln_left"><![CDATA[<b>nog te betalen</b>&#160;%1$s]]></string>
 
@@ -118,55 +113,50 @@
     <string name="error_channel">Kanaalfout is opgetreden</string>
     <string name="error_channel_remote"><![CDATA[<b>Fout van remote peer</b>:<br><br>%1$s]]></string>
     <string name="error_channel_closed"><![CDATA[<b>Kanaal is geforceerd gesloten door de portemonnee, details van fatale fout</b>:<br><br>%1$s]]></string>
-    <string name="error_channel_suspended"><![CDATA[<b>Gehost kanaal is opgeheven door de portemonnee, details van fatale fout</b>:<br><br>%1$s]]></string>
+    <string name="error_channel_suspended"><![CDATA[<b>Gehost kanaal is opgeschort door de portemonnee, details van fatale fout</b>:<br><br>%1$s]]></string>
 
-    <string name="error_channel_unknown"><![CDATA[
-        Remote peer geeft aan dat er een Lightningkanaal bestaat dat om de een or andere reden niet beschikbaar is op je apparaat.<br><br>
-        Peer kan verzocht worden om het kanaal te stoppen zodat de resterende balans teruggaannaar je je ketenportemonnee.<br><br>
-        <b>Ontbrekend kanaal-ID</b><br>%1$s<br><br>
-        <b>Lokaal node-ID</b><br>%1$s<br><br>
-        <b>Peer node-ID</b><br>%2$s
-    ]]></string>
+    <string name="error_channel_unknown"><![CDATA[De externe peer meldt dat er een Lightningkanaal bestaat dat niet op je apparaat aanwezig is.<br><br>Je kunt de peer vragen dat kanaal geforceerd te sluiten, zodat het resterende saldo naar je ketenportemonnee terugkeert.<br><br><b>Ontbrekend kanaal-ID</b><br>%1$s<br><br><b>Lokaal node-ID</b><br>%2$s<br><br><b>Peer-node-ID</b><br>%3$s]]></string>
 
-    <string name="error_rejected_incoming_public">Afgekeurd aanbod van publiek kanaal, allen privékanalen zijn toegestaan.</string>
+    <string name="error_rejected_incoming_public">Afgekeurd aanbod van publiek kanaal, alleen privékanalen zijn toegestaan.</string>
     <string name="error_btc_no_wallet">Kan niet verder gaan omdat gerelateerde ketenportemonnee niet is gevonden, voeg die a.u.b. toe vanuit de appinstellingen.</string>
     <string name="error_btc_broadcast_fail">Kon transactie niet uitzenden, ga a.u.b. na dat de portemonnee een netwerkverbinding heeft en probeer het dan opnieuw.</string>
-    <string name="error_could_not_decrypt"><![CDATA[<b>Ontsleuteling van backp-up is mislukt</b>.<br><br>Zorg dat het back-upbestand en de herstelzin correct zijn en tot dezelfde portemonnee behoren.<br><br>Foutdetails<br><b>%1$s</b>]]></string>
+    <string name="error_could_not_decrypt"><![CDATA[<b>Ontsleuteling van de back-up is mislukt</b>.<br><br>Zorg dat het back-upbestand en de herstelzin correct zijn en tot dezelfde portemonnee behoren.<br><br>Foutdetails<br><b>%1$s</b>]]></string>
+    <string name="error_could_not_read_backup"><![CDATA[<b>Het back-upbestand kan niet worden gelezen</b>.<br><br>Foutdetails<br><b>%1$s</b>]]></string>
+    <string name="error_backup_pending"><![CDATA[Dit back-upbestand is vergrendeld door een oudere versie van de app.<br><br>Android vraagt toestemming om het te ontgrendelen. Daarna gaat het herstel verder.]]></string>
     <string name="error_wrong_phrase"><![CDATA[<b>Ingevoerde wachtwoordzin is incorrect</b>.<br><br>Foutdetails<br><b>%1$s</b>]]></string>
     <string name="error_old_api_level">Vereist API 24+, die van jou is %1$s</string>
     <string name="error_nothing_useful">Niets bruikbaars is gevonden</string>
+    <string name="error_scan_no_qr">Geen leesbare QR-code gevonden. Kom dichterbij, zorg voor meer licht of schakel de zaklamp in.</string>
+    <string name="error_camera_unavailable">De camera kon niet worden gestart. Controleer de cameratoestemming en probeer het opnieuw.</string>
+    <string name="error_camera_permission">Cameratoestemming is nodig om te scannen. Schakel deze in bij de appinstellingen en probeer het opnieuw.</string>
 
     <string name="error_ln_no_chans"><![CDATA[Kan geen Lightningbetalingen verzenden of ontvangen omdat er geen open kanalen beschikbaar zijn.]]></string>
     <string name="error_ln_waiting"><![CDATA[Kan geen Lightningbetalingen verzenden of ontvangen omdat er nog geen kanaal open is.]]></string>
 
-    <string name="error_ln_receive_no_update"><![CDATA[Kan geen Lightningbetalingen verzoeken omdat de ontvangparameters not niet beschikbaar zijn.]]></string>
+    <string name="error_ln_receive_no_update">Kan geen Lightningbetalingen aanvragen omdat de ontvangstparameters nog niet beschikbaar zijn.</string>
     <string name="error_ln_receive_reserve"><![CDATA[Kan geen Lightningbetalingen verzoeken omdat je eerst tenminste <b>%1$s</b> moet besteden om ruimte te maken om te kunnen ontvangen.]]></string>
 
     <string name="error_ln_send_small"><![CDATA[Kan deze Lightningbetaling niet verzenden omdat het verzochte bedrag van <b>%1$s</b> te klein is, een minimaal bedrag is <b>%2$s</b>.]]></string>
     <string name="error_ln_send_reserve"><![CDATA[Kan Lightningbetalingen niet verzenden omdat je betalingskanaal leeg is en je moet er eerst iets in ontvangen.]]></string>
     <string name="error_ln_send_no_secret"><![CDATA[Kan deze Lightningbetaling niet verzenden omdat de factuur geen geheime code bevat.]]></string>
-    <string name="error_ln_send_network"><![CDATA[Kan deze Lightningbetaling niet verzenden omdat het tot een onbekend netwerk behoord.]]></string>
+    <string name="error_ln_send_network">Kan deze Lightningbetaling niet verzenden omdat deze tot een onbekend netwerk behoort.</string>
     <string name="error_ln_send_split"><![CDATA[Kan met deze splitfactuur niet verder gaan omdat de splitparameters verkeerd zijn.]]></string>
     <string name="error_ln_send_done_already"><![CDATA[Kan deze Lightningbetaling niet verzenden omdat het al verstuurd is.]]></string>
     <string name="error_ln_send_expired"><![CDATA[Kan deze Lightningbetaling niet verzenden omdat de factuur inmiddels verlopen is.]]></string>
     <string name="error_ln_send_in_flight"><![CDATA[Kan deze Lightningbetaling niet verzenden omdat het reeds in-flight is.]]></string>
 
     <string name="error_hc_dangerous_state">Gevaarlijke betalingstoestand</string>
-    <string name="error_hc_option_can_stamp"><![CDATA[Je kan nu een <b>bewijsstempel</b> op de Bitcoinblokketen plaatsen om altijd aan te tonen dat je <b>%1$s</b> had, dit kost <b>%2$s</b>.]]></string>
+    <string name="error_hc_option_can_stamp"><![CDATA[Je kunt nu een <b>bewijsstempel</b> op de Bitcoinblokketen plaatsen om altijd te kunnen aantonen dat je recht hebt op <b>%1$s</b>. Dit kost <b>%2$s</b>.]]></string>
     <string name="error_hc_option_can_not_stamp"><![CDATA[Hostverplichting kan voor altijd worden gefixeerd door een <b>bewijsstempel</b> op de Bitcoinblokketen te plaatsen maar je hebt wat gelden nodig om dit voor elkaar te krijgen.]]></string>
 
-    <string name="error_hc_revealed_preimage"><![CDATA[
-        Remote host bevestigt niet onthullend bewijs van je <b>%2$s</b> inkomende betaling.<br><br>
-        Zoals het eruit ziet in <b>%3$s</b> zal het onmogelijk worden om te tonen dat je bewijs tijdig was onthuld.<br><br>
-        %1$s
-    ]]></string>
+    <string name="error_hc_revealed_preimage"><![CDATA[De externe host erkent het onthulde bewijs voor je inkomende betaling van <b>%2$s</b> niet.<br><br>Als dit zo blijft, is het over <b>%3$s</b> onmogelijk om aan te tonen dat je bewijs op tijd is onthuld.<br><br>%1$s]]></string>
 
     <!-- /errors -->
 
     <!-- Notifications -->
 
     <string name="incoming_notify_title">Wachtend op betaling</string>
-    <string name="incoming_notify_body">App loopt om om %1$s te ontvangen</string>
+    <string name="incoming_notify_body">De app is actief om %1$s te ontvangen</string>
 
     <string name="delayed_notify_wt_title">Watchtowernotificatie</string>
     <string name="delayed_notify_wt_body">Open een portemonnee om kanalen te controleren</string>
@@ -179,12 +169,12 @@
     <!-- special tx/payment descriptions -->
 
     <string name="tx_ln_label_reflexive">Betaling aan jezelf</string>
-    <string name="tx_ln_notice_split">%1$d\%% split&#160;|&#160;</string>
+    <string name="tx_ln_notice_split"><![CDATA[%1$d\%% gesplitst&#160;|&#160;]]></string>
 
     <string name="tx_description_op_return">Betalingsbewijsstempel</string>
     <string name="tx_description_funding">Lightningkanaalfinanciering</string>
-    <string name="tx_description_refunding">Kanaalbalansherfinanciering</string>
-    <string name="tx_description_htlc_claiming">Lightningbetalen aan het claimen</string>
+    <string name="tx_description_refunding">Terugbetaling van kanaalsaldo</string>
+    <string name="tx_description_htlc_claiming">Lightningbetaling opeisen</string>
     <string name="tx_description_penalty">Kanaalovertredingsboete</string>
     <string name="tx_description_rbf_cancel">RBF-annulering</string>
     <string name="tx_description_rbf_boost">RBF-boosting</string>
@@ -198,14 +188,14 @@
 
     <string name="popup_retry">Probeer betaling opnieuw</string>
     <string name="popup_view_invoice">Bekijk factuur</string>
-    <string name="popup_run_action"><![CDATA[run&#160;betaling&#160;actie]]></string>
-    <string name="popup_proof_stamp"><![CDATA[aandeel&#160;proof&#160;stamp]]></string>
+    <string name="popup_run_action"><![CDATA[betalingsactie&#160;uitvoeren]]></string>
+    <string name="popup_proof_stamp"><![CDATA[bewijsstempel&#160;delen]]></string>
     <string name="popup_to_address"><![CDATA[<b>adres</b>&#160;%1$s]]></string>
-    <string name="popup_ln_payee"><![CDATA[<b>payee</b>&#160;%1$s]]></string>
+    <string name="popup_ln_payee"><![CDATA[<b>ontvanger</b>&#160;%1$s]]></string>
     <string name="popup_ln_node"><![CDATA[<b>node</b>&#160;%1$s]]></string>
     <string name="popup_txid"><![CDATA[<b>txid</b>&#160;%1$s]]></string>
 
-    <string name="popup_prior_chain_balance"><![CDATA[<b>prior&#160;balans</b>&#160;%1$s]]></string>
+    <string name="popup_prior_chain_balance"><![CDATA[<b>vorig&#160;saldo</b>&#160;%1$s]]></string>
     <string name="popup_ln_fee"><![CDATA[<b>tarief</b>&#160;%1$s&#160;(%2$s)]]></string>
     <string name="popup_fiat"><![CDATA[<b>fiat&#160;waarde</b>&#160;%1$s&#160;(%2$s)]]></string>
     <string name="popup_chain_fee"><![CDATA[<b>keten&#160;tarief</b>&#160;%1$s]]></string>
@@ -217,13 +207,18 @@
 
     <string name="rpa_title">Remote peer-verbinding</string>
     <string name="rpa_disconnected">Remote peer verbinding verbroken</string>
-    <string name="rpa_no_feature_support">Je kan geen kanalen openen met deze node omdat bepaalde belangrijke features not door de remote peer worden ondersteund.</string>
-    <string name="rpa_hc_warn"><![CDATA[<br><b>Let op!</b><br><br>DE gelden van je gehost kanaal worden opgeslagen aan de hostzijde, wees zeker dat je deze peer kan vertrouwen om niet in opgelicht te worden.]]></string>
+    <string name="rpa_no_feature_support">Kan geen kanalen met deze node openen omdat de externe peer enkele belangrijke functies niet ondersteunt.</string>
+    <string name="rpa_hc_warn"><![CDATA[<br><b>Let op!</b><br><br>Het geld in je gehoste kanaal wordt bij de host bewaard. Zorg dat je erop vertrouwt dat deze peer er niet met je geld vandoor gaat.<br><br>Je saldo is gekoppeld aan het fiatsaldo en het bedrag in sats zal schommelen.]]></string>
     <string name="rpa_request_channel">Deel je node-ID met remote peer en houd deze pagina open om een ontvangkanaal te krijgen.</string>
     <string name="rpa_request_hc_usd">USD-fiatkanaal aanvragen</string>
     <string name="rpa_request_hc_eur">EURO-fiatkanaal aanvragen</string>
     <string name="rpa_share_node_id">Deel node-ID</string>
     <string name="rpa_open_nc">Financier nieuw kanaal</string>
+    <string name="rpa_spinner_preparing">Voorbereiden…</string>
+    <string name="rpa_spinner_publishing">Financieringstransactie publiceren…</string>
+    <string name="rpa_err_min_funding">De minimale kanaalfinanciering is %1$s</string>
+    <string name="rpa_err_no_wumbo">Deze peer ondersteunt geen grote kanalen (Wumbo). De maximale financiering is %1$s</string>
+    <string name="dialog_hw_scan_signed">Scan de ondertekende transactie van je hardwareportemonnee</string>
 
     <!-- /Remote peer activity -->
 
@@ -231,7 +226,7 @@
 
     <string name="settings_backup_disabled">Schakel lokale kanaalback-up in</string>
     <string name="settings_backup_enabled">Lokale kanaalback-up is ingeschakeld</string>
-    <string name="settings_backup_info">Kies een map voor versleutelde back-ups</string>
+    <string name="settings_backup_info">Kies een map voor versleutelde kanaalback-ups</string>
     <string name="settings_backup_where">Geen map geselecteerd</string>
     <string name="settings_backup_how">Apprechten -> Opslag</string>
 
@@ -243,10 +238,11 @@
     <string name="settings_chain_legacy">Oudere portemonnee</string>
     <string name="settings_chain_modern">Hedendaagse portemonnee</string>
 
-    <string name="settings_use_auth">Gebruik biometrische authenticatie</string>
+    <string name="settings_use_auth">Gebruik PIN-authenticatie</string>
     <string name="settings_ensure_tor">Gebruik Torverbinding</string>
+    <string name="settings_hide_zero_outputs">Transacties met 0 outputs naar Valet verbergen</string>
 
-    <string name="ln_fee_expensive_omitted">Payment failed because expensive routes were omitted, would you like to retry with increased fee limits?</string>
+    <string name="ln_fee_expensive_omitted">De betaling is mislukt omdat dure routes zijn overgeslagen. Wil je het opnieuw proberen met hogere kostenlimieten?</string>
     <string name="ln_sync_not_complete">LN SYNC is nog niet klaar, wacht a.u.b. even terwijl je de app open houdt en probeer dan nog eens.</string>
     <string name="ln_payee_likely_offline">Het is waarschijnlijk dat de portemonnee van de begunstigde momenteel offline is</string>
 
@@ -254,9 +250,20 @@
     <string name="settings_fiat_currency">Fiatvaluta</string>
     <string name="settings_custom_electrum_host_port">host:poort</string>
     <string name="settings_custom_electrum_disabled">Stel maatwerk-Electrumknooppunt in</string>
-    <string name="settings_custom_electrum_enabled">Gebruik een maatwerk-Electrumknoopppunt</string>
+    <string name="settings_custom_electrum_enabled">Eigen Electrumknooppunt in gebruik</string>
     <string name="settings_custom_electrum_disabled_tip">Momenteel worden willekeurige knooppunten gebruikt</string>
     <string name="settings_custom_electrum_restart_notice">Herstart om wijzigingen te activeren</string>
+    <string name="settings_electrum_close_channels">Sluit alle kanalen voordat je de Electrumserver wijzigt. De server is niet gewijzigd.</string>
+    <string name="settings_custom_signet">Eigen signet gebruiken</string>
+    <string name="settings_custom_signet_info">Een wijziging wist de ketengegevens op dit apparaat</string>
+    <string name="settings_custom_signet_no_electrum">Een eigen signet vereist een eigen Electrumserver</string>
+    <string name="settings_custom_signet_close_channels">Sluit alle kanalen voordat je naar een andere signet overschakelt</string>
+    <string name="settings_custom_signet_restart">De app wist de ketengegevens op dit apparaat en start opnieuw</string>
+    <string name="restore_signet_network">Bij welke signet hoort deze back-up?</string>
+    <string name="error_backup_signet_network">Deze back-up vereist de Signet-app en een geldige signetnetwerkinstelling.</string>
+    <string name="settings_gap_limit">Limiet voor ongebruikte adressen bij scannen</string>
+    <string name="settings_gap_limit_info">Huidig: %1$d adressen</string>
+    <string name="settings_gap_limit_tip">Aantal ongebruikte adressen dat vooruit wordt aangehouden bij het scannen van een HD-portemonnee. Hogere waarden vinden meer historische activiteit, maar vertragen het opstarten.</string>
 
     <string name="settings_view_revocery_phrase_ext">Met deze woorden kun je je portemonneesaldo herstellen op elk apparaat, hou het te allen tijde geheim!</string>
     <string name="settings_view_revocery_phrase">Bekijk BIP39-herstelzin</string>
@@ -290,8 +297,8 @@
 
     <array name="expires_in_blocks">
         <item><![CDATA[<b>verlopen</b>]]></item>
-        <item><![CDATA[<b>verloopt&#160;in</b>&#160;%1$d&#160;block]]></item>
-        <item><![CDATA[<b>verloopt&#160;in</b>&#160;%1$d&#160;blocks]]></item>
+        <item><![CDATA[<b>verloopt&#160;over</b>&#160;%1$d&#160;blok]]></item>
+        <item><![CDATA[<b>verloopt&#160;over</b>&#160;%1$d&#160;blokken]]></item>
     </array>
 
     <!-- lnurl -->
@@ -307,13 +314,14 @@
 
     <string name="popup_hold">Houd vast voor %1$s minuten</string>
     <string name="popup_identity">Voeg portemonnee-identiteit toe</string>
+    <string name="confirm_ignoring_metadata_mismatch">⚠ De hash van de LNURL-metadata komt niet overeen</string>
 
     <!-- lnurl-auth -->
 
     <string name="lnurl_auth_register">Registreer</string>
-    <string name="lnurl_auth_login">Login</string>
-    <string name="lnurl_auth_auth">Auth</string>
-    <string name="lnurl_auth_link">Link</string>
+    <string name="lnurl_auth_login">Inloggen</string>
+    <string name="lnurl_auth_auth">Autoriseren</string>
+    <string name="lnurl_auth_link">Koppelen</string>
 
     <string name="lnurl_auth_register_ok">Succesvol geregistreerd</string>
     <string name="lnurl_auth_login_ok">Succesvol ingelogd</string>
@@ -340,7 +348,7 @@
     <string name="stats_item_transactions"><![CDATA[<b>transacties</b>&#160;%1$s]]></string>
 
     <string name="stats_item_fees"><![CDATA[<b>tarieven</b>&#160;%1$s]]></string>
-    <string name="stats_item_fees_saved"><![CDATA[<b>keten&#160;tarieven&#160;opgeslagen</b>&#160;%1$s]]></string>
+    <string name="stats_item_fees_saved"><![CDATA[<b>bespaarde&#160;ketenkosten</b>&#160;%1$s]]></string>
 
     <string name="stats_item_relays"><![CDATA[<b>quantiteit</b>&#160;%1$s]]></string>
     <string name="stats_item_relayed"><![CDATA[<b>volume</b>&#160;%1$s]]></string>
@@ -351,10 +359,20 @@
     <string name="chan_can_receive">Kan ontvangen</string>
     <string name="chan_in_flight">Waarde in-flight</string>
     <string name="chan_refundable">Terugbetaalbaar</string>
+    <string name="chan_gossip_extended">Gossipsynchronisatie: uitgebreid</string>
+    <string name="chan_gossip_basic">Gossipsynchronisatie: basis</string>
+    <string name="chan_gossip_unsupported">Gossipsynchronisatie: niet beschikbaar</string>
+    <string name="chan_gossip_unknown">Gossipsynchronisatie: onbekend</string>
+    <string name="chan_commitment_zero_fee_anchors">Commitment: ankers zonder kosten</string>
+    <string name="chan_commitment_anchors">Commitment: ankers</string>
+    <string name="chan_commitment_legacy">Commitment: oud type</string>
+    <string name="chan_scid_alias">SCID-alias</string>
+    <string name="chan_zeroconf">Zonder bevestigingen</string>
+    <string name="chan_splicing">Splicing</string>
 
     <string name="chan_nothing"><![CDATA[<i>niets</i>]]></string>
 
-    <string name="chan_open">Get new kanaal</string>
+    <string name="chan_open">Nieuw kanaal verkrijgen</string>
     <string name="chan_open_lnbig">Koop bij LNBIG.COM</string>
     <string name="chan_open_bitrefill">Koop bij BITREFILL.COM</string>
     <string name="chan_open_scan">Scan Node-QR</string>
@@ -378,20 +396,20 @@
 
     <array name="ln_normal_chan_actions">
         <item><![CDATA[Deel <b>Lightningkanaal</b>details]]></item>
-        <item><![CDATA[Sluit kanaal naar portemonnee]]></item>
-        <item><![CDATA[Sluit kanaal naar adres]]></item>
-        <item><![CDATA[Ontvang op kanaal]]></item>
-        <item><![CDATA[Recarregue de outros canais]]></item>
-        <item><![CDATA[Directe, niet-privé-ontvangst naar kanaal]]></item>
+        <item>Sluit kanaal naar portemonnee</item>
+        <item>Sluit kanaal naar adres</item>
+        <item>Ontvang op kanaal</item>
+        <item>Aanvullen vanuit andere kanalen</item>
+        <item>Direct, niet privé, op kanaal ontvangen</item>
     </array>
 
     <array name="ln_hosted_chan_actions">
-        <item><![CDATA[Deel details <b>Hosted Kanaal</b>]]></item>
-        <item><![CDATA[Exporteer kanaaltoestand]]></item>
-        <item><![CDATA[Drain kanaal balance]]></item>
-        <item><![CDATA[Ontvang op kanaal]]></item>
-        <item><![CDATA[Recarregue de outros canais]]></item>
-        <item><![CDATA[Directe, niet-privé-ontvangst naar kanaal]]></item>
+        <item><![CDATA[Deel details van <b>gehost kanaal</b>]]></item>
+        <item>Exporteer kanaaltoestand</item>
+        <item>Kanaalsaldo overmaken</item>
+        <item>Ontvang op kanaal</item>
+        <item>Aanvullen vanuit andere kanalen</item>
+        <item>Direct, niet privé, op kanaal ontvangen</item>
     </array>
 
     <string name="ln_hc_override">Overschrijfvoorstel</string>
@@ -408,9 +426,9 @@
 
     <string name="confirm_remove_item">&#9888; Wil je dit item verwijderen?</string>
     <string name="confirm_ln_normal_chan_close_address"><![CDATA[&#9888; Wil je dit kanaal sluiten voor het volgende adres?<br><br><b>%1$s</b>]]></string>
-    <string name="confirm_ln_normal_chan_force_close">&#9888; Wil je dit kanaal geforceerd sluiten?\n\nLet op dat er een herfinancieringsvertraging en hogere sluittarief zijn.</string>
+    <string name="confirm_ln_normal_chan_force_close">⚠ Wil je dit kanaal geforceerd sluiten?\n\nHoud rekening met een vertraagde terugbetaling en hogere sluitingskosten.</string>
     <string name="confirm_ln_hosted_chan_remove">&#9888; Wil je het gehost kanaal verwijderen?\n\nLet op dat het altijd hersteld kan worden door te verbinden met de hostnode.</string>
-    <string name="confirm_ln_hosted_chan_drain">&#9888; Wil je de gelden van dit kanaal opmaken in andere kanalen van deze portemonnee?</string>
+    <string name="confirm_ln_hosted_chan_drain">⚠ Wil je het geld uit dit kanaal overmaken naar andere kanalen in deze portemonnee?</string>
 
     <!-- /action confirmations -->
 
@@ -430,17 +448,17 @@
     <string name="fiat_wallet">Fiat</string>
     <string name="fiat_wallet_usd">USD</string>
     <string name="fiat_wallet_eur">EUR</string>
-    <string name="chan_reserve">Reserveren</string>
-    <string name="chan_server_rate">Servertarief</string>
-    <string name="chan_fiat_rate">Gemiddelde score</string>
+    <string name="chan_reserve">Reserve</string>
+    <string name="chan_server_rate">Serverkoers</string>
+    <string name="chan_fiat_rate">Gemiddelde wisselkoers</string>
     <string name="chan_fiat_value">Fiat-balans</string>
-    <string name="ln_hosted_chan_refill_impossible">"Onmogelijk om fiat-kanaal bij te vullen "</string>
+    <string name="ln_hosted_chan_refill_impossible">Kan fiatkanaal niet aanvullen</string>
     <string name="ln_hosted_chan_refill_low_funds">Niet genoeg geld om het fiatkanaal aan te vullen</string>
-    <string name="dialog_refill_ln">" <![CDATA[Kanaal aanvullen via <b>Lightning</b>]]>"</string>
+    <string name="dialog_refill_ln"><![CDATA[Kanaal aanvullen via <b>Lightning</b>]]></string>
 
     <!-- /CPFP/RBF -->
 
     <string name="settings_sync_chain">Keten synchroniseren</string>
-    <string name="settings_sync_graph">Grafiek synchroniseren</string>
+    <string name="settings_sync_graph">Graaf synchroniseren</string>
     <string name="settings_sync_started">Synchronisatie gestart, houd de app open</string>
 </resources>
