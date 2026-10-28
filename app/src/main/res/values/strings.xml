@@ -23,8 +23,8 @@
 
     <string name="search_recent">Search recent activity</string>
     <string name="emergency_mode">Something went wrong</string>
-    <string name="error_log">Export error logs</string>
-    <string name="error_log_clear">Clear error logs</string>
+    <string name="error_log">Export diagnostic logs</string>
+    <string name="error_log_clear">Clear diagnostic logs</string>
 
     <string name="setup_title">Wallet setup</string>
     <string name="network_setup_title">Network setup</string>

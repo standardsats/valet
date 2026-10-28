@@ -54,9 +54,10 @@ object ChannelMaster {
   final val NO_PREIMAGE = ByteVector32.One
   final val NO_SECRET = ByteVector32.Zeroes
 
-  // A channel which waits this long for the peer's channel_reestablish on a live connection gets a new connection, at most MAX_FORCED_RECONNECTS times per app run
+  // Bound retries until a channel reestablishes successfully.
   final val REESTABLISH_TIMEOUT = 60.seconds
   final val MAX_FORCED_RECONNECTS = 3
+  final val RECONNECT_DELAY = 5.seconds
 
   def dangerousHCRevealed(allRevealed: Map[ByteVector32, RevealedLocalFulfills], tip: Long, hash: ByteVector32): Iterable[LocalFulfill] = {
     // Of all incoming payments inside of HCs for which we have revealed a preimage, find those which are dangerously close to expiration, but not expired yet, but not hopelessly close
@@ -78,10 +79,13 @@ class ChannelMaster(val payBag: PaymentBag, val chanBag: ChannelBag, val dataBag
   val getPreimageMemo: LoadingCache[ByteVector32, PreimageTry] = memoize(payBag.getPreimage)
   val opm: OutgoingPaymentMaster = new OutgoingPaymentMaster(me)
 
-  val reconnectFailures: TrieMap[PublicKey, Int] = TrieMap.empty
   val reconnectScheduled: TrieMap[PublicKey, Boolean] = TrieMap.empty
   val reestablishWaitSince: TrieMap[ByteVector32, Long] = TrieMap.empty
   val forcedReconnects: TrieMap[ByteVector32, Int] = TrieMap.empty
+  @volatile private var shuttingDown = false
+
+  protected def scheduleConnectionTask(delay: FiniteDuration)(action: => Unit): Unit =
+    Rx.ioQueue.delay(delay).foreach(_ => if (!shuttingDown) action, none)
 
   val localPaymentListeners: mutable.Set[OutgoingPaymentListener] = {
     val defListener: OutgoingPaymentListener = new OutgoingPaymentListener {
@@ -170,9 +174,13 @@ class ChannelMaster(val payBag: PaymentBag, val chanBag: ChannelBag, val dataBag
   // CommsTower sends this once per connection, channels send channel_reestablish again and their wait for an answer starts again
   override def onOperational(worker: CommsTower.Worker, theirInit: Init): Unit = {
     val chans = allFromNode(worker.info.nodeId)
-    reestablishWaitSince --= chans.map(_.commits.channelId)
+    val connectedAt = System.currentTimeMillis
+    chans.foreach(cnc => reestablishWaitSince(cnc.commits.channelId) = connectedAt)
     chans.foreach(_.chan process CMD_SOCKET_ONLINE)
-    reconnectFailures -= worker.info.nodeId
+    // New blocks can be minutes apart. A handshake timeout must run even when the chain tip does not change.
+    scheduleConnectionTask(REESTABLISH_TIMEOUT) {
+      if (CommsTower.workers.get(worker.pair).contains(worker)) allFromNode(worker.info.nodeId).foreach(reconnectIfReestablishUnanswered)
+    }
   }
 
   override def onMessage(worker: CommsTower.Worker, message: LightningMessage): Unit = message match {
@@ -192,21 +200,18 @@ class ChannelMaster(val payBag: PaymentBag, val chanBag: ChannelBag, val dataBag
     scheduleReconnect(worker.info.nodeId)
   }
 
-  // One timer per failing peer, its delay doubles on each failure from 5 seconds up to 5 minutes
-  // initConnect skips a peer while its timer runs, so attempts do not pile up on each new block
+  // Keep retries prompt after a network outage, with one pending timer per peer.
   def scheduleReconnect(nodeId: PublicKey): Unit = if (reconnectScheduled.putIfAbsent(nodeId, true).isEmpty) {
-    val failures = reconnectFailures.getOrElse(nodeId, 0)
-    reconnectFailures(nodeId) = failures + 1
-
-    Rx.ioQueue.delay(5.seconds * (1L << math.min(failures, 6)) min 5.minutes).foreach(_ => {
+    scheduleConnectionTask(RECONNECT_DELAY) {
       reconnectScheduled -= nodeId
       initConnect
-    }, none)
+    }
   }
 
   // CHANNEL MANAGEMENT
 
   override def becomeShutDown: Unit = {
+    shuttingDown = true
     // Outgoing FSMs won't receive anything without channel listeners
     for (channel <- all.values) channel.listeners = Set.empty
     for (fsm <- inProcessors.values) fsm.becomeShutDown
@@ -231,7 +236,7 @@ class ChannelMaster(val payBag: PaymentBag, val chanBag: ChannelBag, val dataBag
       val waitMillis = System.currentTimeMillis - reestablishWaitSince.getOrElseUpdate(channelId, System.currentTimeMillis)
       val attempts = forcedReconnects.getOrElse(channelId, 0)
 
-      if (waitMillis > REESTABLISH_TIMEOUT.toMillis && attempts < MAX_FORCED_RECONNECTS) {
+      if (waitMillis >= REESTABLISH_TIMEOUT.toMillis && attempts < MAX_FORCED_RECONNECTS) {
         LNParams.logBag.put(s"channel-reestablish-timeout ${cnc.commits.remoteInfo.nodeId}", s"channel=$channelId attempt=${attempts + 1}")
         forcedReconnects(channelId) = attempts + 1
         reestablishWaitSince -= channelId
@@ -389,6 +394,10 @@ class ChannelMaster(val payBag: PaymentBag, val chanBag: ChannelBag, val dataBag
       next(statusUpdateStream)
 
     case (chan, _, _, prev, OPEN) if prev != OPEN =>
+      Channel.chanAndCommitsOpt(chan).foreach { cnc =>
+        reestablishWaitSince -= cnc.commits.channelId
+        forcedReconnects -= cnc.commits.channelId
+      }
       // Channel which was not OPEN became operational and OPEN
       // We may get here after getting fresh feerates so check again
       chan process CMD_CHECK_FEERATE
