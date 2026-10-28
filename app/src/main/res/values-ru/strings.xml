@@ -5,16 +5,17 @@
     <string name="sources">Исходный код</string>
     <string name="twitter">Наш твиттер</string>
     <string name="manual">Читать инструкцию</string>
+    <string name="community">Помощь сообщества</string>
 
     <string name="choose_wallet">Выберите кошелек</string>
-    <string name="hardware_wallet">Аппаратный</string>
-    <string name="watching_wallet">Watching wallet</string>
+    <string name="hardware_wallet">Аппаратный кошелёк</string>
+    <string name="watching_wallet">Кошелёк только для наблюдения</string>
     <string name="coin_control">Coin контроль</string>
 
     <string name="bitcoin_wallet">Биткойн</string>
     <string name="lightning_wallet">Молния</string>
     <string name="total_balance">Общий баланс</string>
-    <string name="hosted_channel">HOSTED CHANNEL\nCustodial solution</string>
+    <string name="hosted_channel">ФИАТНЫЙ КАНАЛ\nКастодиальное решение</string>
     <string name="typing_hints">Биткойн адрес, инвойс, емейл&#8230;</string>
     <string name="copied_to_clipboard">Скопировано в буфер</string>
     <string name="add_address">Больше свежих адресов</string>
@@ -22,9 +23,11 @@
 
     <string name="search_recent">Поиск платежей и транзакций</string>
     <string name="emergency_mode">Что-то пошло не так</string>
-    <string name="error_log">Логи ошибок</string>
+    <string name="error_log">Экспортировать журналы</string>
+    <string name="error_log_clear">Очистить журналы</string>
 
-    <string name="setup_title">Создание кошелька</string>
+    <string name="setup_title">Настройка кошелька</string>
+    <string name="network_setup_title">Настройка сети</string>
     <string name="setup_create_new">Создать новый кошелек</string>
     <string name="setup_restore_existing">Восстановить кошелек</string>
     <string name="setup_recovery_phrase">Только фраза восстановления</string>
@@ -36,17 +39,9 @@
     <!-- DO NOT TRANSLATE --> <string name="share_ln_payment">Signed invoice\n%1$s\n\nPayment hash\n%2$s\n\nPayment description\n%3$s\n\nReceiver Node ID\n%4$s\n\nProof of payment\n%5$s\n\nDebug info\n%6$s</string>
     <!-- DO NOT TRANSLATE --> <string name="share_chain_tx">Bitcoin transaction hex\n\n%1$s</string>
 
-    <string name="setup_backup_file_hint">
-        Укажите резервный файл с каналами, затем укажите фразу
-        восстановления чтобы возобновить баланс кошелька и каналы Молнии.
-        Закройте другие копии вашего кошелька перед тем как начать эти действия.
-    </string>
+    <string name="setup_backup_file_hint">Укажите файл резервной копии Lightning и расшифруйте его фразой восстановления, чтобы полностью восстановить Биткойн-кошелёк вместе с каналами Lightning.</string>
 
-    <string name="setup_recovery_phrase_hint">
-        Укажите фразу восстановления, чтобы возобновить только Биткойн-баланс и hosted-каналы.
-        Для возврата средств из каналов Молнии надо будет вручную подключиться к тем узлам,
-        с которыми эти каналы были открыты.
-    </string>
+    <string name="setup_recovery_phrase_hint">Укажите фразу восстановления, чтобы восстановить только Биткойн-кошелёк и hosted-каналы. Средства из каналов Lightning на предыдущих устройствах могут быть возвращены при ручном подключении к удалённым узлам, с которыми были открыты эти каналы.</string>
 
     <string name="action_backup_present_title"><![CDATA[
         <b>Резервный файл добавлен</b><br><br>Фраза восстановления будет
@@ -65,14 +60,14 @@
     <string name="dialog_accept">Принять</string>
     <string name="dialog_cancel">Отмена</string>
     <string name="dialog_split">Разбить</string>
-    <string name="dialog_share">Share</string>
+    <string name="dialog_share">Поделиться</string>
     <string name="dialog_break">Прервать</string>
     <string name="dialog_boost">Ускорить</string>
     <string name="dialog_open">Открыть</string>
     <string name="dialog_copy">Копия</string>
     <string name="dialog_scan">Скан</string>
     <string name="dialog_info">Инфо</string>
-    <string name="dialog_edit">Edit</string>
+    <string name="dialog_edit">Изменить</string>
     <string name="dialog_max">Макс</string>
 
     <string name="dialog_visibility_sender">видно отправителю</string>
@@ -105,7 +100,7 @@
 
     <string name="dialog_send_ln"><![CDATA[Отправить платеж-<b>Молнию</b> %1$s]]></string>
     <string name="dialog_split_ln"><![CDATA[Разбить платеж-<b>Молнию</b> %1$s]]></string>
-    <string name="dialog_split_ln_tip">Сначала пусть кто-то отсканирует,\nПотом одновременно нажмите OK.</string>
+    <string name="dialog_split_ln_tip">Дайте другому участнику отсканировать разделённый инвойс,\nЗатем нажмите OK примерно одновременно</string>
     <string name="dialog_ln_expected_fee"><![CDATA[<b>примерный сбор</b> %1$s]]></string>
     <string name="dialog_ln_requested"><![CDATA[<b>запрошено</b>&#160;%1$s]]></string>
     <string name="dialog_ln_left"><![CDATA[<b>осталось</b>&#160;%1$s]]></string>
@@ -125,17 +120,22 @@
         Удаленная сторона сообщает о канале, который отсутствует на данном устройстве.<br><br>
         Ваш кошелек может попросить удаленную сторону закрыть канал так, чтобы остаток ваших средств в канале вернулся в ваш Биткойн-кошелек.<br><br>
         <b>Отсутствующий ID канала</b><br>%1$s<br><br>
-        <b>Наш node ID</b><br>%1$s<br><br>
-        <b>Их node ID</b><br>%2$s
+        <b>Наш node ID</b><br>%2$s<br><br>
+        <b>Их node ID</b><br>%3$s
     ]]></string>
 
     <string name="error_rejected_incoming_public">Публичный канал отвергнут: только приватные каналы разрешены</string>
     <string name="error_btc_no_wallet">Не получилось потому что нужный Биткойн-кошелек не найден: пожалуйста, добавьте кошелек через страницу настроек.</string>
     <string name="error_btc_broadcast_fail">Невозможно отправить транзакцию. Пожалуйста, убедитесь, что кошелек имеет доступ к сети и попробуйте снова.</string>
-    <string name="error_could_not_decrypt"><![CDATA[<b>Расшифровка резервного файла не удалась</b>.<br><br>Убедитесь, что резервный файл и фзаза восстановления корректны и принадлежат к одному и тому же кошельку.<br><br>Подробности ошибки<br><b>%1$s</b>]]></string>
+    <string name="error_could_not_decrypt"><![CDATA[<b>Расшифровка резервного файла не удалась</b>.<br><br>Убедитесь, что резервный файл и фраза восстановления корректны и принадлежат одному и тому же кошельку.<br><br>Подробности ошибки<br><b>%1$s</b>]]></string>
+    <string name="error_could_not_read_backup"><![CDATA[<b>Не удалось прочитать файл резервной копии</b>.<br><br>Подробности ошибки<br><b>%1$s</b>]]></string>
+    <string name="error_backup_pending"><![CDATA[Этот файл резервной копии заблокирован старой версией приложения.<br><br>Android запросит разрешение на разблокировку, после чего восстановление продолжится.]]></string>
     <string name="error_wrong_phrase"><![CDATA[<b>Введенная фраза восстановления некорректна</b>.<br><br>Подробности ошибки<br><b>%1$s</b>]]></string>
     <string name="error_old_api_level">Требует API уровня 24+, ваш: %1$s</string>
     <string name="error_nothing_useful">Не найдено ничего интересного</string>
+    <string name="error_scan_no_qr">Не найден читаемый QR-код. Поднесите камеру ближе, улучшите освещение или включите фонарик.</string>
+    <string name="error_camera_unavailable">Не удалось запустить камеру. Проверьте разрешение на доступ к камере и повторите попытку.</string>
+    <string name="error_camera_permission">Для сканирования нужно разрешение на доступ к камере. Включите его в настройках приложения и повторите попытку.</string>
 
     <string name="error_ln_no_chans"><![CDATA[Невозможно получить или отправить платеж-молнию потому что нет открытых каналов.]]></string>
     <string name="error_ln_waiting"><![CDATA[Невозможно получить или отправить платеж-молнию потому что ни один ваш канал еще не открыт.]]></string>
@@ -144,7 +144,7 @@
     <string name="error_ln_receive_reserve"><![CDATA[Пока нет возможности принимать средства потому что для приема вам необходимо сначала потратить как минимум <b>%1$s</b>, чтобы освободить место в канале.]]></string>
 
     <string name="error_ln_send_small"><![CDATA[Невозможно послать платеж-Молнию потому что сумма <b>%1$s</b> слишком мала, минимальная составляет <b>%2$s</b>.]]></string>
-    <string name="error_ln_send_reserve"><![CDATA[Невозможно послать платеж-Молнию потому что ваш платженый канал пустой, с начала надо что-то в него получить.]]></string>
+    <string name="error_ln_send_reserve">Невозможно отправлять платежи Lightning, потому что ваш платёжный канал пуст. Сначала нужно получить в него средства.</string>
     <string name="error_ln_send_no_secret"><![CDATA[Невозможно послать платеж-Молнию потому что инвойс не содержит секрет.]]></string>
     <string name="error_ln_send_network"><![CDATA[Невозможно послать платеж-Молнию потому что он принадлежит к неизвестной сети.]]></string>
     <string name="error_ln_send_split"><![CDATA[Невозможно обработать сплит-инвойс, потому что его части некорректные.]]></string>
@@ -195,12 +195,12 @@
     <string name="tx_ln">Платеж-Молния</string>
 
     <string name="tx_state_confs">%1$s из %2$s</string>
-    <string name="tx_state_double_spent">отменен</string>
+    <string name="tx_state_double_spent">сбой</string>
 
     <string name="popup_retry">Повторить попытку</string>
-    <string name="popup_view_invoice">Получить инвойс</string>
-    <string name="popup_run_action"><![CDATA[запустить&#160;экшн&#160;]]></string>
-    <string name="popup_proof_stamp"><![CDATA[крипто&#160;печать]]></string>
+    <string name="popup_view_invoice">Просмотреть инвойс</string>
+    <string name="popup_run_action"><![CDATA[выполнить&#160;действие&#160;платежа]]></string>
+    <string name="popup_proof_stamp"><![CDATA[поделиться&#160;крипто-печатью]]></string>
     <string name="popup_to_address"><![CDATA[<b>адрес</b>&#160;%1$s]]></string>
     <string name="popup_ln_payee"><![CDATA[<b>получатель</b>&#160;%1$s]]></string>
     <string name="popup_ln_node"><![CDATA[<b>узел</b>&#160;%1$s]]></string>
@@ -218,13 +218,18 @@
 
     <string name="rpa_title">Соединение с узлом</string>
     <string name="rpa_disconnected">Удаленный узел отключился</string>
-    <string name="rpa_no_feature_support">Невозможно открыть канал с этим узлом потмоу что он не поддерживает важные особенности протокола</string>
-    <string name="rpa_hc_warn"><![CDATA[<br><b>Внимание!</b><br><br>Ваши средства в hosted-канале будут храниться на стороне хоста: убедитесь, что вы доверяете этому ему! Баланс в этом канале привязан к цене актива, количество сатоши может изменяться в зависимости от движения цены.]]></string>
+    <string name="rpa_no_feature_support">Невозможно открыть каналы с этим узлом, потому что он не поддерживает некоторые важные функции.</string>
+    <string name="rpa_hc_warn"><![CDATA[<br><b>Внимание!</b><br><br>Ваши средства в hosted-канале будут храниться на стороне хоста. Убедитесь, что вы доверяете этому узлу и он не исчезнет с вашими средствами.<br><br>Баланс будет привязан к фиатному балансу, а сумма в сатоши будет меняться.]]></string>
     <string name="rpa_request_channel">Поделитесь своим node ID с удаленным узлом и оставьте открытой эту страницу до получения входящего канала</string>
     <string name="rpa_request_hc_usd">Запросить USD фиатный канал</string>
     <string name="rpa_request_hc_eur">Запросить EUR фиатный канал</string>
     <string name="rpa_share_node_id">Поделиться Node ID</string>
     <string name="rpa_open_nc">Открыть новый канал</string>
+    <string name="rpa_spinner_preparing">Подготовка…</string>
+    <string name="rpa_spinner_publishing">Публикация транзакции финансирования…</string>
+    <string name="rpa_err_min_funding">Минимальная сумма финансирования канала: %1$s</string>
+    <string name="rpa_err_no_wumbo">Этот узел не поддерживает большие каналы (Wumbo). Максимальная сумма финансирования: %1$s</string>
+    <string name="dialog_hw_scan_signed">Отсканируйте подписанную транзакцию с аппаратного кошелька</string>
 
     <!-- /Remote peer activity -->
 
@@ -232,7 +237,7 @@
 
     <string name="settings_backup_disabled">Включить локальное резервирование</string>
     <string name="settings_backup_enabled">Локальное резервирование включено</string>
-    <string name="settings_backup_info">Выберите папку для зашифрованных резервных копий</string>
+    <string name="settings_backup_info">Выберите папку для зашифрованных резервных копий каналов</string>
     <string name="settings_backup_where">Папка не выбрана</string>
     <string name="settings_backup_how">Разрешения -> Хранилище</string>
 
@@ -246,9 +251,10 @@
 
     <string name="settings_use_auth">PIN авторизация</string>
     <string name="settings_ensure_tor">Использовать Tor</string>
+    <string name="settings_hide_zero_outputs">Скрывать транзакции без выходов на Valet</string>
 
     <string name="ln_fee_expensive_omitted">Платеж не прошел потому что дорогие маршруты были исключены: хотите попробовать еще раз с увеличенным лимитом по комиссии?</string>
-    <string name="ln_sync_not_complete">LN SYNC еще не завершен: подождите немного и повторите попытку позже.</string>
+    <string name="ln_sync_not_complete">Синхронизация Lightning ещё не завершена. Подождите немного, не закрывая приложение, и повторите попытку.</string>
     <string name="ln_payee_likely_offline">Похоже что кошелек получателя сейчас в оффлайне</string>
 
     <string name="settings_btc_unit">Единицы Биткойна</string>
@@ -258,9 +264,20 @@
     <string name="settings_custom_electrum_enabled">Используется ваш узел Electrum</string>
     <string name="settings_custom_electrum_disabled_tip">Используются случайные узлы</string>
     <string name="settings_custom_electrum_restart_notice">Кошелек нужно перезапустить</string>
+    <string name="settings_electrum_close_channels">Закройте все каналы перед сменой сервера Electrum. Сервер не был изменён.</string>
+    <string name="settings_custom_signet">Использовать собственную signet</string>
+    <string name="settings_custom_signet_info">Изменение удаляет данные цепочки на этом устройстве</string>
+    <string name="settings_custom_signet_no_electrum">Для собственной signet нужен собственный сервер Electrum</string>
+    <string name="settings_custom_signet_close_channels">Закройте все каналы перед переключением на другую signet</string>
+    <string name="settings_custom_signet_restart">Приложение удаляет данные цепочки на этом устройстве и перезапускается</string>
+    <string name="restore_signet_network">К какой signet относится эта резервная копия?</string>
+    <string name="error_backup_signet_network">Для этой резервной копии нужны приложение Signet и корректная настройка сети signet.</string>
+    <string name="settings_gap_limit">Лимит неиспользованных адресов при сканировании</string>
+    <string name="settings_gap_limit_info">Сейчас: %1$d адресов</string>
+    <string name="settings_gap_limit_tip">Количество неиспользованных адресов, проверяемых наперёд при сканировании HD-кошелька. Большие значения позволяют найти больше прошлой активности, но замедляют запуск.</string>
 
     <string name="settings_view_revocery_phrase_ext">Эти слова позволяют вам восстановить кошелек со средствами на любом устройстве, пожалуйста, все время храните их в тайне!</string>
-    <string name="settings_view_revocery_phrase">Фраза для восстановления</string>
+    <string name="settings_view_revocery_phrase">Просмотреть фразу восстановления BIP39</string>
     <string name="settings_stats">Статистика использования</string>
 
     <string name="settings_backup_location">Место хранения локальной резервной копии</string>
@@ -293,10 +310,10 @@
     </array>
 
     <array name="expires_in_blocks">
-        <item><![CDATA[<b>устарел</b>]]></item>
-        <item><![CDATA[остался&#160;%1$s&#160;блок]]></item>
-        <item><![CDATA[осталось&#160;%1$s&#160;блока]]></item>
-        <item><![CDATA[осталось&#160;%1$s&#160;блоков]]></item>
+        <item><![CDATA[<b>истёк</b>]]></item>
+        <item><![CDATA[<b>истекает&#160;через</b>&#160;%1$d&#160;блок]]></item>
+        <item><![CDATA[<b>истекает&#160;через</b>&#160;%1$d&#160;блока]]></item>
+        <item><![CDATA[<b>истекает&#160;через</b>&#160;%1$d&#160;блоков]]></item>
     </array>
 
     <!-- lnurl -->
@@ -311,7 +328,8 @@
     <string name="dialog_lnurl_from_vendor"><![CDATA[Ответ от продавца%1$s]]></string>
 
     <string name="popup_hold">Держать до %1$s минут</string>
-    <string name="popup_identity">Attach wallet identity</string>
+    <string name="popup_identity">Прикрепить идентификатор кошелька</string>
+    <string name="confirm_ignoring_metadata_mismatch">⚠ Хеш метаданных LNURL не совпадает</string>
 
     <!-- lnurl-auth -->
 
@@ -320,7 +338,7 @@
     <string name="lnurl_auth_auth">Авторизация</string>
     <string name="lnurl_auth_link">Привязать</string>
 
-    <string name="lnurl_auth_register_ok">Успешная регистрирация</string>
+    <string name="lnurl_auth_register_ok">Регистрация прошла успешно</string>
     <string name="lnurl_auth_login_ok">Успешный вход</string>
     <string name="lnurl_auth_auth_ok">Успешная авторизация</string>
     <string name="lnurl_auth_link_ok">Успешно привязан</string>
@@ -353,13 +371,23 @@
 
     <string name="chan_reserve">Резерв</string>
     <string name="chan_server_rate">Курс сервера</string>
-    <string name="chan_fiat_rate">Курс канала</string>
+    <string name="chan_fiat_rate">Средний курс</string>
     <string name="chan_fiat_value">Фиатный баланс</string>
     <string name="chan_capacity">Емкость</string>
     <string name="chan_can_send">Можно отправить</string>
     <string name="chan_can_receive">Можно принять</string>
     <string name="chan_in_flight">В полете</string>
     <string name="chan_refundable">Можно вернуть</string>
+    <string name="chan_gossip_extended">Синхронизация gossip: расширенная</string>
+    <string name="chan_gossip_basic">Синхронизация gossip: базовая</string>
+    <string name="chan_gossip_unsupported">Синхронизация gossip: недоступна</string>
+    <string name="chan_gossip_unknown">Синхронизация gossip: неизвестна</string>
+    <string name="chan_commitment_zero_fee_anchors">Транзакция обязательства: якоря с нулевой комиссией</string>
+    <string name="chan_commitment_anchors">Транзакция обязательства: якоря</string>
+    <string name="chan_commitment_legacy">Транзакция обязательства: устаревшая</string>
+    <string name="chan_scid_alias">Псевдоним SCID</string>
+    <string name="chan_zeroconf">Без подтверждений</string>
+    <string name="chan_splicing">Сплайсинг</string>
 
     <string name="chan_nothing"><![CDATA[<i>ничего</i>]]></string>
 
@@ -372,8 +400,8 @@
     <string name="ln_info_fee_mismatch">Временное расхождение комиссий</string>
 
     <string name="ln_info_close_coop">Кооперативное закрытие</string>
-    <string name="ln_info_close_local">Закрыто с нашей стороны</string>
-    <string name="ln_info_close_remote">Закрыто удаленным узлом</string>
+    <string name="ln_info_close_local">Принудительно закрыто локально</string>
+    <string name="ln_info_close_remote">Принудительно закрыто удалённым узлом</string>
     <string name="ln_info_await_close">Ожидается форс-закрытие&#8230;</string>
     <string name="ln_info_shutdown">Канал закрывается&#8230;</string>
     <string name="ln_info_opening">Открытие&#8230;</string>
@@ -388,30 +416,26 @@
     <!-- DO NOT TRANSLATE --> <string name="ln_hosted_chan_state">%1$s\n\n\nState snapshot\n%2$s\n\nRevealed preimages\n%3$s</string>
 
     <array name="ln_normal_chan_actions">
-        <item><![CDATA[Информация о <b>канале-Молнии</b>]]></item>
-        <item><![CDATA[Закрыть канал в кошелек]]></item>
-        <item><![CDATA[Закрыть канал на адрес]]></item>
-        <item><![CDATA[Получить в канал]]></item>
-        <item><![CDATA[Пополнить из других каналов]]></item>
-        <item><![CDATA[Прямой вывод в канал (неприватно)]]></item>
+        <item><![CDATA[Поделиться данными <b>канала Lightning</b>]]></item>
+        <item>Закрыть канал в кошелёк</item>
+        <item>Закрыть канал на адрес</item>
+        <item>Получить в канал</item>
+        <item>Пополнить из других каналов</item>
+        <item>Прямое получение в канал (неприватно)</item>
     </array>
 
     <array name="ln_hosted_chan_actions">
-        <item><![CDATA[Информация о <b>Фиатном канале</b>]]></item>
-        <item><![CDATA[Экспортировать состояние канала]]></item>
-        <item><![CDATA[Переместить средства]]></item>
-        <item><![CDATA[Получить в канал]]></item>
-        <item><![CDATA[Пополнить из других каналов]]></item>
-        <item><![CDATA[Прямой вывод в канал (неприватно)]]></item>
+        <item><![CDATA[Поделиться данными <b>hosted-канала</b>]]></item>
+        <item>Экспортировать состояние канала</item>
+        <item>Переместить средства из канала</item>
+        <item>Получить в канал</item>
+        <item>Пополнить из других каналов</item>
+        <item>Прямое получение в канал (неприватно)</item>
     </array>
 
-    <string name="ln_hc_override">Override proposal</string>
+    <string name="ln_hc_override">Предложение изменить баланс</string>
 
-    <string name="ln_hc_override_warn"><![CDATA[
-        <br>Удаленный хост хочет изменить ваш баланс в hosted-канале с текущего <b>%1$s</b> на  новый <b>%2$s</b>,
-        это может произойти только с вашего согласия.<br><br><strong>Убедитесь, что баланс правильный и вы согласны с ним!</strong>
-        Согласны ли вы это подписать?
-    ]]></string>
+    <string name="ln_hc_override_warn"><![CDATA[<br>Удалённый хост хочет изменить баланс вашего hosted-канала с <b>%1$s</b> на <b>%2$s</b>. Это возможно только с вашей подписью.<br><br><strong>Убедитесь, что новый баланс верен, прежде чем продолжать!</strong> Хотите подписать предложенное изменение hosted-канала?]]></string>
 
     <!-- /Channel page -->
 

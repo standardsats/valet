@@ -1,65 +1,153 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="lang">ukr</string>
     <string name="app_name">Valet</string>
     <string name="sources">Переглянути код</string>
+    <string name="twitter">Стежте за нами у Twitter</string>
     <string name="manual">Читати інструкцію</string>
+    <string name="community">Допомога спільноти</string>
+    <string name="choose_wallet">Виберіть гаманець</string>
 
     <string name="hardware_wallet">Апаратний гаманець</string>
     <string name="watching_wallet">Спостережний гаманець</string>
     <string name="coin_control">Контроль монет</string>
 
     <string name="bitcoin_wallet">Біткоїн</string>
-    <string name="typing_hints">Біткоїн-адреса</string>
+    <string name="lightning_wallet">Lightning</string>
+    <string name="total_balance">Загальний баланс</string>
+    <string name="hosted_channel">ФІАТНИЙ КАНАЛ\nКастодіальне рішення</string>
+    <string name="typing_hints">Біткоїн-адреса, інвойс, електронна пошта…</string>
     <string name="copied_to_clipboard">Скопійовано у буфер</string>
     <string name="add_address">Більше нових адрес</string>
+    <string name="delayed_pending">в очікуванні</string>
 
-    <string name="search_recent">Шукати транзакції</string>
+    <string name="search_recent">Пошук нещодавньої активності</string>
     <string name="emergency_mode">Щось пішло не так</string>
-    <string name="error_log">Експортувати помилку</string>
+    <string name="error_log">Експортувати журнали</string>
+    <string name="error_log_clear">Очистити журнали</string>
+    <string name="setup_title">Налаштування гаманця</string>
+    <string name="network_setup_title">Налаштування мережі</string>
 
     <string name="setup_create_new">Новий гаманець</string>
     <string name="setup_restore_existing">Відновити гаманець</string>
+    <string name="setup_recovery_phrase">Лише фраза відновлення</string>
+    <string name="setup_backup_file">Резервна копія + фраза відновлення</string>
+    <string name="delayed_refunding">Відкладене повернення коштів із каналу</string>
+    <string name="delayed_refunding_ext">Не видаляйте дані гаманця, доки всі відкладені повернення коштів не завершаться!</string>
 
     <string name="setup_create_new_hint">Новий Біткоїн-гаманець з новою фразою відновлення буде створено з нуля.</string>
-    <string name="share_chain_tx" translatable="false">Біткоїн транзакція hex\n\n%1$s</string>
+    <!-- DO NOT TRANSLATE --> <string name="share_ln_payment">Signed invoice\n%1$s\n\nPayment hash\n%2$s\n\nPayment description\n%3$s\n\nReceiver Node ID\n%4$s\n\nProof of payment\n%5$s\n\nDebug info\n%6$s</string>
+    <!-- DO NOT TRANSLATE --> <string name="share_chain_tx">Bitcoin transaction hex\n\n%1$s</string>
+    <string name="setup_backup_file_hint">Надайте файл резервної копії Lightning і розшифруйте його фразою відновлення, щоб повністю відновити Біткоїн-гаманець разом із каналами Lightning.</string>
+    <string name="setup_recovery_phrase_hint">Надайте фразу відновлення, щоб відновити лише Біткоїн-гаманець і hosted-канали. Кошти з каналів Lightning на попередніх пристроях можуть бути повернуті після ручного підключення до віддалених вузлів, з якими були відкриті ці канали.</string>
+    <string name="action_backup_present_title"><![CDATA[<b>Файл резервної копії Lightning наявний</b><br><br>Фразу відновлення буде використано для його розшифрування та відновлення повністю робочих каналів на цьому пристрої]]></string>
 
     <string name="action_recovery_phrase_title">Фраза для відновлення</string>
     <string name="action_recovery_phrase_hint">Введіть ключові слова</string>
+    <string name="title_chans">Канали Lightning</string>
+    <string name="dialog_send">Надіслати</string>
+    <string name="dialog_receive">Отримати</string>
 
     <string name="dialog_ok">ОК</string>
+    <string name="dialog_stamp">Засвідчити</string>
+    <string name="dialog_accept">Прийняти</string>
     <string name="dialog_cancel">Скасувати</string>
+    <string name="dialog_split">Розділити</string>
     <string name="dialog_share">Поділитися</string>
+    <string name="dialog_break">Розірвати</string>
     <string name="dialog_boost">Підсилити</string>
-    <string name="dialog_copy">Копія</string>
-    <string name="dialog_edit">Edit</string>
+    <string name="dialog_open">Відкрити</string>
+    <string name="dialog_copy">Копіювати</string>
+    <string name="dialog_scan">Сканувати</string>
+    <string name="dialog_info">Інформація</string>
+    <string name="dialog_edit">Редагувати</string>
     <string name="dialog_max">Макс</string>
 
     <string name="dialog_visibility_sender">видно відправнику</string>
+    <string name="dialog_visibility_receiver">видно одержувачу</string>
     <string name="dialog_visibility_private">видно тільки вам</string>
     <string name="dialog_add_description">Додати опис&#8230;</string>
+    <string name="dialog_add_comment">Додати коментар…</string>
     <string name="dialog_set_label">Додати мітку&#8230;</string>
 
     <string name="dialog_receive_btc"><![CDATA[Отримати на <b>Біткоїн</b>-адресу]]></string>
+    <string name="dialog_receive_ln"><![CDATA[Отримати за інвойсом <b>Lightning</b>]]></string>
+    <string name="dialog_refill_ln"><![CDATA[Поповнити канал через <b>Lightning</b>]]></string>
+    <string name="dialog_legacy_transfer_btc">Переказати кошти до сучасного гаманця</string>
+    <string name="dialog_legacy_send_btc">Надіслати транзакцію на адресу</string>
+    <string name="scan_btc_address">Сканувати Біткоїн-адресу</string>
 
     <string name="dialog_up_to"><![CDATA[<b>до</b> %1$s]]></string>
     <string name="dialog_fee_sat_vbyte"><![CDATA[<b>комісія</b> %1$s sat/vB]]></string>
     <string name="dialog_change_feerate">Змінити комісію&#8230;</string>
     <string name="dialog_insufficient_funds">недостатньо коштів</string>
+    <string name="dialog_sat_vbyte">sat/vB</string>
+    <string name="dialog_send_btc_from"><![CDATA[з&#160;гаманця&#160;<b>%1$s</b>]]></string>
 
     <string name="dialog_send_btc"><![CDATA[Надіслати <b>Біткоїн</b>-транзакцію<br><b>на адресу</b> %1$s%2$s]]></string>
     <string name="dialog_send_btc_many"><![CDATA[Надіслати <b>Біткоїн</b>-транзакцію<br><b>на багато адрес</b>]]></string>
     <string name="dialog_send_btc_confirm_amount">Надіслати суму</string>
     <string name="dialog_send_btc_confirm_fiat">Фіатна вартість</string>
-    <string name="dialog_send_btc_confirm_fee">Комісія</string>
+    <string name="dialog_send_btc_confirm_fee">Комісія в ланцюжку</string>
+    <string name="dialog_send_ln"><![CDATA[Надіслати платіж <b>Lightning</b>%1$s]]></string>
+    <string name="dialog_split_ln"><![CDATA[Розділити платіж <b>Lightning</b>%1$s]]></string>
+    <string name="dialog_split_ln_tip">Дайте іншому учаснику відсканувати розділений інвойс,\nПотім натисніть ОК приблизно одночасно</string>
+    <string name="dialog_ln_expected_fee"><![CDATA[<b>очікувана комісія</b> %1$s]]></string>
+    <string name="dialog_ln_requested"><![CDATA[<b>запитано</b>&#160;%1$s]]></string>
+    <string name="dialog_ln_left"><![CDATA[<b>залишилося&#160;сплатити</b>&#160;%1$s]]></string>
+    <string name="btc_transfer_label">застарілий -> сучасний гаманець</string>
+    <string name="btc_transfer_message">Локальний переказ біткоїнів із застарілого до сучасного гаманця в ланцюжку</string>
 
-    <string name="recovery_phrase_warning">Торкніться щоб зберегти <b>фразу відновлення гаманця</b> на випадок якщо ви коли-небудь втратите або заміните цей телефон.</string>
+    <string name="recovery_phrase_warning">Торкніться, щоб зберегти фразу відновлення гаманця на випадок втрати або заміни пристрою.</string>
+    <string name="error_channel">Сталася помилка каналу</string>
+    <string name="error_channel_remote"><![CDATA[<b>Помилка від віддаленого вузла</b>:<br><br>%1$s]]></string>
+    <string name="error_channel_closed"><![CDATA[<b>Гаманець примусово закрив канал, подробиці критичної помилки</b>:<br><br>%1$s]]></string>
+    <string name="error_channel_suspended"><![CDATA[<b>Гаманець призупинив hosted-канал, подробиці критичної помилки</b>:<br><br>%1$s]]></string>
+    <string name="error_channel_unknown"><![CDATA[Віддалений вузол повідомляє про канал Lightning, який чомусь відсутній на вашому пристрої.<br><br>Ви можете попросити вузол примусово закрити цей канал, щоб повернути залишок коштів до вашого гаманця в ланцюжку.<br><br><b>ID відсутнього каналу</b><br>%1$s<br><br><b>ID локального вузла</b><br>%2$s<br><br><b>ID віддаленого вузла</b><br>%3$s]]></string>
+    <string name="error_rejected_incoming_public">Пропозицію публічного каналу відхилено. Дозволено лише приватні канали.</string>
 
     <!-- errors -->
 
     <string name="error_btc_no_wallet">Не можна продовжити, бо відповідний гаманець не знайдено. Будь ласка, додайте його в налаштуваннях.</string>
+    <string name="error_btc_broadcast_fail">Не вдалося опублікувати транзакцію. Переконайтеся, що гаманець підключений до мережі, та повторіть спробу.</string>
+    <string name="error_could_not_decrypt"><![CDATA[<b>Не вдалося розшифрувати резервну копію</b>.<br><br>Переконайтеся, що файл резервної копії та фраза відновлення правильні й належать одному гаманцю.<br><br>Подробиці помилки<br><b>%1$s</b>]]></string>
+    <string name="error_could_not_read_backup"><![CDATA[<b>Не вдалося прочитати файл резервної копії</b>.<br><br>Подробиці помилки<br><b>%1$s</b>]]></string>
+    <string name="error_backup_pending"><![CDATA[Цей файл резервної копії заблокований старою версією застосунку.<br><br>Android запитає дозвіл на розблокування, після чого відновлення продовжиться.]]></string>
     <string name="error_wrong_phrase"><![CDATA[<b>Надана фраза неправильна</b>.<br><br>Подробиці помилки<br><b>%1$s</b>]]></string>
     <string name="error_old_api_level">Потрібний API 24+, у вас %1$s</string>
     <string name="error_nothing_useful">Нічого не знайдено</string>
+    <string name="error_scan_no_qr">Не знайдено читабельного QR-коду. Наблизьте камеру, покращте освітлення або ввімкніть ліхтарик.</string>
+    <string name="error_camera_unavailable">Не вдалося запустити камеру. Перевірте дозвіл на доступ до камери та повторіть спробу.</string>
+    <string name="error_camera_permission">Для сканування потрібен дозвіл на доступ до камери. Увімкніть його в налаштуваннях застосунку та повторіть спробу.</string>
+    <string name="error_ln_no_chans">Неможливо надсилати чи отримувати платежі Lightning, оскільки немає відкритих каналів.</string>
+    <string name="error_ln_waiting">Неможливо надсилати чи отримувати платежі Lightning, оскільки жоден канал ще не відкрився.</string>
+    <string name="error_ln_receive_no_update">Неможливо запитувати платежі Lightning, оскільки параметри отримання ще недоступні.</string>
+    <string name="error_ln_receive_reserve"><![CDATA[Поки неможливо запитувати платежі Lightning. Спершу потрібно витратити щонайменше <b>%1$s</b>, щоб звільнити місце для отримання.]]></string>
+    <string name="error_ln_send_small"><![CDATA[Неможливо надіслати цей платіж Lightning, оскільки запитана сума <b>%1$s</b> замала. Мінімальна сума — <b>%2$s</b>.]]></string>
+    <string name="error_ln_send_reserve">Поки неможливо надсилати платежі Lightning, оскільки ваш платіжний канал порожній. Спершу потрібно отримати в нього кошти.</string>
+    <string name="error_ln_send_no_secret">Неможливо надіслати цей платіж Lightning, оскільки інвойс не містить секрету.</string>
+    <string name="error_ln_send_network">Неможливо надіслати цей платіж Lightning, оскільки він належить невідомій мережі.</string>
+    <string name="error_ln_send_split">Неможливо продовжити з цим розділеним інвойсом, оскільки його параметри поділу неправильні.</string>
+    <string name="error_ln_send_done_already">Неможливо надіслати цей платіж Lightning, оскільки його вже надіслано.</string>
+    <string name="error_ln_send_expired">Неможливо надіслати цей платіж Lightning, оскільки термін дії інвойсу вже минув.</string>
+    <string name="error_ln_send_in_flight">Неможливо надіслати цей платіж Lightning, оскільки він уже надсилається.</string>
+    <string name="error_hc_dangerous_state">Небезпечний стан платежу</string>
+    <string name="error_hc_option_can_stamp"><![CDATA[Ви можете зараз розмістити <b>відбиток доказу</b> у блокчейні Біткоїна, щоб завжди мати змогу довести, що вам винні <b>%1$s</b>. Це коштуватиме <b>%2$s</b>.]]></string>
+    <string name="error_hc_option_can_not_stamp"><![CDATA[Зобов’язання хоста можна назавжди зафіксувати, розмістивши <b>відбиток доказу</b> у блокчейні Біткоїна, але для цього потрібні кошти в ланцюжку.]]></string>
+    <string name="error_hc_revealed_preimage"><![CDATA[Віддалений хост не визнає розкритий доказ вашого вхідного платежу на <b>%2$s</b>.<br><br>Якщо ситуація не зміниться, через <b>%3$s</b> стане неможливо довести, що доказ було розкрито вчасно.<br><br>%1$s]]></string>
+    <string name="incoming_notify_title">Очікування платежу</string>
+    <string name="incoming_notify_body">Застосунок працює для отримання %1$s</string>
+    <string name="delayed_notify_wt_title">Сповіщення сторожової вежі</string>
+    <string name="delayed_notify_wt_body">Відкрийте гаманець, щоб перевірити канали</string>
+    <string name="delayed_notify_pending_payment_title">Платіж Lightning усе ще в очікуванні</string>
+    <string name="delayed_notify_pending_payment_body">Відкрийте гаманець, щоб перевірити його стан</string>
+    <string name="tx_ln_label_reflexive">Платіж собі</string>
+    <string name="tx_ln_notice_split"><![CDATA[%1$d\%% розділено&#160;|&#160;]]></string>
+    <string name="tx_description_op_return">Відбиток доказу платежу</string>
+    <string name="tx_description_funding">Фінансування каналу Lightning</string>
+    <string name="tx_description_refunding">Повернення коштів із каналу</string>
+    <string name="tx_description_htlc_claiming">Стягнення платежу Lightning</string>
+    <string name="tx_description_penalty">Штраф за порушення правил каналу</string>
 
     <!-- /errors -->
 
@@ -70,13 +158,44 @@
     <string name="tx_description_cpfp">CPFP-підсилення</string>
 
     <string name="tx_btc">Біткоїн-транзакція</string>
-    <string name="tx_state_double_spent">відміна</string>
+    <string name="tx_ln">Платіж Lightning</string>
+    <string name="tx_state_confs">глибина %1$s із %2$s</string>
+    <string name="tx_state_double_spent">невдача</string>
+    <string name="popup_retry">Повторити платіж</string>
+    <string name="popup_view_invoice">Переглянути інвойс</string>
+    <string name="popup_run_action"><![CDATA[виконати&#160;дію&#160;платежу]]></string>
+    <string name="popup_proof_stamp"><![CDATA[поділитися&#160;відбитком&#160;доказу]]></string>
 
     <string name="popup_to_address"><![CDATA[<b>адреса</b>&#160;%1$s]]></string>
+    <string name="popup_ln_payee"><![CDATA[<b>одержувач</b>&#160;%1$s]]></string>
+    <string name="popup_ln_node"><![CDATA[<b>вузол</b>&#160;%1$s]]></string>
     <string name="popup_txid"><![CDATA[<b>txid</b>&#160;%1$s]]></string>
+    <string name="popup_prior_chain_balance"><![CDATA[<b>попередній&#160;баланс</b>&#160;%1$s]]></string>
+    <string name="popup_ln_fee"><![CDATA[<b>комісія</b>&#160;%1$s&#160;(%2$s)]]></string>
 
     <string name="popup_fiat"><![CDATA[<b>фіатна вартість</b>&#160;%1$s&#160;(%2$s)]]></string>
     <string name="popup_chain_fee"><![CDATA[<b>комісія</b>&#160;%1$s]]></string>
+    <string name="popup_hash"><![CDATA[<b>хеш</b>&#160;%1$s]]></string>
+    <string name="rpa_title">З’єднання з віддаленим вузлом</string>
+    <string name="rpa_disconnected">Віддалений вузол відключився</string>
+    <string name="rpa_no_feature_support">Неможливо відкрити канали з цим вузлом, оскільки він не підтримує деякі важливі функції.</string>
+    <string name="rpa_hc_warn"><![CDATA[<br><b>Увага!</b><br><br>Кошти вашого hosted-каналу зберігатимуться на стороні хоста. Переконайтеся, що ви довіряєте цьому вузлу і він не зникне з вашими коштами.<br><br>Ваш баланс буде прив’язаний до фіатного балансу, а сума в сатоші змінюватиметься.]]></string>
+    <string name="rpa_request_channel">Поділіться ID свого вузла з віддаленим вузлом і тримайте цю сторінку відкритою, щоб отримати вхідний канал.</string>
+    <string name="rpa_request_hc_usd">Запросити фіатний канал у USD</string>
+    <string name="rpa_request_hc_eur">Запросити фіатний канал у EUR</string>
+    <string name="rpa_share_node_id">Поділитися ID вузла</string>
+    <string name="rpa_open_nc">Профінансувати новий канал</string>
+    <string name="rpa_spinner_preparing">Підготовка…</string>
+    <string name="rpa_spinner_publishing">Публікація транзакції фінансування…</string>
+    <string name="rpa_err_min_funding">Мінімальна сума фінансування каналу: %1$s</string>
+    <string name="rpa_err_no_wumbo">Цей вузол не підтримує великі канали (Wumbo). Максимальна сума фінансування: %1$s</string>
+    <string name="dialog_hw_scan_signed">Відскануйте підписану транзакцію з апаратного гаманця</string>
+    <string name="settings_backup_disabled">Увімкнути локальне резервне копіювання каналів</string>
+    <string name="settings_backup_enabled">Локальне резервне копіювання каналів увімкнено</string>
+    <string name="settings_backup_info">Виберіть папку для зашифрованих резервних копій каналів</string>
+    <string name="settings_backup_where">Папку не вибрано</string>
+    <string name="settings_backup_how">Дозволи застосунку -> Сховище</string>
+    <string name="settings_hardware_add">Додати апаратний гаманець</string>
 
     <!-- /special tx/payment descriptions -->
 
@@ -85,8 +204,15 @@
     <string name="settings_hardware_label">Мітка для апаратного гаманця</string>
     <string name="settings_hw_zpub_tip">Апаратний гаманець або zpub</string>
 
-    <string name="settings_chain_wallets">Додати гаманці&#8230;</string>
+    <string name="settings_chain_wallets">Керувати гаманцями в ланцюжку</string>
+    <string name="settings_chain_legacy">Застарілий гаманець</string>
+    <string name="settings_chain_modern">Сучасний гаманець</string>
+    <string name="settings_use_auth">Використовувати автентифікацію за PIN</string>
     <string name="settings_ensure_tor">Використовувати Tor</string>
+    <string name="settings_hide_zero_outputs">Приховувати транзакції без виходів на Valet</string>
+    <string name="ln_fee_expensive_omitted">Платіж не пройшов, оскільки дорогі маршрути було пропущено. Повторити спробу з вищими лімітами комісії?</string>
+    <string name="ln_sync_not_complete">Синхронізація Lightning ще не завершилася. Зачекайте трохи, не закриваючи застосунок, і повторіть спробу.</string>
+    <string name="ln_payee_likely_offline">Ймовірно, гаманець одержувача зараз не в мережі</string>
 
 
     <string name="settings_btc_unit">Біткоїн одиниця</string>
@@ -96,9 +222,24 @@
     <string name="settings_custom_electrum_enabled">Використовується власний Electrum</string>
     <string name="settings_custom_electrum_disabled_tip">Використовуються випадкові вузли</string>
     <string name="settings_custom_electrum_restart_notice">Перезавантажте, щоб застосувати зміни</string>
+    <string name="settings_electrum_close_channels">Закрийте всі канали перед зміною сервера Electrum. Сервер не було змінено.</string>
+    <string name="settings_custom_signet">Використовувати власну signet</string>
+    <string name="settings_custom_signet_info">Зміна видаляє дані ланцюжка на цьому пристрої</string>
+    <string name="settings_custom_signet_no_electrum">Для власної signet потрібен власний сервер Electrum</string>
+    <string name="settings_custom_signet_close_channels">Закрийте всі канали перед переходом на іншу signet</string>
+    <string name="settings_custom_signet_restart">Застосунок видаляє дані ланцюжка на цьому пристрої та перезапускається</string>
+    <string name="restore_signet_network">До якої signet належить ця резервна копія?</string>
+    <string name="error_backup_signet_network">Для цієї резервної копії потрібні застосунок Signet і коректне налаштування мережі signet.</string>
+    <string name="settings_gap_limit">Ліміт невикористаних адрес під час сканування</string>
+    <string name="settings_gap_limit_info">Зараз: %1$d адрес</string>
+    <string name="settings_gap_limit_tip">Кількість невикористаних адрес, які перевіряються наперед під час сканування HD-гаманця. Вищі значення дозволяють знайти більше минулої активності, але сповільнюють запуск.</string>
 
     <string name="settings_view_revocery_phrase_ext">Ці слова дозволяють відновити баланс гаманця на будь-якому пристрої. Будь ласка, завжди тримайте їх в секреті!</string>
     <string name="settings_view_revocery_phrase">Переглянути BIP39-фразу гаманця</string>
+    <string name="settings_stats">Статистика використання</string>
+    <string name="settings_backup_location">Де зберігати локальну резервну копію</string>
+    <string name="settings_backup_location_too_old">Версія Android надто стара для вибору папки</string>
+    <string name="settings_choose_directory">Виберіть папку</string>
 
     <!-- /Settings activity -->
 
@@ -110,14 +251,138 @@
     <string name="tx_rbf_current">Поточна комісія</string>
     <string name="tx_rbf_boost_explain"><![CDATA[Застосуйте RBF до цієї вихідної транзакції щоб <b>збільшити її комісію та пришвидшити підтвердження</b>]]></string>
     <string name="tx_rbf_cancel_explain"><![CDATA[Застосуйте RBF до цієї вихідної транзакції щоб <b>збільшити комісію та повернути її назад у гаманець</b>]]></string>
+    <string name="tx_rbf_err_rbf_disabled">Неможливо прискорити цю транзакцію, оскільки її прапорець RBF вимкнено</string>
     <string name="tx_rbf_err_foreign_inputs">Не можна підсилити цю транзакцію, оскільки вона містить входи, які не належать цьому гаманцю</string>
     <string name="tx_rbf_err_parents_missing">Не можна підсилити цю транзакцію, оскільки її батьки відсутні в цьому гаманці</string>
+    <string name="fiat_wallet">Фіат</string>
+    <string name="fiat_wallet_usd">USD</string>
+    <string name="fiat_wallet_eur">EUR</string>
 
     <!-- /CPFP/RBF -->
 
     <string name="confirm_remove_item">&#9888; Хочете видалити цей елемент?</string>
+    <string name="confirm_ln_normal_chan_close_address"><![CDATA[&#9888; Закрити цей канал із поверненням коштів на цю адресу?<br><br><b>%1$s</b>]]></string>
+    <string name="confirm_ln_normal_chan_force_close">⚠ Примусово закрити цей канал?\n\nЗверніть увагу: повернення коштів буде відкладено, а комісії за закриття будуть вищими.</string>
+    <string name="confirm_ln_hosted_chan_remove">⚠ Видалити цей hosted-канал?\n\nЙого завжди можна відновити, підключившись до вузла хоста.</string>
+    <string name="confirm_ln_hosted_chan_drain">⚠ Переказати кошти з цього каналу до інших каналів у цьому гаманці?</string>
+    <string name="tx_cpfp_after">Після прискорення</string>
 
     <string name="settings_sync_chain">Синхронізувати ланцюг</string>
     <string name="settings_sync_graph">Синхронізувати граф</string>
     <string name="settings_sync_started">Синхронізацію розпочато, не закривайте застосунок</string>
+    <array name="parts_in_flight">
+        <item>підготовка</item>
+        <item>%1$d частина в процесі переказу</item>
+        <item>%1$d частини в процесі переказу</item>
+        <item>%1$d частин у процесі переказу</item>
+    </array>
+    <array name="pct_collected">
+        <item>очікування</item>
+        <item>зібрано %1$d\%%</item>
+        <item>зібрано %1$d\%%</item>
+        <item>зібрано %1$d\%%</item>
+        <item>завершення</item>
+    </array>
+    <array name="in_blocks">
+        <item>очікування</item>
+        <item>%1$d блок</item>
+        <item>%1$d блоки</item>
+        <item>%1$d блоків</item>
+        <item>%1$d+ блоків</item>
+    </array>
+    <array name="expires_in_blocks">
+        <item><![CDATA[<b>термін&#160;дії&#160;минув</b>]]></item>
+        <item><![CDATA[<b>термін&#160;дії&#160;спливає&#160;через</b>&#160;%1$d&#160;блок]]></item>
+        <item><![CDATA[<b>термін&#160;дії&#160;спливає&#160;через</b>&#160;%1$d&#160;блоки]]></item>
+        <item><![CDATA[<b>термін&#160;дії&#160;спливає&#160;через</b>&#160;%1$d&#160;блоків]]></item>
+    </array>
+    <string name="dialog_lnurl_decrypt_fail">Не вдалося розшифрувати повідомлення. Зверніться до продавця, щоб розв’язати цю проблему.</string>
+    <string name="dialog_lnurl_withdraw"><![CDATA[Посилання для виведення <b>Lightning</b><br><br><b>%1$s</b>%2$s]]></string>
+    <string name="dialog_lnurl_pay"><![CDATA[Посилання для оплати <b>Lightning</b><br><br><b>%1$s</b>%2$s]]></string>
+    <string name="dialog_lnurl_processing"><![CDATA[Обробка&#8230;<br><br><b>%1$s</b>]]></string>
+    <string name="dialog_lnurl_splitting"><![CDATA[Запит інвойсу&#8230;<br><br><b>%1$s</b>]]></string>
+    <string name="dialog_lnurl_sending"><![CDATA[Надсилання %1$s<br><br><b>%2$s</b>]]></string>
+    <string name="dialog_lnurl_from_vendor">Відповідь продавця%1$s</string>
+    <string name="popup_hold">Утримувати до %1$s хвилин</string>
+    <string name="popup_identity">Додати ідентифікатор гаманця</string>
+    <string name="confirm_ignoring_metadata_mismatch">⚠ Хеш метаданих LNURL не збігається</string>
+    <string name="lnurl_auth_register">Зареєструватися</string>
+    <string name="lnurl_auth_login">Увійти</string>
+    <string name="lnurl_auth_auth">Авторизуватися</string>
+    <string name="lnurl_auth_link">Прив’язати</string>
+    <string name="lnurl_auth_register_ok">Реєстрація успішна</string>
+    <string name="lnurl_auth_login_ok">Вхід успішний</string>
+    <string name="lnurl_auth_auth_ok">Авторизація успішна</string>
+    <string name="lnurl_auth_link_ok">Успішно прив’язано</string>
+    <string name="lnurl_auth_info"><![CDATA[Ключ авторизації, створений вашим гаманцем для <i>%1$s</i>:<br><br><strong>%2$s</strong>.<br><br>Він використовуватиметься для анонімної авторизації на <i>%1$s</i> без розкриття особистих даних.]]></string>
+    <string name="stats_title_chan_loss"><![CDATA[<b>Комісії за закриття каналів</b>]]></string>
+    <string name="stats_title_chain"><![CDATA[<b>Біткоїн-транзакції</b>]]></string>
+    <string name="stats_title_relays"><![CDATA[<b>Ретрансляції Lightning</b>]]></string>
+    <string name="stats_title_ln"><![CDATA[<b>Платежі Lightning</b>]]></string>
+    <string name="stats_item_sent"><![CDATA[<b>надіслано</b>&#160;%1$s]]></string>
+    <string name="stats_item_received"><![CDATA[<b>отримано</b>&#160;%1$s]]></string>
+    <string name="stats_item_payments"><![CDATA[<b>платежі</b>&#160;%1$s]]></string>
+    <string name="stats_item_transactions"><![CDATA[<b>транзакції</b>&#160;%1$s]]></string>
+    <string name="stats_item_fees"><![CDATA[<b>комісії</b>&#160;%1$s]]></string>
+    <string name="stats_item_fees_saved"><![CDATA[<b>заощаджені&#160;комісії&#160;в&#160;ланцюжку</b>&#160;%1$s]]></string>
+    <string name="stats_item_relays"><![CDATA[<b>кількість</b>&#160;%1$s]]></string>
+    <string name="stats_item_relayed"><![CDATA[<b>обсяг</b>&#160;%1$s]]></string>
+    <string name="stats_item_earned"><![CDATA[<b>зароблено</b>&#160;%1$s]]></string>
+    <string name="chan_reserve">Резерв</string>
+    <string name="chan_server_rate">Курс сервера</string>
+    <string name="chan_fiat_rate">Середній курс</string>
+    <string name="chan_fiat_value">Фіатний баланс</string>
+    <string name="chan_capacity">Місткість</string>
+    <string name="chan_can_send">Можна надіслати</string>
+    <string name="chan_can_receive">Можна отримати</string>
+    <string name="chan_in_flight">Сума в процесі переказу</string>
+    <string name="chan_refundable">Можна повернути</string>
+    <string name="chan_gossip_extended">Синхронізація gossip: розширена</string>
+    <string name="chan_gossip_basic">Синхронізація gossip: базова</string>
+    <string name="chan_gossip_unsupported">Синхронізація gossip: недоступна</string>
+    <string name="chan_gossip_unknown">Синхронізація gossip: невідома</string>
+    <string name="chan_commitment_zero_fee_anchors">Транзакція зобов’язання: якорі з нульовою комісією</string>
+    <string name="chan_commitment_anchors">Транзакція зобов’язання: якорі</string>
+    <string name="chan_commitment_legacy">Транзакція зобов’язання: застаріла</string>
+    <string name="chan_scid_alias">Псевдонім SCID</string>
+    <string name="chan_zeroconf">Без підтверджень</string>
+    <string name="chan_splicing">Сплайсинг</string>
+    <string name="chan_nothing"><![CDATA[<i>нічого</i>]]></string>
+    <string name="chan_open">Отримати новий канал</string>
+    <string name="chan_open_lnbig">Придбати на LNBIG.COM</string>
+    <string name="chan_open_bitrefill">Придбати на BITREFILL.COM</string>
+    <string name="chan_open_scan">Сканувати QR-код вузла</string>
+    <string name="ln_info_no_update">Отримання поки неможливе</string>
+    <string name="ln_info_fee_mismatch">Тимчасова невідповідність ставки комісії</string>
+    <string name="ln_info_close_coop">Спільне закриття</string>
+    <string name="ln_info_close_local">Примусово закрито локально</string>
+    <string name="ln_info_close_remote">Примусово закрито віддалено</string>
+    <string name="ln_info_await_close">Очікування примусового закриття…</string>
+    <string name="ln_info_shutdown">Закриття…</string>
+    <string name="ln_info_opening">Відкриття…</string>
+    <string name="ln_hosted_chan_drain_impossible_few_funds">Зараз неможливо переказати кошти з цього hosted-каналу, оскільки сума в ньому замала.</string>
+    <string name="ln_hosted_chan_drain_impossible_no_chans">Зараз неможливо переказати кошти з цього hosted-каналу, оскільки немає звичайних каналів, здатних їх отримати.</string>
+    <string name="ln_hosted_chan_remove_impossible">Зараз неможливо видалити цей hosted-канал, оскільки він містить незавершені платежі. Зачекайте, доки їх буде завершено.</string>
+    <string name="ln_hosted_chan_refill_impossible">Неможливо поповнити фіатний канал</string>
+    <string name="ln_hosted_chan_refill_low_funds">Недостатньо коштів для поповнення фіатного каналу</string>
+    <!-- DO NOT TRANSLATE --> <string name="ln_chan_details">Channel details\n\nRemote peer node ID\n%1$s\n\nLocal wallet node ID\n%2$s\n\nChannel short ID\n%3$s\n\nFunding txid\n%4$s\n\nChannel started\n%5$s</string>
+    <!-- DO NOT TRANSLATE --> <string name="ln_hosted_chan_state">%1$s\n\n\nState snapshot\n%2$s\n\nRevealed preimages\n%3$s</string>
+    <array name="ln_normal_chan_actions">
+        <item><![CDATA[Поділитися даними <b>каналу Lightning</b>]]></item>
+        <item>Закрити канал у гаманець</item>
+        <item>Закрити канал на адресу</item>
+        <item>Отримати в канал</item>
+        <item>Поповнити з інших каналів</item>
+        <item>Пряме отримання в канал (неприватно)</item>
+    </array>
+    <array name="ln_hosted_chan_actions">
+        <item><![CDATA[Поділитися даними <b>hosted-каналу</b>]]></item>
+        <item>Експортувати стан каналу</item>
+        <item>Переказати кошти з каналу</item>
+        <item>Отримати в канал</item>
+        <item>Поповнити з інших каналів</item>
+        <item>Пряме отримання в канал (неприватно)</item>
+    </array>
+    <string name="ln_hc_override">Пропозиція змінити баланс</string>
+    <string name="ln_hc_override_warn"><![CDATA[<br>Віддалений хост хоче змінити баланс вашого hosted-каналу з <b>%1$s</b> на <b>%2$s</b>. Це можливо лише з вашим підписом.<br><br><strong>Переконайтеся, що новий баланс правильний, перш ніж продовжувати!</strong> Підписати запропоновану зміну hosted-каналу?]]></string>
 </resources>
