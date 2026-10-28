@@ -23,8 +23,8 @@
 
     <string name="search_recent">Search recent activity</string>
     <string name="emergency_mode">Something went wrong</string>
-    <string name="error_log">Export diagnostic logs</string>
-    <string name="error_log_clear">Clear diagnostic logs</string>
+    <string name="error_log">Export logs</string>
+    <string name="error_log_clear">Clear logs</string>
 
     <string name="setup_title">Wallet setup</string>
     <string name="network_setup_title">Network setup</string>
@@ -35,19 +35,18 @@
 
     <string name="delayed_refunding">Delayed channel refunding</string>
     <string name="delayed_refunding_ext">Do not erase wallet data until all delayed refunds are cleared!</string>
-    <string name="setup_create_new_hint">A completely fresh Bitcoin wallet with a new recovery phrase will be generated from scratch.</string>
+    <string name="setup_create_new_hint">A fresh Bitcoin wallet with a new recovery phrase will be generated.</string>
     <!-- DO NOT TRANSLATE --> <string name="share_ln_payment">Signed invoice\n%1$s\n\nPayment hash\n%2$s\n\nPayment description\n%3$s\n\nReceiver Node ID\n%4$s\n\nProof of payment\n%5$s\n\nDebug info\n%6$s</string>
     <!-- DO NOT TRANSLATE --> <string name="share_chain_tx">Bitcoin transaction hex\n\n%1$s</string>
 
     <string name="setup_backup_file_hint">
-        Provide a file containing Lightning backup, then provide a recovery
+        Provide a file containing Lightning backup and decrypt it with recovery
         phrase to fully restore Bitcoin wallet along with Lightning channels.
-        Turn other copies of your wallet off before proceeding.
     </string>
 
     <string name="setup_recovery_phrase_hint">
         Provide a recovery phrase to restore Bitcoin wallet and hosted channels only.
-        Lightning channel balances on previous devices will be refunded on manually
+        Lightning channel balances on previous devices may be refunded on manually
         connecting to remote nodes you had those channels with.
     </string>
 
