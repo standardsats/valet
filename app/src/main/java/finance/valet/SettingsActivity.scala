@@ -245,10 +245,10 @@ class SettingsActivity extends BaseCheckActivity with HasTypicalChainFee with Ch
           nodeaddress.encode(nodeAddress).require.toHex
         }
 
-        // With a custom signet on, the Electrum server selects the chain
+        // Server changes require no channel records, including channels still closing.
         def saveIfSignetAllows(address: String): Unit = WalletApp.signetSwitchProblem(WalletApp.customSignet, address) match {
           case Some(problemRes) => onFail(me getString problemRes)
-          case None if isSignetSwitch(WalletApp.customSignet, address) => confirmSignetSwitch(saveAddress(address).commit)
+          case None if isSignetSwitch(WalletApp.customSignet, address) => confirmSignetSwitch(WalletApp.customSignet, address)(saveAddress(address).commit)
           case None => runAnd(saveAddress(address).commit)(warnAndUpdateView)
         }
 
@@ -282,7 +282,7 @@ class SettingsActivity extends BaseCheckActivity with HasTypicalChainFee with Ch
 
       WalletApp.signetSwitchProblem(customSignet1, WalletApp.customElectrumHex) match {
         case Some(problemRes) => onFail(me getString problemRes)
-        case None if isSignetSwitch(customSignet1, WalletApp.customElectrumHex) => confirmSignetSwitch(save)
+        case None if isSignetSwitch(customSignet1, WalletApp.customElectrumHex) => confirmSignetSwitch(customSignet1, WalletApp.customElectrumHex)(save)
         case None => runAnd(save)(updateView)
       }
     }
@@ -292,9 +292,14 @@ class SettingsActivity extends BaseCheckActivity with HasTypicalChainFee with Ch
     WalletApp.isSignetFlavor && WalletApp.signetIdFor(customSignet1, electrumHex1) != WalletApp.storedSignetId
 
   // The app restarts right away: a channel which opens before the restart would belong to the old chain
-  def confirmSignetSwitch(change: => Unit): Unit = {
+  def confirmSignetSwitch(customSignet1: Boolean, electrumHex1: String)(change: => Unit): Unit = {
     val builder = titleBodyAsViewBuilder(null, getString(settings_custom_signet_restart).asDefView)
-    mkCheckForm(alert => runAnd(alert.dismiss) { change; WalletApp.restart }, none, builder, dialog_ok, dialog_cancel)
+    mkCheckForm(alert => runAnd(alert.dismiss) {
+      WalletApp.signetSwitchProblem(customSignet1, electrumHex1) match {
+        case Some(problemRes) => onFail(me getString problemRes)
+        case None => change; WalletApp.restart
+      }
+    }, none, builder, dialog_ok, dialog_cancel)
   }
 
   lazy private[this] val setFiat = new SettingsHolder(me) {

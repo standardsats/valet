@@ -1,7 +1,7 @@
 package finance.valet
 
 import android.app.{Activity, PendingIntent}
-import android.content.Intent
+import android.content.{DialogInterface, Intent}
 import android.net.Uri
 import android.os.Bundle
 import android.view.View
@@ -17,6 +17,7 @@ import fr.acinq.bitcoin.MnemonicCode
 import fr.acinq.eclair.wire.CommonCodecs.nodeaddress
 import fr.acinq.eclair.wire.{Domain, NodeAddress}
 import immortan.crypto.Tools.{SEPARATOR, none, runAnd, ~}
+import immortan.crypto.ChannelBackup
 import immortan.wire.ExtCodecs
 import immortan.{LNParams, LightningNodeKeys, WalletSecret}
 import scodec.bits.{BitVector, ByteVector}
@@ -178,20 +179,56 @@ class SetupActivity extends BaseActivity { me =>
   private def askMnemonicsAndRestore(cipherBytes: Array[Byte]): Unit =
     showMnemonicPopup(R.string.action_backup_present_title) { mnemonics =>
       val walletSeed = MnemonicCode.toSeed(mnemonics, passphrase = new String)
-      LocalBackup.decryptBackup(ByteVector.view(cipherBytes), walletSeed) match {
+      ChannelBackup.decrypt(ByteVector.view(cipherBytes), walletSeed) match {
 
-        case Success(plainEssentialBytes) =>
-          // We were able to decrypt a file, implant it into db location and proceed
-          LocalBackup.copyPlainDataToDbLocation(me, WalletApp.dbFileNameEssential, plainEssentialBytes)
-          // Keep the user-selected backup file: until a backup directory is chosen it is the only copy
-          WalletApp.backupSaveWorker.replaceWork(true)
-          proceedWithMnemonics(mnemonics)
+        case Success(backup) =>
+          def restore(signetId: Option[String]): Unit = {
+            LocalBackup.copyPlainDataToDbLocation(me, WalletApp.dbFileNameEssential, backup.database)
+            signetId.foreach { id =>
+              WalletApp.restoreSignetSettings(id)
+              // The restored channels already belong to this chain; establish their identity before startup's switch guard.
+              WalletApp.app.prefs.edit.putString(WalletApp.SIGNET_CHAIN_DATA, id).commit
+            }
+            WalletApp.backupSaveWorker.replaceWork(true)
+            proceedWithMnemonics(mnemonics)
+          }
+
+          backup.signetId match {
+            case Some(_) if !WalletApp.isSignetFlavor => onFail(getString(error_backup_signet_network))
+            case Some(id) if id == WalletApp.MUTINYNET_ID || (id.startsWith(WalletApp.CUSTOM_SIGNET_ID_PREFIX) && WalletApp.electrumAddress(id.drop(WalletApp.CUSTOM_SIGNET_ID_PREFIX.length)).isSuccess) => restore(Some(id))
+            case Some(_) => onFail(getString(error_backup_signet_network))
+            case None if WalletApp.isSignetFlavor => chooseBackupSignet(id => restore(Some(id)))
+            case None => restore(None)
+          }
 
         case Failure(exception) =>
           val msg = getString(R.string.error_could_not_decrypt)
           onFail(msg format WalletApp.app.userFacingError(exception))
       }
     }
+
+  // Old backups have no chain identity. Ask before importing any channel records or starting network connections.
+  private def chooseBackupSignet(restore: String => Unit): Unit = {
+    new AlertDialog.Builder(me).setTitle(restore_signet_network)
+      .setItems(Array[CharSequence]("Mutinynet", getString(settings_custom_signet)), new DialogInterface.OnClickListener {
+        override def onClick(dialog: DialogInterface, which: Int): Unit = if (which == 0) restore(WalletApp.MUTINYNET_ID) else {
+          val (container, inputLayout, input) = singleInputPopup
+          inputLayout.setHint(settings_custom_electrum_host_port)
+          val builder = titleBodyAsViewBuilder(getString(settings_custom_signet).asDefView, container)
+          mkCheckForm(alert => {
+            val address = input.getText.toString.trim
+            def encode: String = {
+              val idx = address.lastIndexOf(':')
+              require(idx > 0 && idx < address.length - 1, "Expected <host>:<port>")
+              val node = NodeAddress.fromParts(address.take(idx), address.drop(idx + 1).toInt, Domain)
+              WalletApp.CUSTOM_SIGNET_ID_PREFIX + nodeaddress.encode(node).require.toHex
+            }
+            runInFutureProcessOnUI(encode, onFail)(id => runAnd(alert.dismiss)(restore(id)))
+          }, none, builder, dialog_ok, dialog_cancel)
+          showKeys(input)
+        }
+      }).show
+  }
 
   def createNewWallet(view: View): Unit = {
     val twelveWordsEntropy: ByteVector = fr.acinq.eclair.randomBytes(16)

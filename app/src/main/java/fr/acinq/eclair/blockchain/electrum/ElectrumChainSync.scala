@@ -40,12 +40,14 @@ class ElectrumChainSync(client: ActorRef, headerDb: HeaderDb, chainHash: ByteVec
 
   // Read once: Mutinynet has a large checkpoints file
   val assetCheckpoints: Vector[CheckPoint] = CheckPoint.loadFromChainHash(chainHash)
+  private var restartedFromGenesis = false
 
   // Regtest or a custom signet can be reset by its operator, then the saved headers belong to an old chain
   // Only the server tells the chain, so the saved headers go and the chain starts again from the genesis block
-  def mayRestartFromGenesis(blockchain: Blockchain): Boolean = assetCheckpoints.isEmpty && (blockchain.checkpoints.nonEmpty || blockchain.height > 0)
+  def mayRestartFromGenesis(blockchain: Blockchain): Boolean = !restartedFromGenesis && assetCheckpoints.isEmpty && (blockchain.checkpoints.nonEmpty || blockchain.height > 0)
 
   def restartFromGenesis(remoteHeight: Int): State = {
+    restartedFromGenesis = true
     log.warning(s"Saved headers do not match the server chain at height $remoteHeight, chain starts again from genesis")
     headerDb.removeAllHeaders
     context.system.eventStream publish ElectrumChainSync.ChainSyncStarted(localTip = 0L, remoteHeight)
@@ -59,6 +61,8 @@ class ElectrumChainSync(client: ActorRef, headerDb: HeaderDb, chainHash: ByteVec
 
   when(DISCONNECTED) {
     case Event(_: ElectrumClient.ElectrumReady, blockchain) =>
+      // A later connection may belong to a freshly reset chain, but bad chunks on this connection get only one retry.
+      restartedFromGenesis = false
       client ! ElectrumClient.HeaderSubscription(self)
       goto(WAITING_FOR_TIP) using blockchain
   }

@@ -85,6 +85,14 @@ abstract class ElectrumWalletType {
   // A search derives up to 2 * maxIndex keys, so each result (also a miss) is kept for the next claim of the same channel
   def privateKeyFor(publicKey: PublicKey, maxIndex: Long): Option[PrivateKey] = privateKeys.getOrElseUpdate(publicKey -> maxIndex, findPrivateKey(publicKey, maxIndex))
 
+  def privateKeyFor(publicKey: PublicKey, derivedKeys: Iterable[ExtendedPublicKey]): Option[PrivateKey] = secrets.flatMap { accountAndXPriv =>
+    // Use a known path directly. Older channel keys may have fallen outside the wallet's in-memory window.
+    derivedKeys.find(_.publicKey == publicKey).map(key => derivePrivateKey(accountAndXPriv.master, key.path).privateKey).orElse {
+      val maxIndex = derivedKeys.foldLeft(0L)((end, key) => end.max(key.path.lastChildNumber + 1))
+      privateKeyFor(publicKey, maxIndex)
+    }
+  }
+
   private def findPrivateKey(publicKey: PublicKey, maxIndex: Long): Option[PrivateKey] = secrets.flatMap { accountAndXPriv =>
     val keys = (0L until maxIndex).iterator.flatMap(idx => derivePublicKey(accountMaster, idx) :: derivePublicKey(changeMaster, idx) :: Nil)
     keys.find(_.publicKey == publicKey).map(key => derivePrivateKey(accountAndXPriv.master, key.path).privateKey)

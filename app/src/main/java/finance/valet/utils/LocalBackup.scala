@@ -3,7 +3,6 @@ package finance.valet.utils
 import android.os.Environment._
 import fr.acinq.bitcoin.{Block, ByteVector32, Crypto}
 import androidx.appcompat.app.AppCompatActivity
-import fr.acinq.eclair.randomBytes
 import com.google.common.io.{ByteStreams, Files}
 import android.app.PendingIntent
 import android.content.{ContentValues, Context, Intent}
@@ -14,7 +13,7 @@ import androidx.documentfile.provider.DocumentFile
 import finance.valet.WalletApp
 import finance.valet.WalletApp.customBackupLocation
 import scodec.bits.ByteVector
-import immortan.crypto.Tools
+import immortan.crypto.ChannelBackup
 import immortan.wire.ExtCodecs
 import scodec.Attempt.{Failure, Successful}
 
@@ -142,12 +141,13 @@ object LocalBackup { me =>
   }
 
   // Prefixing by one byte to discern future backup types (full wallet backup / minimal channel backup etc)
-  def encryptBackup(backup: ByteVector, seed: ByteVector): ByteVector = 0.toByte +: Tools.chaChaEncrypt(Crypto.sha256(seed), randomBytes(12), backup)
-  def decryptBackup(backup: ByteVector, seed: ByteVector): Try[ByteVector] = Tools.chaChaDecrypt(Crypto.sha256(seed), backup drop 1)
+  def encryptBackup(backup: ByteVector, seed: ByteVector): ByteVector = ChannelBackup.encrypt(ChannelBackup(backup, None), seed)
+  def decryptBackup(backup: ByteVector, seed: ByteVector): Try[ByteVector] = ChannelBackup.decrypt(backup, seed).map(_.database)
 
   def encryptAndWritePlainBackup(context: Context, dbFileName: String, chainHash: ByteVector32, seed: ByteVector): Unit = {
     val dataBaseFile = new File(context.getDatabasePath(dbFileName).getPath)
-    val cipherBytes = encryptBackup(ByteVector.view(Files toByteArray dataBaseFile), seed)
+    val signetId = if (chainHash == Block.SignetGenesisBlock.hash) Some(WalletApp.storedSignetId) else None
+    val cipherBytes = ChannelBackup.encrypt(ChannelBackup(ByteVector.view(Files toByteArray dataBaseFile), signetId), seed)
     val backupFile = getBackupFileUnsafe(context, chainHash, seed)
     atomicWrite(backupFile, cipherBytes)
     WalletApp.customBackupLocation.foreach(copyFileToDirectory(context, _, backupFile))

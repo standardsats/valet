@@ -272,11 +272,14 @@
     <string name="settings_custom_electrum_enabled">Using custom Electrum node</string>
     <string name="settings_custom_electrum_disabled_tip">Random nodes are used currently</string>
     <string name="settings_custom_electrum_restart_notice">Restart to apply changes</string>
+    <string name="settings_electrum_close_channels">Close all channels before changing the Electrum server. The server has not been changed.</string>
     <string name="settings_custom_signet">Use custom signet</string>
     <string name="settings_custom_signet_info">A change clears the chain data on this device</string>
     <string name="settings_custom_signet_no_electrum">A custom signet needs a custom Electrum server</string>
     <string name="settings_custom_signet_close_channels">Close all channels before you switch to another signet</string>
     <string name="settings_custom_signet_restart">The app clears the chain data on this device and restarts</string>
+    <string name="restore_signet_network">Which signet does this backup belong to?</string>
+    <string name="error_backup_signet_network">This backup requires the Signet app and a valid signet network setting.</string>
 
     <string name="settings_gap_limit">Address scan gap limit</string>
     <string name="settings_gap_limit_info">Current: %1$d addresses</string>
