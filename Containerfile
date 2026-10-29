@@ -45,4 +45,6 @@ WORKDIR /app/valet/
 # NOTE: this file is the quick, in-place build path -- it runs as root, in the
 # bind-mounted tree, with the project's own ./gradlew. That is NOT how F-Droid
 # builds, and it inherits whatever .gradle/ the host left in the working tree.
-CMD export SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct) && ./gradlew --no-daemon assembleRelease && ./gradlew --no-daemon bundleRelease
+# Trust only the explicitly mounted checkout, and stop if its timestamp cannot be read.
+# Keep assignment separate from export: export otherwise hides git's failure status.
+CMD SOURCE_DATE_EPOCH=$(git -c safe.directory=/app/valet log -1 --pretty=%ct) && export SOURCE_DATE_EPOCH && ./gradlew --no-daemon assembleRelease && ./gradlew --no-daemon bundleRelease
