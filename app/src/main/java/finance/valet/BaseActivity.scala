@@ -103,6 +103,39 @@ object BaseActivity {
 
     def confirmDestinations(destinations: Seq[(String, Option[MilliSatoshi])]): Seq[ConfirmDestination] =
       destinations.map { case raw ~ amount => confirmDestination(raw, amount) }
+
+    def verifiedSingleConfirmDestination[K](
+      rawDestination: String,
+      toKey: String => K,
+      actualOutputs: Map[K, Satoshi]
+    ): Either[String, ConfirmDestination] = {
+      val expectedKey = toKey(rawDestination)
+      val expectedAmount = actualOutputs.get(expectedKey)
+
+      if (actualOutputs.size != 1 || expectedAmount.isEmpty) Left("Could not verify destination output in transaction preview")
+      else Right(confirmDestination(rawDestination, expectedAmount.map(_.toMilliSatoshi)))
+    }
+
+    def verifiedBatchConfirmDestinations[K](
+      rawDestinations: Seq[(String, Satoshi)],
+      toKey: String => K,
+      actualOutputs: Map[K, Satoshi]
+    ): Either[String, Seq[ConfirmDestination]] = {
+      val groupedByKey = rawDestinations.groupBy { case raw ~ _ => toKey(raw) }
+      val hasAmbiguousDuplicates = groupedByKey.exists { case _ ~ rows => rows.size > 1 }
+
+      if (hasAmbiguousDuplicates) Left("Could not verify destination outputs in batch transaction preview")
+      else {
+        val expectedOutputs = rawDestinations.map { case raw ~ amount => toKey(raw) -> amount }.toMap
+
+        if (expectedOutputs != actualOutputs) Left("Could not verify destination outputs in batch transaction preview")
+        else Right(rawDestinations.map {
+          case raw ~ _ =>
+            val key = toKey(raw)
+            confirmDestination(raw, actualOutputs.get(key).map(_.toMilliSatoshi))
+        })
+      }
+    }
   }
 
   implicit class StringOps(source: String) {

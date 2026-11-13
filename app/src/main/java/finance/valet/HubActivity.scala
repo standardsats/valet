@@ -1539,14 +1539,17 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
         val finalSendButton = sendView.chainConfirmView.chainButtonsView.chainNextButton
         val totalSendAmount = response.pubKeyScriptToAmount.values.head.toMilliSatoshi
 
-        val destinationAmount = response.pubKeyScriptToAmount.get(chainPubKeyScript).map(_.toMilliSatoshi)
-        if (destinationAmount.isEmpty || response.pubKeyScriptToAmount.size != 1) {
-          alert.dismiss
-          onFail("Could not verify destination output in transaction preview")
-          return
-        }
+        val verifiedSingleDestination = BaseActivity.AddressPresentation
+          .verifiedSingleConfirmDestination(uri.address, LNParams.addressToPubKeyScript, response.pubKeyScriptToAmount)
 
-        val confirmDestinations = BaseActivity.AddressPresentation.confirmDestinations(Seq(uri.address -> destinationAmount))
+        val confirmDestinations = verifiedSingleDestination match {
+          case Left(error) =>
+            alert.dismiss
+            onFail(error)
+            return
+
+          case Right(destination) => Seq(destination)
+        }
 
         if (fromWallet.isSigning) {
           finalSendButton setOnClickListener onButtonTap(process apply response.tx)
@@ -1622,7 +1625,7 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
   }
 
   def bringSendMultiBitcoinPopup(addressToAmount: MultiAddressParser.AddressToAmount, fromWallet: ElectrumEclairWallet): Unit = {
-    val scriptToAmount = addressToAmount.values.firstItems.map(LNParams.addressToPubKeyScript).zip(addressToAmount.values.secondItems).toMap
+    val rawDestinations = addressToAmount.values.toList
     val sendView: ChainSendView = new ChainSendView(fromWallet, badge = None, visibilityRes = -1)
 
     def attempt(alert: AlertDialog): Unit = {
@@ -1630,15 +1633,17 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
         // It is fine to sum the whole map element here: possible change output will never be present in it
         val finalSendButton = sendView.chainConfirmView.chainButtonsView.chainNextButton
         val totalSendAmount = response.pubKeyScriptToAmount.values.sum.toMilliSatoshi
-        if (response.pubKeyScriptToAmount != scriptToAmount) {
-          alert.dismiss
-          onFail("Could not verify destination outputs in batch transaction preview")
-          return
-        }
+        val verifiedDestinations = BaseActivity.AddressPresentation
+          .verifiedBatchConfirmDestinations(rawDestinations, LNParams.addressToPubKeyScript, response.pubKeyScriptToAmount)
 
-        val confirmDestinations = BaseActivity.AddressPresentation.confirmDestinations(addressToAmount.values.map {
-          case address ~ amount => address -> amount.toMilliSatoshi.asSome
-        })
+        val confirmDestinations = verifiedDestinations match {
+          case Left(error) =>
+            alert.dismiss
+            onFail(error)
+            return
+
+          case Right(destinations) => destinations
+        }
 
         if (fromWallet.isSigning) {
           finalSendButton setOnClickListener onButtonTap(process apply response.tx)
