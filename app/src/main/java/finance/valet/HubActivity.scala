@@ -1539,14 +1539,23 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
         val finalSendButton = sendView.chainConfirmView.chainButtonsView.chainNextButton
         val totalSendAmount = response.pubKeyScriptToAmount.values.head.toMilliSatoshi
 
+        val destinationAmount = response.pubKeyScriptToAmount.get(chainPubKeyScript).map(_.toMilliSatoshi)
+        if (destinationAmount.isEmpty || response.pubKeyScriptToAmount.size != 1) {
+          alert.dismiss
+          onFail("Could not verify destination output in transaction preview")
+          return
+        }
+
+        val confirmDestinations = BaseActivity.AddressPresentation.confirmDestinations(Seq(uri.address -> destinationAmount))
+
         if (fromWallet.isSigning) {
           finalSendButton setOnClickListener onButtonTap(process apply response.tx)
-          sendView.switchToConfirm(alert, totalSendAmount, response.fee.toMilliSatoshi)
+          sendView.switchToConfirm(alert, totalSendAmount, response.fee.toMilliSatoshi, confirmDestinations)
         } else if (fromWallet.hasFingerprint) {
           sendView.chainReaderView.onSignedTx = signedTx => UITask {
             if (signedTx.txOut.toSet != response.tx.txOut.toSet) alert.dismiss
             finalSendButton setOnClickListener onButtonTap(process apply signedTx)
-            sendView.switchToConfirm(alert, totalSendAmount, response.fee.toMilliSatoshi)
+            sendView.switchToConfirm(alert, totalSendAmount, response.fee.toMilliSatoshi, confirmDestinations)
           }.run
 
           val masterFingerprint = fromWallet.info.core.masterFingerprint.get
@@ -1621,15 +1630,24 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
         // It is fine to sum the whole map element here: possible change output will never be present in it
         val finalSendButton = sendView.chainConfirmView.chainButtonsView.chainNextButton
         val totalSendAmount = response.pubKeyScriptToAmount.values.sum.toMilliSatoshi
+        if (response.pubKeyScriptToAmount != scriptToAmount) {
+          alert.dismiss
+          onFail("Could not verify destination outputs in batch transaction preview")
+          return
+        }
+
+        val confirmDestinations = BaseActivity.AddressPresentation.confirmDestinations(addressToAmount.values.map {
+          case address ~ amount => address -> amount.toMilliSatoshi.asSome
+        })
 
         if (fromWallet.isSigning) {
           finalSendButton setOnClickListener onButtonTap(process apply response.tx)
-          sendView.switchToConfirm(alert, totalSendAmount, response.fee.toMilliSatoshi)
+          sendView.switchToConfirm(alert, totalSendAmount, response.fee.toMilliSatoshi, confirmDestinations)
         } else if (fromWallet.hasFingerprint) {
           sendView.chainReaderView.onSignedTx = signedTx => UITask {
             if (signedTx.txOut.toSet != response.tx.txOut.toSet) alert.dismiss
             finalSendButton setOnClickListener onButtonTap(process apply signedTx)
-            sendView.switchToConfirm(alert, totalSendAmount, response.fee.toMilliSatoshi)
+            sendView.switchToConfirm(alert, totalSendAmount, response.fee.toMilliSatoshi, confirmDestinations)
           }.run
 
           val masterFingerprint = fromWallet.info.core.masterFingerprint.get

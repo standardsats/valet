@@ -25,6 +25,24 @@
             <include layout="@layout/frag_two_sided_item" android:id="@+id/confirmFiat"/>
             <include layout="@layout/frag_two_sided_item" android:id="@+id/confirmAmount"/>
             <include layout="@layout/frag_two_sided_item" android:id="@+id/confirmFee"/>
+
+            <TextView
+                android:id="@+id/confirmDestinationCaption"
+                style="@style/BoundedView"
+                android:layout_marginStart="15dp"
+                android:layout_marginEnd="15dp"
+                android:layout_marginTop="8dp"
+                android:textStyle="bold"
+                android:visibility="gone"/>
+
+            <LinearLayout
+                android:id="@+id/confirmDestinationRows"
+                style="@style/StandardLinearLayout"
+                android:layout_marginStart="15dp"
+                android:layout_marginEnd="15dp"
+                android:layout_marginBottom="8dp"
+                android:visibility="gone"/>
+
             <include layout="@layout/frag_chain_buttons"/>
         </LinearLayout>
 

@@ -93,6 +93,16 @@ object BaseActivity {
     }
 
     def accessibilityFull(raw: String): String = normalized(raw)
+
+    case class ConfirmDestination(raw: String, amount: Option[MilliSatoshi]) {
+      val grouped: String = groupedFull(raw)
+      val accessibility: String = accessibilityFull(raw)
+    }
+
+    def confirmDestination(raw: String, amount: Option[MilliSatoshi]): ConfirmDestination = ConfirmDestination(raw, amount)
+
+    def confirmDestinations(destinations: Seq[(String, Option[MilliSatoshi])]): Seq[ConfirmDestination] =
+      destinations.map { case raw ~ amount => confirmDestination(raw, amount) }
   }
 
   implicit class StringOps(source: String) {
@@ -656,6 +666,40 @@ trait BaseActivity extends AppCompatActivity { me =>
     val confirmFiat = new TwoSidedItem(host.findViewById(R.id.confirmFiat), getString(dialog_send_btc_confirm_fiat), new String)
     val confirmAmount = new TwoSidedItem(host.findViewById(R.id.confirmAmount), getString(dialog_send_btc_confirm_amount), new String)
     val confirmFee = new TwoSidedItem(host.findViewById(R.id.confirmFee), getString(dialog_send_btc_confirm_fee), new String)
+    val confirmDestinationCaption: TextView = host.findViewById(R.id.confirmDestinationCaption).asInstanceOf[TextView]
+    val confirmDestinationRows: LinearLayout = host.findViewById(R.id.confirmDestinationRows).asInstanceOf[LinearLayout]
+
+    def renderDestinations(destinations: Seq[BaseActivity.AddressPresentation.ConfirmDestination]): Unit = {
+      confirmDestinationRows.removeAllViews()
+
+      if (destinations.nonEmpty) {
+        confirmDestinationCaption.setText(if (destinations.size > 1) dialog_send_btc_confirm_destinations else dialog_send_btc_confirm_destination)
+
+        destinations.foreach { destination =>
+          val row = new LinearLayout(host.getContext)
+          row.setOrientation(LinearLayout.VERTICAL)
+
+          val addressView = new TextView(host.getContext)
+          addressView.setTextAppearance(host.getContext, R.style.AddressDisplayText)
+          addressView.setSingleLine(false)
+          addressView.setHorizontallyScrolling(false)
+          addressView.setText(destination.grouped)
+          addressView.setContentDescription(destination.accessibility)
+          row.addView(addressView)
+
+          destination.amount.foreach { amount =>
+            val amountView = new TextView(host.getContext)
+            amountView.setText(WalletApp.denom.parsedWithSign(amount, cardIn, cardZero).html)
+            row.addView(amountView)
+          }
+
+          confirmDestinationRows.addView(row)
+        }
+      }
+
+      setVis(isVisible = destinations.nonEmpty, confirmDestinationCaption)
+      setVis(isVisible = destinations.nonEmpty, confirmDestinationRows)
+    }
   }
 
   class ChainEditView(val host: LinearLayout, manager: RateManager, fromWallet: ElectrumEclairWallet) extends HasHostView {
@@ -703,12 +747,13 @@ trait BaseActivity extends AppCompatActivity { me =>
       haltProcesses
     }
 
-    def switchToConfirm(alert: AlertDialog, totalAmount: MilliSatoshi, fee: MilliSatoshi): Unit = {
+    def switchToConfirm(alert: AlertDialog, totalAmount: MilliSatoshi, fee: MilliSatoshi, destinations: Seq[BaseActivity.AddressPresentation.ConfirmDestination] = Nil): Unit = {
       chainConfirmView.chainButtonsView.chainCancelButton setOnClickListener onButtonTap(alert.dismiss)
       chainConfirmView.chainButtonsView.chainEditButton setOnClickListener onButtonTap(me switchToEdit alert)
       chainConfirmView.confirmAmount.secondItem setText WalletApp.denom.parsedWithSign(totalAmount, cardIn, cardZero).html
       chainConfirmView.confirmFee.secondItem setText WalletApp.denom.parsedWithSign(fee, cardIn, cardZero).html
       chainConfirmView.confirmFiat.secondItem setText WalletApp.currentMsatInFiatHuman(totalAmount).html
+      chainConfirmView.renderDestinations(destinations)
       switchButtons(alert, on = false)
       switchTo(chainConfirmView)
       haltProcesses
