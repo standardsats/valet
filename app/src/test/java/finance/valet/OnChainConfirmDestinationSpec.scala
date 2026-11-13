@@ -44,7 +44,7 @@ class OnChainConfirmDestinationSpec {
     val toKey: String => String = _ => "script-a"
     val ok = BaseActivity.AddressPresentation.verifiedSingleConfirmDestination(addressA, toKey, Map("script-a" -> 1500L.sat))
     assertTrue(ok.isRight)
-    assertEquals(Some(MilliSatoshi(150000L)), ok.right.get.amount)
+    assertEquals(Some(MilliSatoshi(1500000L)), ok.right.get.amount)
 
     val mismatch = BaseActivity.AddressPresentation.verifiedSingleConfirmDestination(addressA, toKey, Map("script-b" -> 1500L.sat))
     assertTrue(mismatch.isLeft)
@@ -67,9 +67,9 @@ class OnChainConfirmDestinationSpec {
     assertTrue(verified.isRight)
     assertEquals(2, verified.right.get.size)
     assertEquals(addressA, verified.right.get.head.raw)
-    assertEquals(Some(MilliSatoshi(100000L)), verified.right.get.head.amount)
+    assertEquals(Some(MilliSatoshi(1000000L)), verified.right.get.head.amount)
     assertEquals(addressB, verified.right.get(1).raw)
-    assertEquals(Some(MilliSatoshi(200000L)), verified.right.get(1).amount)
+    assertEquals(Some(MilliSatoshi(2000000L)), verified.right.get(1).amount)
   }
 
   @Test
