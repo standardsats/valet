@@ -10,16 +10,9 @@
     <TextView
         android:gravity="center"
         android:id="@+id/qrLabel"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:breakStrategy="balanced"
-        android:hyphenationFrequency="none"
-        android:ellipsize="none"
-        android:maxLines="10"
-        android:textIsSelectable="false"
         android:paddingTop="10dp"
         android:paddingBottom="20dp"
-        style="@style/AddressDisplayText"/>
+        style="@style/FillingView"/>
 
     <ImageView
         android:id="@+id/qrCode"

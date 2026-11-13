@@ -162,4 +162,14 @@ class AddressPresentationSpec {
     val addressOnly = BaseActivity.AddressPresentation.receiveAccessibilityText(longWitnessRegtest, None, None)
     assertEquals(longWitnessRegtest, addressOnly)
   }
+
+  @Test
+  def receiveAccessibilityTextStripsStyledAmountMarkupToPlainText: Unit = {
+    val styledAmount = "<font color=#FFCF44>0.00123456 BTC</font><br><font color=#A0A0A0>~$77.10</font>"
+    val full = BaseActivity.AddressPresentation.receiveAccessibilityText(longWitnessRegtest, Some("Coffee Shop"), Some(styledAmount))
+
+    assertFalse(full.contains("<font"))
+    assertFalse(full.contains("<br"))
+    assertEquals(longWitnessRegtest + ", Coffee Shop, 0.00123456 BTC ~$77.10", full)
+  }
 }

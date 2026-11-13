@@ -106,9 +106,24 @@ object BaseActivity {
       }
     }
 
+    private def plainAccessibilitySegment(raw: String): String = {
+      val noBreakTags = normalized(raw).replaceAll("(?i)<br\\s*/?>", " ")
+      val noTags = noBreakTags.replaceAll("<[^>]+>", "")
+      val decoded = noTags
+        .replace("&nbsp;", " ")
+        .replace("&#160;", " ")
+        .replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace("&#8230;", "…")
+      decoded.replaceAll("\\s+", " ").trim
+    }
+
     def receiveAccessibilityText(raw: String, label: Option[String], humanAmount: Option[String]): String = {
       val address = accessibilityFull(raw)
-      val details = Seq(label, humanAmount).flatten
+      val details = Seq(label, humanAmount).flatten.map(plainAccessibilitySegment).filter(_.nonEmpty)
       if (details.isEmpty) address else (address +: details).mkString(", ")
     }
 

@@ -1,6 +1,7 @@
 package finance.valet
 
-import android.os.Bundle
+import android.os.{Build, Bundle}
+import android.text.Layout
 import android.view.{View, ViewGroup}
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
@@ -52,6 +53,16 @@ class QRChainActivity extends QRActivity with ExternalDataChecker { me =>
       val accessibilityText = BaseActivity.AddressPresentation.receiveAccessibilityText(bu.address, bu.label, humanAmountOpt)
 
       holder.qrLabel setText visibleText.html
+      holder.qrLabel.setTextAppearance(R.style.AddressDisplayText)
+      holder.qrLabel.setTextIsSelectable(false)
+      holder.qrLabel.setSingleLine(false)
+      holder.qrLabel.setHorizontallyScrolling(false)
+      holder.qrLabel.setEllipsize(null)
+      holder.qrLabel.setMaxLines(Int.MaxValue)
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        holder.qrLabel.setBreakStrategy(Layout.BREAK_STRATEGY_BALANCED)
+        holder.qrLabel.setHyphenationFrequency(Layout.HYPHENATION_FREQUENCY_NONE)
+      }
       holder.qrLabel setContentDescription accessibilityText
       runInFutureProcessOnUI(QRActivity.get(contentToShare, qrSize), onFail) { qrBitmap =>
         def share: Unit = runInFutureProcessOnUI(shareData(qrBitmap, contentToShare), onFail)(none)
