@@ -83,6 +83,8 @@ object BaseActivity {
     // Compatibility alias; not a payment validator.
     def isSupported(raw: String): Boolean = isDisplayEligibleAddress(raw)
 
+    // Display helper only: never use grouped output as payment/copy/share payload.
+    // Clipboard/share consumers must use the original raw address/URI value.
     def groupedFull(raw: String): String = {
       val candidate = normalized(raw)
       if (candidate.isEmpty) ""
