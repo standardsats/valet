@@ -64,6 +64,28 @@ import scala.util.{Failure, Success, Try}
 object BaseActivity {
   final val COMMUNITY_URL = "https://t.me/StandardSatsCommunity"
 
+  object AddressPresentation {
+    private[this] val groupedSeparator = "\u0020"
+    // Stage 2 policy: only address payloads get grouped; URI payloads and unknown strings are untouched.
+    private[this] val supportedAddress = "^(?i)(bc1|tb1|bcrt1|[13mn2])[a-z0-9]{10,}$".r
+
+    private def normalized(raw: String): String = Option(raw).map(_.trim).getOrElse("")
+
+    def isSupported(raw: String): Boolean = {
+      val candidate = normalized(raw)
+      candidate.nonEmpty && supportedAddress.pattern.matcher(candidate).matches
+    }
+
+    def groupedFull(raw: String): String = {
+      val candidate = normalized(raw)
+      if (candidate.isEmpty) ""
+      else if (isSupported(candidate)) candidate.grouped(4).mkString(groupedSeparator)
+      else candidate
+    }
+
+    def accessibilityFull(raw: String): String = normalized(raw)
+  }
+
   implicit class StringOps(source: String) {
     def html: Spanned = android.text.Html.fromHtml(source, 0)
     def humanFour: String = source.grouped(4).mkString(s"\u0020")
