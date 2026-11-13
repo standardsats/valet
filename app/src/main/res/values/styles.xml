@@ -138,6 +138,15 @@
         <item name="android:maxLines">1</item>
     </style>
 
+    <!-- Reusable readable typography for validated address payloads only -->
+    <style name="AddressDisplayText" parent="BoundedView">
+        <item name="android:fontFamily">monospace</item>
+        <item name="android:textSize">18sp</item>
+        <item name="android:letterSpacing">0.03</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:textIsSelectable">true</item>
+    </style>
+
     <!-- chip text -->
 
     <style name="ChipTextGray">

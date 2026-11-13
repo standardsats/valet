@@ -66,20 +66,27 @@ object BaseActivity {
 
   object AddressPresentation {
     private[this] val groupedSeparator = "\u0020"
-    // Stage 2 policy: only address payloads get grouped; URI payloads and unknown strings are untouched.
-    private[this] val supportedAddress = "^(?i)(bc1|tb1|bcrt1|[13mn2])[a-z0-9]{10,}$".r
+    // Display-only eligibility for already validated addresses; this is not checksum/network validation.
+    private[this] val syntacticBech32Address = "^(bc1|tb1|bcrt1)[ac-hj-np-z02-9]{10,}$".r
+    private[this] val syntacticBase58Address = "^[13mn2][123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{10,}$".r
 
     private def normalized(raw: String): String = Option(raw).map(_.trim).getOrElse("")
 
-    def isSupported(raw: String): Boolean = {
+    def isDisplayEligibleAddress(raw: String): Boolean = {
       val candidate = normalized(raw)
-      candidate.nonEmpty && supportedAddress.pattern.matcher(candidate).matches
+      candidate.nonEmpty && (
+        syntacticBech32Address.pattern.matcher(candidate).matches ||
+        syntacticBase58Address.pattern.matcher(candidate).matches
+      )
     }
+
+    // Compatibility alias; not a payment validator.
+    def isSupported(raw: String): Boolean = isDisplayEligibleAddress(raw)
 
     def groupedFull(raw: String): String = {
       val candidate = normalized(raw)
       if (candidate.isEmpty) ""
-      else if (isSupported(candidate)) candidate.grouped(4).mkString(groupedSeparator)
+      else if (isDisplayEligibleAddress(candidate)) candidate.grouped(4).mkString(groupedSeparator)
       else candidate
     }
 
