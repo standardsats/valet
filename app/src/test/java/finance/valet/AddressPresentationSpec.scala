@@ -2,7 +2,7 @@ package finance.valet
 
 import fr.acinq.bitcoin.{Block, ByteVector32}
 import fr.acinq.eclair.addressToPublicKeyScript
-import immortan.utils.BitcoinUri
+import immortan.utils.{BitcoinUri, InputParser, PaymentRequestExt}
 import org.junit.Assert._
 import org.junit.Test
 
@@ -109,15 +109,19 @@ class AddressPresentationSpec {
 
   @Test
   def receivePayloadPreservesExactAddressOrExactParameterizedBip21: Unit = {
-    val rawAddress = bech32P2wpkhMainnet
+    val rawAddress = longWitnessRegtest
     val fixture = "bitcoin:bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh?amount=0.00123456&label=Coffee%20Shop&message=Thanks%2Bfor%2Bpaying"
 
     val parsed = BitcoinUri.fromRaw(fixture)
-    val rawUri = parsed.uri.get.toString
-    assertEquals(fixture, rawUri)
+    val normalizedRawUri = PaymentRequestExt.withoutSlashes(InputParser.bitcoin, parsed.uri.get)
 
-    assertEquals(rawAddress, BaseActivity.AddressPresentation.receivePayload(rawAddress, rawUri, hasAmountOrLabel = false))
-    assertEquals(fixture, BaseActivity.AddressPresentation.receivePayload(rawAddress, rawUri, hasAmountOrLabel = true))
+    assertEquals(fixture, normalizedRawUri)
+    assertEquals("amount=0.00123456&label=Coffee%20Shop&message=Thanks%2Bfor%2Bpaying", parsed.uri.get.getEncodedQuery)
+    assertEquals(Some("Coffee Shop"), parsed.label)
+    assertEquals(Some("Thanks+for+paying"), parsed.message)
+
+    assertEquals(rawAddress, BaseActivity.AddressPresentation.receivePayload(rawAddress, normalizedRawUri, hasAmountOrLabel = false))
+    assertEquals(fixture, BaseActivity.AddressPresentation.receivePayload(rawAddress, normalizedRawUri, hasAmountOrLabel = true))
   }
 
   @Test
@@ -148,5 +152,14 @@ class AddressPresentationSpec {
 
     val withLabelOnly = BaseActivity.AddressPresentation.receiveReadableText(bech32P2wpkhMainnet, Some("Coffee Shop"), None)
     assertEquals(s"$grouped<br><br>Coffee Shop", withLabelOnly)
+  }
+
+  @Test
+  def receiveAccessibilityTextPreservesRawAddressAndContextOrder: Unit = {
+    val full = BaseActivity.AddressPresentation.receiveAccessibilityText(longWitnessRegtest, Some("Coffee Shop"), Some("0.00123456 BTC"))
+    assertEquals(s"$longWitnessRegtest, Coffee Shop, 0.00123456 BTC", full)
+
+    val addressOnly = BaseActivity.AddressPresentation.receiveAccessibilityText(longWitnessRegtest, None, None)
+    assertEquals(longWitnessRegtest, addressOnly)
   }
 }

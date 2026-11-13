@@ -42,14 +42,17 @@ class QRChainActivity extends QRActivity with ExternalDataChecker { me =>
 
     private def updateView(bu: BitcoinUri, holder: QRViewHolder): Unit = bu.uri foreach { uri =>
       val humanAmountOpt = for (requestedAmount <- bu.amount) yield WalletApp.denom.parsedWithSign(requestedAmount, cardIn, totalZero)
+      val normalizedUri = PaymentRequestExt.withoutSlashes(InputParser.bitcoin, uri)
       val contentToShare = BaseActivity.AddressPresentation.receivePayload(
         bu.address,
-        PaymentRequestExt.withoutSlashes(InputParser.bitcoin, uri),
+        normalizedUri,
         hasAmountOrLabel = bu.amount.isDefined || bu.label.isDefined
       )
       val visibleText = BaseActivity.AddressPresentation.receiveReadableText(bu.address, bu.label, humanAmountOpt)
+      val accessibilityText = BaseActivity.AddressPresentation.receiveAccessibilityText(bu.address, bu.label, humanAmountOpt)
 
       holder.qrLabel setText visibleText.html
+      holder.qrLabel setContentDescription accessibilityText
       runInFutureProcessOnUI(QRActivity.get(contentToShare, qrSize), onFail) { qrBitmap =>
         def share: Unit = runInFutureProcessOnUI(shareData(qrBitmap, contentToShare), onFail)(none)
         holder.qrCopy setOnClickListener onButtonTap(WalletApp.app copy contentToShare)

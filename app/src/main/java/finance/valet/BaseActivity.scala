@@ -106,6 +106,12 @@ object BaseActivity {
       }
     }
 
+    def receiveAccessibilityText(raw: String, label: Option[String], humanAmount: Option[String]): String = {
+      val address = accessibilityFull(raw)
+      val details = Seq(label, humanAmount).flatten
+      if (details.isEmpty) address else (address +: details).mkString(", ")
+    }
+
     // Copy/share/QR payload helper: returns exact raw address or exact URI string.
     // Never returns grouped display text.
     def receivePayload(address: String, uri: String, hasAmountOrLabel: Boolean): String =
