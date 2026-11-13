@@ -371,7 +371,8 @@ class ChanActivity extends ChanErrorHandlerActivity with ChoiceReceiver with Has
   def closeNcToAddress(cs: NormalCommits): Unit = {
     def confirmResolve(bitcoinUri: BitcoinUri): Unit = {
       val pubKeyScript = LNParams.addressToPubKeyScript(bitcoinUri.address)
-      val builder = confirmationBuilder(cs, getString(confirm_ln_normal_chan_close_address).format(bitcoinUri.address.humanFour).html)
+      val readableAddress = BaseActivity.AddressPresentation.closeReadableAddress(bitcoinUri.address)
+      val builder = confirmationBuilder(cs, getString(confirm_ln_normal_chan_close_address).format(readableAddress).html)
       def proceed: Unit = for (chan <- me getChanByCommits cs) chan process CMD_CLOSE(pubKeyScript.asSome, force = false)
       mkCheckForm(alert => runAnd(alert.dismiss)(proceed), none, builder, dialog_ok, dialog_cancel)
     }

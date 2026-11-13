@@ -106,4 +106,47 @@ class AddressPresentationSpec {
     assertEquals(Some("Thanks+for+paying"), parsed.message)
     assertEquals(Some(BigDecimal("0.00123456")), parsed.uri.map(_.getQueryParameter("amount")).map(BigDecimal.apply).toOption)
   }
+
+  @Test
+  def receivePayloadPreservesExactAddressOrExactParameterizedBip21: Unit = {
+    val rawAddress = bech32P2wpkhMainnet
+    val fixture = "bitcoin:bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh?amount=0.00123456&label=Coffee%20Shop&message=Thanks%2Bfor%2Bpaying"
+
+    val parsed = BitcoinUri.fromRaw(fixture)
+    val rawUri = parsed.uri.get.toString
+    assertEquals(fixture, rawUri)
+
+    assertEquals(rawAddress, BaseActivity.AddressPresentation.receivePayload(rawAddress, rawUri, hasAmountOrLabel = false))
+    assertEquals(fixture, BaseActivity.AddressPresentation.receivePayload(rawAddress, rawUri, hasAmountOrLabel = true))
+  }
+
+  @Test
+  def groupedCharacterOrderIsConsistentAcrossSendReceiveAndCloseViewsIncludingLongAddress: Unit = {
+    val grouped = groupedExpected(longWitnessRegtest)
+
+    val receiveReadable = BaseActivity.AddressPresentation.receiveReadableAddress(longWitnessRegtest)
+    val closeReadable = BaseActivity.AddressPresentation.closeReadableAddress(longWitnessRegtest)
+    val sendReadable = BaseActivity.AddressPresentation.confirmDestination(longWitnessRegtest, amount = None).grouped
+
+    assertEquals(grouped, receiveReadable)
+    assertEquals(grouped, closeReadable)
+    assertEquals(grouped, sendReadable)
+
+    assertEquals(longWitnessRegtest, receiveReadable.replace(" ", ""))
+    assertEquals(longWitnessRegtest, closeReadable.replace(" ", ""))
+    assertEquals(longWitnessRegtest, sendReadable.replace(" ", ""))
+  }
+
+  @Test
+  def receiveReadableTextUsesFullGroupedAddressAndKeepsAmountLabelOrder: Unit = {
+    val grouped = groupedExpected(bech32P2wpkhMainnet)
+    val withBoth = BaseActivity.AddressPresentation.receiveReadableText(bech32P2wpkhMainnet, Some("Coffee Shop"), Some("0.00123456 BTC"))
+    assertEquals(s"$grouped<br><br>Coffee Shop<br><br>0.00123456 BTC", withBoth)
+
+    val withAmountOnly = BaseActivity.AddressPresentation.receiveReadableText(bech32P2wpkhMainnet, None, Some("0.00123456 BTC"))
+    assertEquals(s"$grouped<br><br>0.00123456 BTC", withAmountOnly)
+
+    val withLabelOnly = BaseActivity.AddressPresentation.receiveReadableText(bech32P2wpkhMainnet, Some("Coffee Shop"), None)
+    assertEquals(s"$grouped<br><br>Coffee Shop", withLabelOnly)
+  }
 }

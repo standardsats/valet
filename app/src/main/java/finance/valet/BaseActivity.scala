@@ -94,6 +94,25 @@ object BaseActivity {
 
     def accessibilityFull(raw: String): String = normalized(raw)
 
+    def receiveReadableAddress(raw: String): String = groupedFull(raw)
+
+    def receiveReadableText(raw: String, label: Option[String], humanAmount: Option[String]): String = {
+      val readableAddress = receiveReadableAddress(raw)
+      (label, humanAmount) match {
+        case Some(textLabel) ~ Some(textAmount) => s"$readableAddress<br><br>$textLabel<br><br>$textAmount"
+        case None ~ Some(textAmount) => s"$readableAddress<br><br>$textAmount"
+        case Some(textLabel) ~ None => s"$readableAddress<br><br>$textLabel"
+        case _ => readableAddress
+      }
+    }
+
+    // Copy/share/QR payload helper: returns exact raw address or exact URI string.
+    // Never returns grouped display text.
+    def receivePayload(address: String, uri: String, hasAmountOrLabel: Boolean): String =
+      if (hasAmountOrLabel) uri else address
+
+    def closeReadableAddress(raw: String): String = groupedFull(raw)
+
     case class ConfirmDestination(raw: String, amount: Option[MilliSatoshi]) {
       val grouped: String = groupedFull(raw)
       val accessibility: String = accessibilityFull(raw)
