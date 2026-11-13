@@ -1542,29 +1542,28 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
         val verifiedSingleDestination = BaseActivity.AddressPresentation
           .verifiedSingleConfirmDestination(uri.address, LNParams.addressToPubKeyScript, response.pubKeyScriptToAmount)
 
-        val confirmDestinations = verifiedSingleDestination match {
+        verifiedSingleDestination match {
           case Left(error) =>
             alert.dismiss
             onFail(error)
-            return
+          case Right(destination) =>
+            val confirmDestinations = Seq(destination)
 
-          case Right(destination) => Seq(destination)
+            if (fromWallet.isSigning) {
+              finalSendButton setOnClickListener onButtonTap(process apply response.tx)
+              sendView.switchToConfirm(alert, totalSendAmount, response.fee.toMilliSatoshi, confirmDestinations)
+            } else if (fromWallet.hasFingerprint) {
+              sendView.chainReaderView.onSignedTx = signedTx => UITask {
+                if (signedTx.txOut.toSet != response.tx.txOut.toSet) alert.dismiss
+                finalSendButton setOnClickListener onButtonTap(process apply signedTx)
+                sendView.switchToConfirm(alert, totalSendAmount, response.fee.toMilliSatoshi, confirmDestinations)
+              }.run
+
+              val masterFingerprint = fromWallet.info.core.masterFingerprint.get
+              val psbt = prepareBip84Psbt(response, masterFingerprint)
+              sendView.switchToHardwareOutgoing(alert, psbt)
+            } else alert.dismiss
         }
-
-        if (fromWallet.isSigning) {
-          finalSendButton setOnClickListener onButtonTap(process apply response.tx)
-          sendView.switchToConfirm(alert, totalSendAmount, response.fee.toMilliSatoshi, confirmDestinations)
-        } else if (fromWallet.hasFingerprint) {
-          sendView.chainReaderView.onSignedTx = signedTx => UITask {
-            if (signedTx.txOut.toSet != response.tx.txOut.toSet) alert.dismiss
-            finalSendButton setOnClickListener onButtonTap(process apply signedTx)
-            sendView.switchToConfirm(alert, totalSendAmount, response.fee.toMilliSatoshi, confirmDestinations)
-          }.run
-
-          val masterFingerprint = fromWallet.info.core.masterFingerprint.get
-          val psbt = prepareBip84Psbt(response, masterFingerprint)
-          sendView.switchToHardwareOutgoing(alert, psbt)
-        } else alert.dismiss
       }
     }
 
@@ -1626,6 +1625,15 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
 
   def bringSendMultiBitcoinPopup(addressToAmount: MultiAddressParser.AddressToAmount, fromWallet: ElectrumEclairWallet): Unit = {
     val rawDestinations = addressToAmount.values.toList
+    val hasAmbiguousDuplicates = rawDestinations.groupBy { case address ~ _ => LNParams.addressToPubKeyScript(address) }.exists {
+      case _ ~ rows => rows.size > 1
+    }
+    if (hasAmbiguousDuplicates) {
+      onFail("Could not verify destination outputs in batch transaction preview")
+      return
+    }
+
+    val scriptToAmount = rawDestinations.map { case address ~ amount => LNParams.addressToPubKeyScript(address) -> amount }.toMap
     val sendView: ChainSendView = new ChainSendView(fromWallet, badge = None, visibilityRes = -1)
 
     def attempt(alert: AlertDialog): Unit = {
@@ -1636,29 +1644,28 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
         val verifiedDestinations = BaseActivity.AddressPresentation
           .verifiedBatchConfirmDestinations(rawDestinations, LNParams.addressToPubKeyScript, response.pubKeyScriptToAmount)
 
-        val confirmDestinations = verifiedDestinations match {
+        verifiedDestinations match {
           case Left(error) =>
             alert.dismiss
             onFail(error)
-            return
+          case Right(destinations) =>
+            val confirmDestinations = destinations
 
-          case Right(destinations) => destinations
+            if (fromWallet.isSigning) {
+              finalSendButton setOnClickListener onButtonTap(process apply response.tx)
+              sendView.switchToConfirm(alert, totalSendAmount, response.fee.toMilliSatoshi, confirmDestinations)
+            } else if (fromWallet.hasFingerprint) {
+              sendView.chainReaderView.onSignedTx = signedTx => UITask {
+                if (signedTx.txOut.toSet != response.tx.txOut.toSet) alert.dismiss
+                finalSendButton setOnClickListener onButtonTap(process apply signedTx)
+                sendView.switchToConfirm(alert, totalSendAmount, response.fee.toMilliSatoshi, confirmDestinations)
+              }.run
+
+              val masterFingerprint = fromWallet.info.core.masterFingerprint.get
+              val psbt = prepareBip84Psbt(response, masterFingerprint)
+              sendView.switchToHardwareOutgoing(alert, psbt)
+            } else alert.dismiss
         }
-
-        if (fromWallet.isSigning) {
-          finalSendButton setOnClickListener onButtonTap(process apply response.tx)
-          sendView.switchToConfirm(alert, totalSendAmount, response.fee.toMilliSatoshi, confirmDestinations)
-        } else if (fromWallet.hasFingerprint) {
-          sendView.chainReaderView.onSignedTx = signedTx => UITask {
-            if (signedTx.txOut.toSet != response.tx.txOut.toSet) alert.dismiss
-            finalSendButton setOnClickListener onButtonTap(process apply signedTx)
-            sendView.switchToConfirm(alert, totalSendAmount, response.fee.toMilliSatoshi, confirmDestinations)
-          }.run
-
-          val masterFingerprint = fromWallet.info.core.masterFingerprint.get
-          val psbt = prepareBip84Psbt(response, masterFingerprint)
-          sendView.switchToHardwareOutgoing(alert, psbt)
-        } else alert.dismiss
       }
     }
 
