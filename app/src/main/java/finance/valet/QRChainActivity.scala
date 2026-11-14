@@ -53,7 +53,7 @@ class QRChainActivity extends QRActivity with ExternalDataChecker { me =>
       val accessibilityText = BaseActivity.AddressPresentation.receiveAccessibilityText(bu.address, bu.label, humanAmountOpt)
 
       holder.qrLabel setText visibleText.html
-      holder.qrLabel.setTextAppearance(R.style.AddressDisplayText)
+      holder.qrLabel.setTextAppearance(holder.qrLabel.getContext, R.style.AddressDisplayText)
       holder.qrLabel.setTextIsSelectable(false)
       holder.qrLabel.setSingleLine(false)
       holder.qrLabel.setHorizontallyScrolling(false)
