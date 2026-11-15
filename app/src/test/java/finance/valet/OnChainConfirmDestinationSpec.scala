@@ -89,4 +89,16 @@ class OnChainConfirmDestinationSpec {
 
     assertTrue(rejected.isLeft)
   }
+
+  @Test
+  def destinationAmountRowsPolicyShowsPerRecipientAmountsOnlyForBatch: Unit = {
+    val single = BaseActivity.AddressPresentation.confirmDestinations(Seq(addressA -> Some(MilliSatoshi(1000L))))
+    val batch = BaseActivity.AddressPresentation.confirmDestinations(Seq(
+      addressA -> Some(MilliSatoshi(1000L)),
+      addressB -> Some(MilliSatoshi(2000L))
+    ))
+
+    assertFalse(BaseActivity.AddressPresentation.shouldShowPerDestinationAmounts(single))
+    assertTrue(BaseActivity.AddressPresentation.shouldShowPerDestinationAmounts(batch))
+  }
 }

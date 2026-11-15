@@ -1670,7 +1670,7 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
     }
 
     lazy val alert = {
-      val title = new TitleView(me getString dialog_send_btc_many)
+      val title = new TitleView(me getString dialog_send_transaction)
       val builder = titleBodyAsViewBuilder(title.asColoredView(me chainWalletBackground fromWallet), sendView.body)
       addFlowChip(title.flow, getString(dialog_send_btc_from).format(fromWallet.info.label), R.drawable.border_yellow)
       mkCheckForm(attempt, none, builder, dialog_ok, dialog_cancel)

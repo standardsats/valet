@@ -144,6 +144,8 @@ object BaseActivity {
     def confirmDestinations(destinations: Seq[(String, Option[MilliSatoshi])]): Seq[ConfirmDestination] =
       destinations.map { case raw ~ amount => confirmDestination(raw, amount) }
 
+    def shouldShowPerDestinationAmounts(destinations: Seq[ConfirmDestination]): Boolean = destinations.size > 1
+
     def verifiedSingleConfirmDestination[K](
       rawDestination: String,
       toKey: String => K,
@@ -287,9 +289,7 @@ trait BaseActivity extends AppCompatActivity { me =>
   }
 
   def titleViewFromUri(uri: BitcoinUri): TitleView = {
-    val label = uri.label.map(label => s"<br><br><b>$label</b>").getOrElse(new String)
-    val message = uri.message.map(message => s"<br><i>$message<i>").getOrElse(new String)
-    val caption = getString(dialog_send_btc).format(uri.address.short, label + message)
+    val caption = getString(dialog_send_transaction)
     val title = new TitleView(caption)
 
     for (amount <- uri.amount) {
@@ -744,6 +744,11 @@ trait BaseActivity extends AppCompatActivity { me =>
 
     def renderDestinations(destinations: Seq[BaseActivity.AddressPresentation.ConfirmDestination]): Unit = {
       confirmDestinationRows.removeAllViews()
+      val showPerDestinationAmounts = BaseActivity.AddressPresentation.shouldShowPerDestinationAmounts(destinations)
+
+      val density = host.getContext.getResources.getDisplayMetrics.density
+      val blockPadding = (density * 10).toInt
+      val blockSpacing = (density * 8).toInt
 
       if (destinations.nonEmpty) {
         confirmDestinationCaption.setText(if (destinations.size > 1) dialog_send_btc_confirm_destinations else dialog_send_btc_confirm_destination)
@@ -751,6 +756,12 @@ trait BaseActivity extends AppCompatActivity { me =>
         destinations.foreach { destination =>
           val row = new LinearLayout(host.getContext)
           row.setOrientation(LinearLayout.VERTICAL)
+          row.setPadding(blockPadding, blockPadding, blockPadding, blockPadding)
+
+          val layoutParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+          layoutParams.bottomMargin = blockSpacing
+          row.setLayoutParams(layoutParams)
+          row.setBackgroundResource(R.drawable.confirm_destination_block_bg)
 
           val addressView = new TextView(host.getContext)
           addressView.setTextAppearance(host.getContext, R.style.AddressDisplayText)
@@ -760,7 +771,7 @@ trait BaseActivity extends AppCompatActivity { me =>
           addressView.setContentDescription(destination.accessibility)
           row.addView(addressView)
 
-          destination.amount.foreach { amount =>
+          if (showPerDestinationAmounts) destination.amount.foreach { amount =>
             val amountView = new TextView(host.getContext)
             amountView.setText(WalletApp.denom.parsedWithSign(amount, cardIn, cardZero).html)
             row.addView(amountView)
