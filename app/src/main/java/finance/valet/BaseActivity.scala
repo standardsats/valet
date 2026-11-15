@@ -146,6 +146,12 @@ object BaseActivity {
 
     def shouldShowPerDestinationAmounts(destinations: Seq[ConfirmDestination]): Boolean = destinations.size > 1
 
+    def sendTransactionTitleCaption(baseTitle: String, label: Option[String], message: Option[String]): String = {
+      val labelLine = label.map(text => s"<br><br><b>$text</b>").getOrElse(new String)
+      val messageLine = message.map(text => s"<br><i>$text<i>").getOrElse(new String)
+      baseTitle + labelLine + messageLine
+    }
+
     def verifiedSingleConfirmDestination[K](
       rawDestination: String,
       toKey: String => K,
@@ -289,7 +295,7 @@ trait BaseActivity extends AppCompatActivity { me =>
   }
 
   def titleViewFromUri(uri: BitcoinUri): TitleView = {
-    val caption = getString(dialog_send_transaction)
+    val caption = BaseActivity.AddressPresentation.sendTransactionTitleCaption(getString(dialog_send_transaction), uri.label, uri.message)
     val title = new TitleView(caption)
 
     for (amount <- uri.amount) {

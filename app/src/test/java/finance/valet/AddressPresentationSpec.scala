@@ -172,4 +172,28 @@ class AddressPresentationSpec {
     assertFalse(full.contains("<br"))
     assertEquals(longWitnessRegtest + ", Coffee Shop, 0.00123456 BTC ~$77.10", full)
   }
+
+  @Test
+  def sendTransactionTitleCaptionKeepsLabelAndMessageWithoutAddress: Unit = {
+    val caption = BaseActivity.AddressPresentation.sendTransactionTitleCaption(
+      baseTitle = "Send transaction",
+      label = Some("Coffee Shop"),
+      message = Some("Thanks+for+paying")
+    )
+
+    assertEquals("Send transaction<br><br><b>Coffee Shop</b><br><i>Thanks+for+paying<i>", caption)
+    assertFalse(caption.contains(bech32P2wpkhMainnet))
+  }
+
+  @Test
+  def sendTransactionTitleCaptionPlainKeepsNeutralHeadingOnly: Unit = {
+    val caption = BaseActivity.AddressPresentation.sendTransactionTitleCaption(
+      baseTitle = "Send transaction",
+      label = None,
+      message = None
+    )
+
+    assertEquals("Send transaction", caption)
+    assertFalse(caption.contains(bech32P2wpkhMainnet))
+  }
 }
