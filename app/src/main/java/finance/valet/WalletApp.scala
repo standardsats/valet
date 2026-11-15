@@ -136,12 +136,26 @@ object WalletApp {
   def channelsExist: Boolean = LNParams.cm.chanBag.all.nonEmpty
 
   // Server changes require zero channels; signet changes must also preserve the chain of any channel records.
-  def signetSwitchProblem(customSignet1: Boolean, electrumHex1: String): Option[Int] =
-    if (electrumHex1 != customElectrumHex && channelsExist) Some(settings_electrum_close_channels)
-    else if (!isSignetFlavor) None
-    else if (customSignet1 && electrumAddress(electrumHex1).isFailure) Some(settings_custom_signet_no_electrum)
-    else if (signetIdFor(customSignet1, electrumHex1) != storedSignetId && channelsExist) Some(settings_custom_signet_close_channels)
+  private[valet] def signetSwitchProblemByPolicy(isSignetFlavor1: Boolean,
+                                                 changedElectrum: => Boolean,
+                                                 channelsExist1: => Boolean,
+                                                 customSignet1: Boolean,
+                                                 customElectrumValid: => Boolean,
+                                                 changedSignetId: => Boolean): Option[Int] =
+    if (!isSignetFlavor1) None
+    else if (changedElectrum && channelsExist1) Some(settings_electrum_close_channels)
+    else if (customSignet1 && !customElectrumValid) Some(settings_custom_signet_no_electrum)
+    else if (changedSignetId && channelsExist1) Some(settings_custom_signet_close_channels)
     else None
+
+  def signetSwitchProblem(customSignet1: Boolean, electrumHex1: String): Option[Int] =
+    signetSwitchProblemByPolicy(
+      isSignetFlavor1 = isSignetFlavor,
+      changedElectrum = electrumHex1 != customElectrumHex,
+      channelsExist1 = channelsExist,
+      customSignet1 = customSignet1,
+      customElectrumValid = electrumAddress(electrumHex1).isSuccess,
+      changedSignetId = signetIdFor(customSignet1, electrumHex1) != storedSignetId)
 
   // Puts back the settings of the chain which the local data and channels belong to
   def restoreSignetSettings(signetId: String): Unit = {
