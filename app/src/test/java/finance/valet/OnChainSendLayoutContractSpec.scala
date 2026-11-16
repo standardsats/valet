@@ -13,7 +13,7 @@ class OnChainSendLayoutContractSpec {
   }
 
   private def read(path: String): String = {
-    val target = repoRoots.map(_.resolve(path)).find(Files.exists).getOrElse {
+    val target = repoRoots.map(_.resolve(path)).find(candidate => Files.exists(candidate)).getOrElse {
       throw new IllegalStateException(s"Could not locate $path from roots: ${repoRoots.mkString(", ")}")
     }
 
