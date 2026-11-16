@@ -2,44 +2,131 @@ package finance.valet
 
 import org.junit.Assert._
 import org.junit.Test
+import org.w3c.dom.{Document, Element, Node}
 
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path, Paths}
+import javax.xml.parsers.DocumentBuilderFactory
 
 class OnChainSendLayoutContractSpec {
-  private val repoRoots: Seq[Path] = {
-    val cwd = Paths.get("").toAbsolutePath.normalize
-    Seq(cwd, cwd.getParent, Paths.get("/app/valet"), Paths.get("/srv/valet"), Paths.get("/opt/data/workspace/t_3f9e3ff6-valet-impl")).filter(_ != null)
-  }
+  private val AndroidNs = "http://schemas.android.com/apk/res/android"
 
-  private def read(path: String): String = {
-    val target = repoRoots.map(_.resolve(path)).find(candidate => Files.exists(candidate)).getOrElse {
-      throw new IllegalStateException(s"Could not locate $path from roots: ${repoRoots.mkString(", ")}")
+  private lazy val repoRoot: Path = {
+    var current: Path = Paths.get("").toAbsolutePath.normalize
+
+    while (current != null) {
+      if (Files.isDirectory(current.resolve("app/src"))) return current
+      current = current.getParent
     }
 
-    Files.readString(target, StandardCharsets.UTF_8)
+    throw new IllegalStateException("Could not locate repo root containing app/src from current working directory ancestry")
+  }
+
+  private def read(path: String): String =
+    Files.readString(repoRoot.resolve(path), StandardCharsets.UTF_8)
+
+  private def parseXml(path: String): Document = {
+    val factory = DocumentBuilderFactory.newInstance
+    factory.setNamespaceAware(true)
+    val builder = factory.newDocumentBuilder()
+    builder.parse(repoRoot.resolve(path).toFile)
+  }
+
+  private def androidAttr(element: Element, name: String): String =
+    if (element.hasAttributeNS(AndroidNs, name)) element.getAttributeNS(AndroidNs, name) else ""
+
+  private def elementByAndroidId(document: Document, idValue: String): Element = {
+    val all = document.getElementsByTagName("*")
+
+    for (idx <- 0 until all.getLength) {
+      val node = all.item(idx)
+      if (node.isInstanceOf[Element]) {
+        val element = node.asInstanceOf[Element]
+        if (androidAttr(element, "id") == s"@+id/$idValue") return element
+      }
+    }
+
+    throw new IllegalStateException(s"Element with android:id=@+id/$idValue not found")
+  }
+
+  private def directElementChildren(parent: Element): Vector[Element] = {
+    val nodes = parent.getChildNodes
+    val builder = Vector.newBuilder[Element]
+
+    for (idx <- 0 until nodes.getLength) {
+      val node = nodes.item(idx)
+      if (node.getNodeType == Node.ELEMENT_NODE) builder += node.asInstanceOf[Element]
+    }
+
+    builder.result()
+  }
+
+  private def dimenValue(document: Document, name: String): String = {
+    val all = document.getElementsByTagName("dimen")
+
+    for (idx <- 0 until all.getLength) {
+      val node = all.item(idx)
+      if (node.isInstanceOf[Element]) {
+        val element = node.asInstanceOf[Element]
+        if (element.getAttribute("name") == name) return element.getTextContent.trim
+      }
+    }
+
+    throw new IllegalStateException(s"dimen '$name' not found")
   }
 
   @Test
-  def onChainConfirmDestinationUsesUniformCaptionToFirstBoxGapAndKeepsInsets: Unit = {
-    val onChain = read("app/src/main/res/layout/frag_input_on_chain.xml")
+  def onChainConfirmDestinationUsesUniformSpacingResourceAndInsets: Unit = {
+    val onChain = parseXml("app/src/main/res/layout/frag_input_on_chain.xml")
+    val dimens = parseXml("app/src/main/res/values/dimens.xml")
 
-    assertTrue(onChain.contains("android:id=\"@+id/confirmDestinationCaption\""))
-    assertTrue(onChain.contains("android:layout_marginStart=\"15dp\""))
-    assertTrue(onChain.contains("android:layout_marginEnd=\"15dp\""))
+    val caption = elementByAndroidId(onChain, "confirmDestinationCaption")
+    val rows = elementByAndroidId(onChain, "confirmDestinationRows")
 
-    assertTrue(onChain.contains("android:id=\"@+id/confirmDestinationRows\""))
-    assertTrue(onChain.contains("android:layout_marginTop=\"@dimen/confirm_destination_spacing\""))
-    assertTrue(onChain.contains("android:layout_marginBottom=\"@dimen/confirm_destination_spacing\""))
-  }
+    assertEquals("15dp", androidAttr(caption, "layout_marginStart"))
+    assertEquals("15dp", androidAttr(caption, "layout_marginEnd"))
+    assertEquals("15dp", androidAttr(rows, "layout_marginStart"))
+    assertEquals("15dp", androidAttr(rows, "layout_marginEnd"))
 
-  @Test
-  def sharedFiatConverterDividerIsAddressableAndHiddenOnlyInOnChainRenderer: Unit = {
-    val shared = read("app/src/main/res/layout/frag_input_fiat_converter.xml")
-    assertTrue(shared.contains("android:id=\"@+id/fiatConverterBottomDivider\""))
+    assertEquals("@dimen/confirm_destination_spacing", androidAttr(rows, "layout_marginTop"))
+    assertEquals("@dimen/confirm_destination_spacing", androidAttr(rows, "layout_marginBottom"))
+    assertEquals("8dp", dimenValue(dimens, "confirm_destination_spacing"))
 
     val baseActivitySource = read("app/src/main/java/finance/valet/BaseActivity.scala")
-    assertTrue(baseActivitySource.contains("R.id.fiatConverterBottomDivider"))
-    assertTrue(baseActivitySource.contains("setVis(isVisible = false, fiatConverterBottomDivider)"))
+    assertTrue(baseActivitySource.contains("getDimensionPixelSize(R.dimen.confirm_destination_spacing)"))
+  }
+
+  @Test
+  def sharedDividerDefaultsRemainVisibleAndHideScopeStaysInChainEditViewOnly: Unit = {
+    val shared = parseXml("app/src/main/res/layout/frag_input_fiat_converter.xml")
+    val onChain = parseXml("app/src/main/res/layout/frag_input_on_chain.xml")
+
+    val sharedDivider = elementByAndroidId(shared, "fiatConverterBottomDivider")
+    assertEquals("View", sharedDivider.getTagName)
+    assertEquals("@style/GrayDivider", sharedDivider.getAttribute("style"))
+    assertNotEquals("gone", androidAttr(sharedDivider, "visibility"))
+
+    val editChain = elementByAndroidId(onChain, "editChain")
+    val children = directElementChildren(editChain)
+
+    val feeIncludeIndex = children.indexWhere { child =>
+      child.getTagName == "include" && androidAttr(child, "layout") == "@layout/frag_fees"
+    }
+
+    val postFeeDividerIndex = children.indexWhere { child =>
+      child.getTagName == "View" && child.getAttribute("style") == "@style/GrayDivider"
+    }
+
+    assertTrue("Expected frag_fees include inside editChain", feeIncludeIndex >= 0)
+    assertEquals("Expected GrayDivider immediately after frag_fees include", feeIncludeIndex + 1, postFeeDividerIndex)
+
+    val baseActivitySource = read("app/src/main/java/finance/valet/BaseActivity.scala")
+    val scopedHidePattern =
+      "(?s)class\\s+ChainEditView.*?val fiatConverterBottomDivider: View = inputChain\\.findViewById\\(R\\.id\\.fiatConverterBottomDivider\\).*?setVis\\(isVisible = false, fiatConverterBottomDivider\\)".r
+
+    assertTrue(scopedHidePattern.findFirstIn(baseActivitySource).nonEmpty)
+    assertEquals(2, "fiatConverterBottomDivider".r.findAllIn(baseActivitySource).length)
+    assertTrue(baseActivitySource.contains("row.setBackgroundResource(R.drawable.confirm_destination_block_bg)"))
+    assertTrue(baseActivitySource.contains("val blockPadding = (density * 10).toInt"))
   }
 }

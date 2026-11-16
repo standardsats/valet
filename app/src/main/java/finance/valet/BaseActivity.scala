@@ -754,7 +754,7 @@ trait BaseActivity extends AppCompatActivity { me =>
 
       val density = host.getContext.getResources.getDisplayMetrics.density
       val blockPadding = (density * 10).toInt
-      val blockSpacing = (density * 8).toInt
+      val blockSpacing = host.getContext.getResources.getDimensionPixelSize(R.dimen.confirm_destination_spacing)
 
       if (destinations.nonEmpty) {
         confirmDestinationCaption.setText(if (destinations.size > 1) dialog_send_btc_confirm_destinations else dialog_send_btc_confirm_destination)
