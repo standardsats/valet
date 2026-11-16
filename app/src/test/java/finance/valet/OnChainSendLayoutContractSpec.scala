@@ -11,16 +11,20 @@ import javax.xml.parsers.DocumentBuilderFactory
 class OnChainSendLayoutContractSpec {
   private val AndroidNs = "http://schemas.android.com/apk/res/android"
 
-  private lazy val repoRoot: Path = {
-    var current: Path = Paths.get("").toAbsolutePath.normalize
+  private def findRepoRootFromCwdAncestry(start: Path): Option[Path] = {
+    var current: Path = start
 
-    while (current != null) {
-      if (Files.isDirectory(current.resolve("app/src"))) return current
+    while (current != null && !Files.isDirectory(current.resolve("app/src"))) {
       current = current.getParent
     }
 
-    throw new IllegalStateException("Could not locate repo root containing app/src from current working directory ancestry")
+    Option(current)
   }
+
+  private lazy val repoRoot: Path =
+    findRepoRootFromCwdAncestry(Paths.get("").toAbsolutePath.normalize).getOrElse {
+      throw new IllegalStateException("Could not locate repo root containing app/src from current working directory ancestry")
+    }
 
   private def read(path: String): String =
     Files.readString(repoRoot.resolve(path), StandardCharsets.UTF_8)
@@ -75,6 +79,15 @@ class OnChainSendLayoutContractSpec {
     throw new IllegalStateException(s"dimen '$name' not found")
   }
 
+  private def classBody(source: String, className: String): String = {
+    val classStart = source.indexOf(s"class $className")
+    if (classStart < 0) throw new IllegalStateException(s"Class '$className' not found")
+
+    val nextClass = source.indexOf("\n  class ", classStart + 1)
+    val classEnd = if (nextClass >= 0) nextClass else source.length
+    source.substring(classStart, classEnd)
+  }
+
   @Test
   def onChainConfirmDestinationUsesUniformSpacingResourceAndInsets: Unit = {
     val onChain = parseXml("app/src/main/res/layout/frag_input_on_chain.xml")
@@ -110,7 +123,7 @@ class OnChainSendLayoutContractSpec {
     val children = directElementChildren(editChain)
 
     val feeIncludeIndex = children.indexWhere { child =>
-      child.getTagName == "include" && androidAttr(child, "layout") == "@layout/frag_fees"
+      child.getTagName == "include" && child.getAttribute("layout") == "@layout/frag_fees"
     }
 
     val postFeeDividerIndex = children.indexWhere { child =>
@@ -121,11 +134,12 @@ class OnChainSendLayoutContractSpec {
     assertEquals("Expected GrayDivider immediately after frag_fees include", feeIncludeIndex + 1, postFeeDividerIndex)
 
     val baseActivitySource = read("app/src/main/java/finance/valet/BaseActivity.scala")
-    val scopedHidePattern =
-      "(?s)class\\s+ChainEditView.*?val fiatConverterBottomDivider: View = inputChain\\.findViewById\\(R\\.id\\.fiatConverterBottomDivider\\).*?setVis\\(isVisible = false, fiatConverterBottomDivider\\)".r
+    val chainEditViewBody = classBody(baseActivitySource, "ChainEditView")
+    val hideCall = "setVis(isVisible = false, fiatConverterBottomDivider)"
 
-    assertTrue(scopedHidePattern.findFirstIn(baseActivitySource).nonEmpty)
-    assertEquals(2, "fiatConverterBottomDivider".r.findAllIn(baseActivitySource).length)
+    assertTrue(chainEditViewBody.contains("val fiatConverterBottomDivider: View = inputChain.findViewById(R.id.fiatConverterBottomDivider)"))
+    assertTrue(chainEditViewBody.contains(hideCall))
+    assertEquals(1, hideCall.r.findAllIn(baseActivitySource).length)
     assertTrue(baseActivitySource.contains("row.setBackgroundResource(R.drawable.confirm_destination_block_bg)"))
     assertTrue(baseActivitySource.contains("val blockPadding = (density * 10).toInt"))
   }
