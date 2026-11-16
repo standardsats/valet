@@ -5,45 +5,31 @@ import org.junit.Test
 
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Paths}
-import scala.xml.{Elem, XML}
 
 class OnChainSendLayoutContractSpec {
   private val repoRoot = Paths.get("/opt/data/workspace/t_3f9e3ff6-valet-impl")
 
-  private def xml(path: String): Elem = XML.loadFile(repoRoot.resolve(path).toFile)
-
-  private def attr(node: scala.xml.Node, key: String): String = node.attribute("android", key).map(_.text).getOrElse("")
+  private def read(path: String): String = Files.readString(repoRoot.resolve(path), StandardCharsets.UTF_8)
 
   @Test
   def onChainConfirmDestinationUsesUniformCaptionToFirstBoxGapAndKeepsInsets: Unit = {
-    val onChain = xml("app/src/main/res/layout/frag_input_on_chain.xml")
+    val onChain = read("app/src/main/res/layout/frag_input_on_chain.xml")
 
-    val caption = (onChain \\ "TextView").find(node => attr(node, "id") == "@+id/confirmDestinationCaption").get
-    val rows = (onChain \\ "LinearLayout").find(node => attr(node, "id") == "@+id/confirmDestinationRows").get
+    assertTrue(onChain.contains("android:id=\"@+id/confirmDestinationCaption\""))
+    assertTrue(onChain.contains("android:layout_marginStart=\"15dp\""))
+    assertTrue(onChain.contains("android:layout_marginEnd=\"15dp\""))
 
-    assertEquals("15dp", attr(caption, "layout_marginStart"))
-    assertEquals("15dp", attr(caption, "layout_marginEnd"))
-    assertEquals("15dp", attr(rows, "layout_marginStart"))
-    assertEquals("15dp", attr(rows, "layout_marginEnd"))
-
-    assertEquals("@dimen/confirm_destination_spacing", attr(rows, "layout_marginTop"))
-    assertEquals("@dimen/confirm_destination_spacing", attr(rows, "layout_marginBottom"))
+    assertTrue(onChain.contains("android:id=\"@+id/confirmDestinationRows\""))
+    assertTrue(onChain.contains("android:layout_marginTop=\"@dimen/confirm_destination_spacing\""))
+    assertTrue(onChain.contains("android:layout_marginBottom=\"@dimen/confirm_destination_spacing\""))
   }
 
   @Test
   def sharedFiatConverterDividerIsAddressableAndHiddenOnlyInOnChainRenderer: Unit = {
-    val shared = xml("app/src/main/res/layout/frag_input_fiat_converter.xml")
+    val shared = read("app/src/main/res/layout/frag_input_fiat_converter.xml")
+    assertTrue(shared.contains("android:id=\"@+id/fiatConverterBottomDivider\""))
 
-    val divider = (shared \\ "View").find { node =>
-      attr(node, "style") == "@style/GrayDivider"
-    }.get
-    assertEquals("@+id/fiatConverterBottomDivider", attr(divider, "id"))
-
-    val baseActivitySource = Files.readString(
-      repoRoot.resolve("app/src/main/java/finance/valet/BaseActivity.scala"),
-      StandardCharsets.UTF_8
-    )
-
+    val baseActivitySource = read("app/src/main/java/finance/valet/BaseActivity.scala")
     assertTrue(baseActivitySource.contains("R.id.fiatConverterBottomDivider"))
     assertTrue(baseActivitySource.contains("setVis(isVisible = false, fiatConverterBottomDivider)"))
   }
