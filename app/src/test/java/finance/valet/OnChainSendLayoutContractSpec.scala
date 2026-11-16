@@ -4,12 +4,21 @@ import org.junit.Assert._
 import org.junit.Test
 
 import java.nio.charset.StandardCharsets
-import java.nio.file.{Files, Paths}
+import java.nio.file.{Files, Path, Paths}
 
 class OnChainSendLayoutContractSpec {
-  private val repoRoot = Paths.get("/opt/data/workspace/t_3f9e3ff6-valet-impl")
+  private val repoRoots: Seq[Path] = {
+    val cwd = Paths.get("").toAbsolutePath.normalize
+    Seq(cwd, cwd.getParent, Paths.get("/app/valet"), Paths.get("/srv/valet"), Paths.get("/opt/data/workspace/t_3f9e3ff6-valet-impl")).filter(_ != null)
+  }
 
-  private def read(path: String): String = Files.readString(repoRoot.resolve(path), StandardCharsets.UTF_8)
+  private def read(path: String): String = {
+    val target = repoRoots.map(_.resolve(path)).find(Files.exists).getOrElse {
+      throw new IllegalStateException(s"Could not locate $path from roots: ${repoRoots.mkString(", ")}")
+    }
+
+    Files.readString(target, StandardCharsets.UTF_8)
+  }
 
   @Test
   def onChainConfirmDestinationUsesUniformCaptionToFirstBoxGapAndKeepsInsets: Unit = {
