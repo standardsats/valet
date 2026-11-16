@@ -23,4 +23,5 @@
     <!-- inverted progress bar -->
 
     <dimen name="text_size_12">12sp</dimen>
+    <dimen name="confirm_destination_spacing">8dp</dimen>
 </resources>

@@ -796,6 +796,8 @@ trait BaseActivity extends AppCompatActivity { me =>
     val canSend: String = WalletApp.denom.parsedWithSign(fromWallet.info.lastBalance.toMilliSatoshi, cardIn, cardZero)
     val canSendFiat: String = WalletApp.currentMsatInFiatHuman(fromWallet.info.lastBalance.toMilliSatoshi)
     val inputChain: LinearLayout = host.findViewById(R.id.inputChain).asInstanceOf[LinearLayout]
+    val fiatConverterBottomDivider: View = inputChain.findViewById(R.id.fiatConverterBottomDivider)
+    if (fiatConverterBottomDivider != null) setVis(isVisible = false, fiatConverterBottomDivider)
     manager.hintFiatDenom setText getString(dialog_up_to).format(canSendFiat).html
     manager.hintDenom setText getString(dialog_up_to).format(canSend).html
   }
