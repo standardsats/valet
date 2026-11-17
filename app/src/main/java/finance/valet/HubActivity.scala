@@ -1579,10 +1579,9 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
         sendView.manager.updateText(value = max)
       }
 
-      val title = titleViewFromUri(uri)
+      val title = sendEditTitleViewFromUri(uri, fromWallet.info.label)
       val neutralRes = if (uri.amount.isDefined) -1 else dialog_max
       val builder = titleBodyAsViewBuilder(title.asColoredView(me chainWalletBackground fromWallet), sendView.body)
-      addFlowChip(title.flow, getString(dialog_send_btc_from).format(fromWallet.info.label), R.drawable.border_yellow)
       if (uri.prExt.isEmpty) mkCheckFormNeutral(attempt, none, useMax, builder, dialog_ok, dialog_cancel, neutralRes)
       else mkCheckFormNeutral(attempt, none, switchToLn, builder, dialog_ok, dialog_cancel, lightning_wallet)
     }
@@ -1670,9 +1669,8 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
     }
 
     lazy val alert = {
-      val title = new TitleView(me getString dialog_send_transaction)
+      val title = sendEditTitleViewForBatch(fromWallet.info.label)
       val builder = titleBodyAsViewBuilder(title.asColoredView(me chainWalletBackground fromWallet), sendView.body)
-      addFlowChip(title.flow, getString(dialog_send_btc_from).format(fromWallet.info.label), R.drawable.border_yellow)
       mkCheckForm(attempt, none, builder, dialog_ok, dialog_cancel)
     }
 

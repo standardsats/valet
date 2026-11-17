@@ -21,6 +21,14 @@
             android:textColor="@color/colorAccent"
             android:id="@+id/tipTitle"/>
 
+        <TextView
+            style="@style/FillingView"
+            android:id="@+id/tipSubtitle"
+            android:layout_below="@id/tipTitle"
+            android:layout_marginTop="4dp"
+            android:textColor="@color/colorAccent"
+            android:visibility="gone"/>
+
     </RelativeLayout>
 
     <org.apmem.tools.layouts.FlowLayout

@@ -127,8 +127,8 @@ class OnChainSendLayoutContractSpec {
     // Wallet label must be inline; old wallet chip call should be removed from send-edit entry points.
     assertFalse(hubSource.contains("addFlowChip(title.flow, getString(dialog_send_btc_from).format(fromWallet.info.label), R.drawable.border_yellow)"))
 
-    // Single-send first dialog must bind destination subtitle using raw uri address.
-    assertTrue(hubSource.contains("title.configureDestinationSubtitle(uri.address)"))
+    // Single-send first dialog must use the dedicated helper that binds raw destination subtitle.
+    assertTrue(hubSource.contains("val title = sendEditTitleViewFromUri(uri, fromWallet.info.label)"))
   }
 
   @Test

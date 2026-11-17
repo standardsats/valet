@@ -196,4 +196,19 @@ class AddressPresentationSpec {
     assertEquals("Send transaction", caption)
     assertFalse(caption.contains(bech32P2wpkhMainnet))
   }
+
+  @Test
+  def sendTransactionInlineTitleAppendsWalletLabelWithoutMarkup: Unit = {
+    val heading = BaseActivity.AddressPresentation.sendTransactionInlineTitle("Send transaction", "Main wallet")
+    assertEquals("Send transaction Main wallet", heading)
+    assertFalse(heading.contains("<"))
+  }
+
+  @Test
+  def sendTransactionDestinationLineKeepsRawUngroupedAddress: Unit = {
+    val destination = "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh"
+    val line = BaseActivity.AddressPresentation.sendTransactionDestinationLine(destination)
+    assertEquals(s"to $destination", line)
+    assertFalse(line.contains("\n"))
+  }
 }

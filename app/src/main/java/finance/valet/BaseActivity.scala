@@ -11,7 +11,7 @@ import android.graphics.{Bitmap, Color}
 import android.net.Uri
 import android.os.{Build, Bundle}
 import android.text.method.LinkMovementMethod
-import android.text.{Editable, Spanned, TextWatcher}
+import android.text.{Editable, Spanned, TextUtils, TextWatcher}
 import android.view.View.OnClickListener
 import android.view.{View, ViewGroup, WindowManager}
 import android.widget._
@@ -145,6 +145,17 @@ object BaseActivity {
       destinations.map { case raw ~ amount => confirmDestination(raw, amount) }
 
     def shouldShowPerDestinationAmounts(destinations: Seq[ConfirmDestination]): Boolean = destinations.size > 1
+
+    def sendTransactionInlineTitle(baseTitle: String, walletLabel: String): String = {
+      val base = normalized(baseTitle)
+      val wallet = normalized(walletLabel)
+      if (wallet.isEmpty) base else s"$base $wallet"
+    }
+
+    def sendTransactionDestinationLine(rawDestination: String): String = {
+      val raw = normalized(rawDestination)
+      if (raw.isEmpty) "to" else s"to $raw"
+    }
 
     def sendTransactionTitleCaption(baseTitle: String, label: Option[String], message: Option[String]): String = {
       val labelLine = label.map(text => s"<br><br><b>$text</b>").getOrElse(new String)
@@ -305,6 +316,26 @@ trait BaseActivity extends AppCompatActivity { me =>
     }
 
     title
+  }
+
+  def sendEditTitleViewFromUri(uri: BitcoinUri, walletLabel: String): TitleView = {
+    val inlineHeading = BaseActivity.AddressPresentation.sendTransactionInlineTitle(getString(dialog_send_transaction), walletLabel)
+    val caption = BaseActivity.AddressPresentation.sendTransactionTitleCaption(inlineHeading, uri.label, uri.message)
+    val title = new TitleView(caption)
+    title.configureDestinationSubtitle(uri.address)
+
+    for (amount <- uri.amount) {
+      val amountHuman = WalletApp.denom.parsedWithSign(amount, cardIn, cardZero)
+      val requested = getString(dialog_ln_requested).format(amountHuman)
+      addFlowChip(title.flow, requested, R.drawable.border_yellow)
+    }
+
+    title
+  }
+
+  def sendEditTitleViewForBatch(walletLabel: String): TitleView = {
+    val inlineHeading = BaseActivity.AddressPresentation.sendTransactionInlineTitle(getString(dialog_send_transaction), walletLabel)
+    new TitleView(inlineHeading)
   }
 
   def chainWalletBackground(wallet: ElectrumEclairWallet): Int = if (wallet.isBuiltIn) R.color.cardBitcoinModern else R.color.cardBitcoinLegacy
@@ -543,7 +574,44 @@ trait BaseActivity extends AppCompatActivity { me =>
     val flow: FlowLayout = view.findViewById(R.id.tipExtraTags).asInstanceOf[FlowLayout]
     val backArrow: ImageView = view.findViewById(R.id.backArrow).asInstanceOf[ImageView]
     val tipTitle: TextView = clickableTextField(view findViewById R.id.tipTitle)
+    val tipSubtitle: TextView = clickableTextField(view findViewById R.id.tipSubtitle)
+    private var subtitleLayoutListener: View.OnLayoutChangeListener = _
     tipTitle.setText(titleText.html)
+
+    def configureDestinationSubtitle(rawDestination: String): Unit = {
+      val fullLine = BaseActivity.AddressPresentation.sendTransactionDestinationLine(rawDestination)
+      tipSubtitle.setVisibility(View.VISIBLE)
+      tipSubtitle.setTextIsSelectable(false)
+      tipSubtitle.setSingleLine(true)
+      tipSubtitle.setHorizontallyScrolling(true)
+      tipSubtitle.setMaxLines(1)
+      tipSubtitle.setTextDirection(View.TEXT_DIRECTION_LTR)
+      tipSubtitle.setLayoutDirection(View.LAYOUT_DIRECTION_LTR)
+      tipSubtitle.setEllipsize(TextUtils.TruncateAt.MIDDLE)
+      tipSubtitle.setContentDescription(fullLine)
+
+      def renderForWidth(): Unit = {
+        val available = tipSubtitle.getWidth - tipSubtitle.getPaddingLeft - tipSubtitle.getPaddingRight
+        if (available > 0) {
+          val prefix = "to "
+          val raw = Option(rawDestination).map(_.trim).getOrElse("")
+          val prefixWidth = tipSubtitle.getPaint.measureText(prefix)
+          val addressWidth = Math.max(0f, available.toFloat - prefixWidth)
+          val ellipsized = TextUtils.ellipsize(raw, tipSubtitle.getPaint, addressWidth, TextUtils.TruncateAt.MIDDLE)
+          tipSubtitle.setText(prefix + ellipsized)
+        } else tipSubtitle.setText(fullLine)
+      }
+
+      if (subtitleLayoutListener != null) tipSubtitle.removeOnLayoutChangeListener(subtitleLayoutListener)
+      subtitleLayoutListener = new View.OnLayoutChangeListener {
+        override def onLayoutChange(v: View, left: Int, top: Int, right: Int, bottom: Int, oldLeft: Int, oldTop: Int, oldRight: Int, oldBottom: Int): Unit = {
+          val changedWidth = (right - left) != (oldRight - oldLeft)
+          if (changedWidth) renderForWidth()
+        }
+      }
+      tipSubtitle.addOnLayoutChangeListener(subtitleLayoutListener)
+      tipSubtitle.post(new Runnable { override def run: Unit = renderForWidth() })
+    }
 
     def asDefView: LinearLayout = {
       view.setBackgroundColor(0x22AAAAAA)
