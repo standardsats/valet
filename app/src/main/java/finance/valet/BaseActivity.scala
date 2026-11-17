@@ -893,7 +893,11 @@ trait BaseActivity extends AppCompatActivity { me =>
     }
 
     lazy private val views = List(chainEditView, chainSlideshowView, circularSpinnerView, chainConfirmView, chainReaderView)
-    def switchTo(visibleSection: HasHostView): Unit = for (section <- views) setVis(isVisible = section == visibleSection, section.host)
+    var onSectionSwitched: HasHostView => Unit = _
+    def switchTo(visibleSection: HasHostView): Unit = {
+      for (section <- views) setVis(isVisible = section == visibleSection, section.host)
+      if (onSectionSwitched != null) onSectionSwitched(visibleSection)
+    }
     def switchButtons(alert: AlertDialog, on: Boolean): Unit = setVisMany(on -> getPositiveButton(alert), on -> getNegativeButton(alert), on -> getNeutralButton(alert), true -> body)
     val onDismissListener: DialogInterface.OnDismissListener = new DialogInterface.OnDismissListener { override def onDismiss(dialog: DialogInterface): Unit = haltProcesses }
 

@@ -1579,9 +1579,28 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
         sendView.manager.updateText(value = max)
       }
 
-      val title = sendEditTitleViewFromUri(uri, fromWallet.info.label)
+      val editTitle = sendEditTitleViewFromUri(uri, fromWallet.info.label)
+      val confirmTitle = titleViewFromUri(uri)
+      addFlowChip(confirmTitle.flow, getString(dialog_send_btc_from).format(fromWallet.info.label), R.drawable.border_yellow)
+
+      val editTitleView = editTitle.asColoredView(me chainWalletBackground fromWallet)
+      val confirmTitleView = confirmTitle.asColoredView(me chainWalletBackground fromWallet)
+      val titleContainer = new LinearLayout(me)
+      titleContainer.setOrientation(LinearLayout.VERTICAL)
+      titleContainer.addView(editTitleView)
+      titleContainer.addView(confirmTitleView)
+
+      def syncTitle(section: HasHostView): Unit = {
+        val useEditTitle = section == sendView.chainEditView
+        setVis(isVisible = useEditTitle, editTitleView)
+        setVis(isVisible = !useEditTitle, confirmTitleView)
+      }
+
+      sendView.onSectionSwitched = section => syncTitle(section)
+      syncTitle(sendView.chainEditView)
+
       val neutralRes = if (uri.amount.isDefined) -1 else dialog_max
-      val builder = titleBodyAsViewBuilder(title.asColoredView(me chainWalletBackground fromWallet), sendView.body)
+      val builder = titleBodyAsViewBuilder(titleContainer, sendView.body)
       if (uri.prExt.isEmpty) mkCheckFormNeutral(attempt, none, useMax, builder, dialog_ok, dialog_cancel, neutralRes)
       else mkCheckFormNeutral(attempt, none, switchToLn, builder, dialog_ok, dialog_cancel, lightning_wallet)
     }
@@ -1669,8 +1688,27 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
     }
 
     lazy val alert = {
-      val title = sendEditTitleViewForBatch(fromWallet.info.label)
-      val builder = titleBodyAsViewBuilder(title.asColoredView(me chainWalletBackground fromWallet), sendView.body)
+      val editTitle = sendEditTitleViewForBatch(fromWallet.info.label)
+      val confirmTitle = new TitleView(me getString dialog_send_transaction)
+      addFlowChip(confirmTitle.flow, getString(dialog_send_btc_from).format(fromWallet.info.label), R.drawable.border_yellow)
+
+      val editTitleView = editTitle.asColoredView(me chainWalletBackground fromWallet)
+      val confirmTitleView = confirmTitle.asColoredView(me chainWalletBackground fromWallet)
+      val titleContainer = new LinearLayout(me)
+      titleContainer.setOrientation(LinearLayout.VERTICAL)
+      titleContainer.addView(editTitleView)
+      titleContainer.addView(confirmTitleView)
+
+      def syncTitle(section: HasHostView): Unit = {
+        val useEditTitle = section == sendView.chainEditView
+        setVis(isVisible = useEditTitle, editTitleView)
+        setVis(isVisible = !useEditTitle, confirmTitleView)
+      }
+
+      sendView.onSectionSwitched = section => syncTitle(section)
+      syncTitle(sendView.chainEditView)
+
+      val builder = titleBodyAsViewBuilder(titleContainer, sendView.body)
       mkCheckForm(attempt, none, builder, dialog_ok, dialog_cancel)
     }
 

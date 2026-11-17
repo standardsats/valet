@@ -142,8 +142,19 @@ class OnChainSendLayoutContractSpec {
     assertFalse(hubSource.contains("addFlowChip(title.flow, getString(dialog_send_btc_from).format(fromWallet.info.label), R.drawable.border_yellow)"))
 
     // Single-send and batch must use dedicated first-dialog helpers.
-    assertTrue(hubSource.contains("val title = sendEditTitleViewFromUri(uri, fromWallet.info.label)"))
-    assertTrue(hubSource.contains("val title = sendEditTitleViewForBatch(fromWallet.info.label)"))
+    assertTrue(hubSource.contains("val editTitle = sendEditTitleViewFromUri(uri, fromWallet.info.label)"))
+    assertTrue(hubSource.contains("val editTitle = sendEditTitleViewForBatch(fromWallet.info.label)"))
+
+    // Confirmation and non-edit sections must keep the old title policy.
+    assertTrue(hubSource.contains("val confirmTitle = titleViewFromUri(uri)"))
+    assertTrue(hubSource.contains("val confirmTitle = new TitleView(me getString dialog_send_transaction)"))
+    assertTrue(hubSource.contains("addFlowChip(confirmTitle.flow, getString(dialog_send_btc_from).format(fromWallet.info.label), R.drawable.border_yellow)"))
+
+    // Section switch callback binds title visibility to actual ChainSendView state transitions.
+    assertTrue(baseActivitySource.contains("var onSectionSwitched: HasHostView => Unit = _"))
+    assertTrue(baseActivitySource.contains("if (onSectionSwitched != null) onSectionSwitched(visibleSection)"))
+    assertTrue(hubSource.contains("sendView.onSectionSwitched = section => syncTitle(section)"))
+    assertTrue(hubSource.contains("val useEditTitle = section == sendView.chainEditView"))
 
     // Subtitle render path must keep middle ellipsis and full accessibility line from one localized source.
     assertTrue(baseActivitySource.contains("tipSubtitle.setEllipsize(TextUtils.TruncateAt.MIDDLE)"))
