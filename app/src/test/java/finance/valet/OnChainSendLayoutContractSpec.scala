@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path, Paths}
 import javax.xml.parsers.DocumentBuilderFactory
 import java.util.regex.Pattern
+import scala.collection.JavaConverters._
 
 class OnChainSendLayoutContractSpec {
   private val AndroidNs = "http://schemas.android.com/apk/res/android"
@@ -80,6 +81,30 @@ class OnChainSendLayoutContractSpec {
     throw new IllegalStateException(s"dimen '$name' not found")
   }
 
+  private def stringValue(document: Document, name: String): String = {
+    val all = document.getElementsByTagName("string")
+
+    for (idx <- 0 until all.getLength) {
+      val node = all.item(idx)
+      if (node.isInstanceOf[Element]) {
+        val element = node.asInstanceOf[Element]
+        if (element.getAttribute("name") == name) return element.getTextContent.trim
+      }
+    }
+
+    throw new IllegalStateException(s"string '$name' not found")
+  }
+
+  private def localeStringFiles: Seq[Path] = {
+    val resRoot = repoRoot.resolve("app/src/main/res")
+    Files.list(resRoot).iterator.asScala
+      .filter(path => Files.isDirectory(path) && path.getFileName.toString.startsWith("values"))
+      .map(_.resolve("strings.xml"))
+      .filter(Files.exists(_))
+      .toSeq
+      .sortBy(_.toString)
+  }
+
   private def classBody(source: String, className: String): String = {
     val classStart = source.indexOf(s"class $className")
     if (classStart < 0) throw new IllegalStateException(s"Class '$className' not found")
@@ -102,8 +127,9 @@ class OnChainSendLayoutContractSpec {
     assertEquals("15dp", androidAttr(rows, "layout_marginStart"))
     assertEquals("15dp", androidAttr(rows, "layout_marginEnd"))
 
-    assertEquals("@dimen/confirm_destination_spacing", androidAttr(rows, "layout_marginTop"))
+    assertEquals("@dimen/confirm_destination_caption_gap", androidAttr(rows, "layout_marginTop"))
     assertEquals("@dimen/confirm_destination_spacing", androidAttr(rows, "layout_marginBottom"))
+    assertEquals("16dp", dimenValue(dimens, "confirm_destination_caption_gap"))
     assertEquals("8dp", dimenValue(dimens, "confirm_destination_spacing"))
 
     val baseActivitySource = read("app/src/main/java/finance/valet/BaseActivity.scala")
@@ -170,6 +196,55 @@ class OnChainSendLayoutContractSpec {
       case e: Element if e.getAttribute("name") == "dialog_send_btc_to_prefix" => e.getTextContent.trim
     }.getOrElse(throw new IllegalStateException("string 'dialog_send_btc_to_prefix' not found"))
     assertEquals("to address", toPrefix)
+
+    val confirmTitle = stringValue(strings, "dialog_confirm_transaction")
+    assertEquals("<b>Confirm</b> transaction", confirmTitle)
+  }
+
+  @Test
+  def localeHeadersExposeSendConfirmAndDestinationPrefixKeys: Unit = {
+    val expectedByQualifier = Map(
+      "values" -> Map(
+        "dialog_send_transaction" -> "Send transaction",
+        "dialog_confirm_transaction" -> "<b>Confirm</b> transaction",
+        "dialog_send_btc_to_prefix" -> "to address"
+      ),
+      "values-es" -> Map(
+        "dialog_send_transaction" -> "Enviar transacción",
+        "dialog_confirm_transaction" -> "<b>Confirmar</b> transacción",
+        "dialog_send_btc_to_prefix" -> "a la dirección"
+      ),
+      "values-nl" -> Map(
+        "dialog_send_transaction" -> "Transactie verzenden",
+        "dialog_confirm_transaction" -> "Transactie <b>bevestigen</b>",
+        "dialog_send_btc_to_prefix" -> "naar adres"
+      ),
+      "values-pt" -> Map(
+        "dialog_send_transaction" -> "Enviar transação",
+        "dialog_confirm_transaction" -> "<b>Confirmar</b> transação",
+        "dialog_send_btc_to_prefix" -> "para o endereço"
+      ),
+      "values-ru" -> Map(
+        "dialog_send_transaction" -> "Отправить транзакцию",
+        "dialog_confirm_transaction" -> "<b>Подтвердить</b> транзакцию",
+        "dialog_send_btc_to_prefix" -> "на адрес"
+      ),
+      "values-uk" -> Map(
+        "dialog_send_transaction" -> "Надіслати транзакцію",
+        "dialog_confirm_transaction" -> "<b>Підтвердити</b> транзакцію",
+        "dialog_send_btc_to_prefix" -> "на адресу"
+      )
+    )
+
+    val localeDocs = localeStringFiles.map(path => path.getParent.getFileName.toString -> parseXml(s"app/src/main/res/${path.getParent.getFileName}/strings.xml")).toMap
+    assertEquals("Unexpected locale string file inventory", expectedByQualifier.keySet, localeDocs.keySet)
+
+    expectedByQualifier.foreach { case (qualifier, expectedKeys) =>
+      val doc = localeDocs(qualifier)
+      expectedKeys.foreach { case (key, expected) =>
+        assertEquals(s"$qualifier:$key", expected, stringValue(doc, key))
+      }
+    }
   }
 
   @Test

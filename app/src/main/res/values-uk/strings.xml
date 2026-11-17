@@ -86,6 +86,9 @@
 
     <string name="dialog_send_btc"><![CDATA[Надіслати <b>Біткоїн</b>-транзакцію<br><b>на адресу</b> %1$s%2$s]]></string>
     <string name="dialog_send_btc_many"><![CDATA[Надіслати <b>Біткоїн</b>-транзакцію<br><b>на багато адрес</b>]]></string>
+    <string name="dialog_send_transaction">Надіслати транзакцію</string>
+    <string name="dialog_confirm_transaction"><![CDATA[<b>Підтвердити</b> транзакцію]]></string>
+    <string name="dialog_send_btc_to_prefix">на адресу</string>
     <string name="dialog_send_btc_confirm_amount">Надіслати суму</string>
     <string name="dialog_send_btc_confirm_fiat">Фіатна вартість</string>
     <string name="dialog_send_btc_confirm_fee">Комісія в ланцюжку</string>

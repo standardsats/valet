@@ -94,6 +94,9 @@
     <string name="dialog_send_btc_from"><![CDATA[desde la billetera&#160;<b>%1$s</b>]]></string>
     <string name="dialog_send_btc"><![CDATA[Enviar transacción <b>Bitcoin</b><br><b>a la dirección</b> %1$s%2$s]]></string>
     <string name="dialog_send_btc_many"><![CDATA[Enviar transaccion <b>Bitcoin</b> <br><b>a multiples direcciones</b>]]></string>
+    <string name="dialog_send_transaction">Enviar transacción</string>
+    <string name="dialog_confirm_transaction"><![CDATA[<b>Confirmar</b> transacción]]></string>
+    <string name="dialog_send_btc_to_prefix">a la dirección</string>
     <string name="dialog_send_btc_confirm_amount">Enviar monto</string>
     <string name="dialog_send_btc_confirm_fiat">Valor en Fiat</string>
     <string name="dialog_send_btc_confirm_fee">Tarifa de mineria</string>
