@@ -107,6 +107,7 @@
     <string name="dialog_send_btc_confirm_fee">Chain fee</string>
     <string name="dialog_send_btc_confirm_destination">Destination</string>
     <string name="dialog_send_btc_confirm_destinations">Destinations</string>
+    <string name="dialog_send_btc_to_prefix">to</string>
 
     <string name="dialog_send_ln"><![CDATA[Send <b>Lightning</b> payment%1$s]]></string>
     <string name="dialog_split_ln"><![CDATA[Split <b>Lightning</b> payment%1$s]]></string>

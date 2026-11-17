@@ -205,9 +205,15 @@ class AddressPresentationSpec {
   }
 
   @Test
+  def sendTransactionInlineTitleKeepsLiteralWalletCharsInModel: Unit = {
+    val heading = BaseActivity.AddressPresentation.sendTransactionInlineTitle("Send transaction", "Cold <wallet> & \"savings\"")
+    assertEquals("Send transaction Cold <wallet> & \"savings\"", heading)
+  }
+
+  @Test
   def sendTransactionDestinationLineKeepsRawUngroupedAddress: Unit = {
     val destination = "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh"
-    val line = BaseActivity.AddressPresentation.sendTransactionDestinationLine(destination)
+    val line = BaseActivity.AddressPresentation.sendTransactionDestinationLine("to", destination)
     assertEquals(s"to $destination", line)
     assertFalse(line.contains("\n"))
   }

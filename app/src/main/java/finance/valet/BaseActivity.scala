@@ -152,9 +152,10 @@ object BaseActivity {
       if (wallet.isEmpty) base else s"$base $wallet"
     }
 
-    def sendTransactionDestinationLine(rawDestination: String): String = {
+    def sendTransactionDestinationLine(prefix: String, rawDestination: String): String = {
+      val safePrefix = normalized(prefix)
       val raw = normalized(rawDestination)
-      if (raw.isEmpty) "to" else s"to $raw"
+      if (raw.isEmpty) safePrefix else s"$safePrefix $raw"
     }
 
     def sendTransactionTitleCaption(baseTitle: String, label: Option[String], message: Option[String]): String = {
@@ -320,7 +321,8 @@ trait BaseActivity extends AppCompatActivity { me =>
 
   def sendEditTitleViewFromUri(uri: BitcoinUri, walletLabel: String): TitleView = {
     val inlineHeading = BaseActivity.AddressPresentation.sendTransactionInlineTitle(getString(dialog_send_transaction), walletLabel)
-    val caption = BaseActivity.AddressPresentation.sendTransactionTitleCaption(inlineHeading, uri.label, uri.message)
+    val safeInlineHeading = TextUtils.htmlEncode(inlineHeading)
+    val caption = BaseActivity.AddressPresentation.sendTransactionTitleCaption(safeInlineHeading, uri.label, uri.message)
     val title = new TitleView(caption)
     title.configureDestinationSubtitle(uri.address)
 
@@ -335,7 +337,7 @@ trait BaseActivity extends AppCompatActivity { me =>
 
   def sendEditTitleViewForBatch(walletLabel: String): TitleView = {
     val inlineHeading = BaseActivity.AddressPresentation.sendTransactionInlineTitle(getString(dialog_send_transaction), walletLabel)
-    new TitleView(inlineHeading)
+    new TitleView(TextUtils.htmlEncode(inlineHeading))
   }
 
   def chainWalletBackground(wallet: ElectrumEclairWallet): Int = if (wallet.isBuiltIn) R.color.cardBitcoinModern else R.color.cardBitcoinLegacy
@@ -579,7 +581,8 @@ trait BaseActivity extends AppCompatActivity { me =>
     tipTitle.setText(titleText.html)
 
     def configureDestinationSubtitle(rawDestination: String): Unit = {
-      val fullLine = BaseActivity.AddressPresentation.sendTransactionDestinationLine(rawDestination)
+      val prefix = getString(dialog_send_btc_to_prefix)
+      val fullLine = BaseActivity.AddressPresentation.sendTransactionDestinationLine(prefix, rawDestination)
       tipSubtitle.setVisibility(View.VISIBLE)
       tipSubtitle.setTextIsSelectable(false)
       tipSubtitle.setSingleLine(true)
@@ -593,12 +596,11 @@ trait BaseActivity extends AppCompatActivity { me =>
       def renderForWidth(): Unit = {
         val available = tipSubtitle.getWidth - tipSubtitle.getPaddingLeft - tipSubtitle.getPaddingRight
         if (available > 0) {
-          val prefix = "to "
           val raw = Option(rawDestination).map(_.trim).getOrElse("")
-          val prefixWidth = tipSubtitle.getPaint.measureText(prefix)
+          val prefixWidth = tipSubtitle.getPaint.measureText(prefix + " ")
           val addressWidth = Math.max(0f, available.toFloat - prefixWidth)
           val ellipsized = TextUtils.ellipsize(raw, tipSubtitle.getPaint, addressWidth, TextUtils.TruncateAt.MIDDLE)
-          tipSubtitle.setText(prefix + ellipsized)
+          tipSubtitle.setText(prefix + " " + ellipsized)
         } else tipSubtitle.setText(fullLine)
       }
 
