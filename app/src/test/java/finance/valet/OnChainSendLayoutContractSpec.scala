@@ -7,6 +7,7 @@ import org.w3c.dom.{Document, Element, Node}
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path, Paths}
 import javax.xml.parsers.DocumentBuilderFactory
+import java.util.regex.Pattern
 
 class OnChainSendLayoutContractSpec {
   private val AndroidNs = "http://schemas.android.com/apk/res/android"
@@ -139,7 +140,7 @@ class OnChainSendLayoutContractSpec {
 
     assertTrue(chainEditViewBody.contains("val fiatConverterBottomDivider: View = inputChain.findViewById(R.id.fiatConverterBottomDivider)"))
     assertTrue(chainEditViewBody.contains(hideCall))
-    assertEquals(1, hideCall.r.findAllIn(baseActivitySource).length)
+    assertEquals(1, Pattern.quote(hideCall).r.findAllIn(baseActivitySource).length)
     assertTrue(baseActivitySource.contains("row.setBackgroundResource(R.drawable.confirm_destination_block_bg)"))
     assertTrue(baseActivitySource.contains("val blockPadding = (density * 10).toInt"))
   }
