@@ -115,20 +115,40 @@ class OnChainSendLayoutContractSpec {
     val baseActivitySource = read("app/src/main/java/finance/valet/BaseActivity.scala")
     val hubSource = read("app/src/main/java/finance/valet/HubActivity.scala")
     val titleLayout = parseXml("app/src/main/res/layout/frag_top_tip.xml")
+    val styles = parseXml("app/src/main/res/values/styles.xml")
 
     // New first-dialog title helpers must be dedicated and not alter global TitleView callers.
     assertTrue(baseActivitySource.contains("def sendEditTitleViewFromUri(uri: BitcoinUri, walletLabel: String): TitleView"))
+    assertTrue(baseActivitySource.contains("def sendEditTitleViewForBatch(walletLabel: String): TitleView"))
     assertTrue(baseActivitySource.contains("def configureDestinationSubtitle(rawDestination: String): Unit"))
+
+    // Inline heading must be HTML-encoded at render boundary to preserve literal wallet labels.
+    assertTrue(baseActivitySource.contains("TextUtils.htmlEncode(inlineHeading)"))
 
     // Title layout must expose a dedicated subtitle line for destination address.
     val subtitle = elementByAndroidId(titleLayout, "tipSubtitle")
     assertEquals("gone", androidAttr(subtitle, "visibility"))
+    assertEquals("@style/FillingView", subtitle.getAttribute("style"))
+
+    // FillingView style must constrain width to enable middle ellipsis in dialog bounds.
+    val styleNodes = styles.getElementsByTagName("style")
+    val fillingView = (0 until styleNodes.getLength).map(styleNodes.item).collectFirst {
+      case e: Element if e.getAttribute("name") == "FillingView" => e
+    }.getOrElse(throw new IllegalStateException("Style 'FillingView' not found"))
+    val fillingChildren = directElementChildren(fillingView)
+    assertTrue(fillingChildren.exists(e => e.getAttribute("name") == "android:layout_width" && e.getTextContent.trim == "match_parent"))
 
     // Wallet label must be inline; old wallet chip call should be removed from send-edit entry points.
     assertFalse(hubSource.contains("addFlowChip(title.flow, getString(dialog_send_btc_from).format(fromWallet.info.label), R.drawable.border_yellow)"))
 
-    // Single-send first dialog must use the dedicated helper that binds raw destination subtitle.
+    // Single-send and batch must use dedicated first-dialog helpers.
     assertTrue(hubSource.contains("val title = sendEditTitleViewFromUri(uri, fromWallet.info.label)"))
+    assertTrue(hubSource.contains("val title = sendEditTitleViewForBatch(fromWallet.info.label)"))
+
+    // Subtitle render path must keep middle ellipsis and full accessibility line from one localized source.
+    assertTrue(baseActivitySource.contains("tipSubtitle.setEllipsize(TextUtils.TruncateAt.MIDDLE)"))
+    assertTrue(baseActivitySource.contains("tipSubtitle.setContentDescription(fullLine)"))
+    assertTrue(baseActivitySource.contains("val prefix = getString(dialog_send_btc_to_prefix)"))
   }
 
   @Test
