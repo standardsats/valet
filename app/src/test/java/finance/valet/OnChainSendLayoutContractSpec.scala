@@ -111,6 +111,27 @@ class OnChainSendLayoutContractSpec {
   }
 
   @Test
+  def firstDialogTitleUsesInlineWalletAndDedicatedAddressLineContract: Unit = {
+    val baseActivitySource = read("app/src/main/java/finance/valet/BaseActivity.scala")
+    val hubSource = read("app/src/main/java/finance/valet/HubActivity.scala")
+    val titleLayout = parseXml("app/src/main/res/layout/frag_top_tip.xml")
+
+    // New first-dialog title helpers must be dedicated and not alter global TitleView callers.
+    assertTrue(baseActivitySource.contains("def sendEditTitleViewFromUri(uri: BitcoinUri, walletLabel: String): TitleView"))
+    assertTrue(baseActivitySource.contains("def configureDestinationSubtitle(rawDestination: String): Unit"))
+
+    // Title layout must expose a dedicated subtitle line for destination address.
+    val subtitle = elementByAndroidId(titleLayout, "tipSubtitle")
+    assertEquals("gone", androidAttr(subtitle, "visibility"))
+
+    // Wallet label must be inline; old wallet chip call should be removed from send-edit entry points.
+    assertFalse(hubSource.contains("addFlowChip(title.flow, getString(dialog_send_btc_from).format(fromWallet.info.label), R.drawable.border_yellow)"))
+
+    // Single-send first dialog must bind destination subtitle using raw uri address.
+    assertTrue(hubSource.contains("title.configureDestinationSubtitle(uri.address)"))
+  }
+
+  @Test
   def sharedDividerDefaultsRemainVisibleAndHideScopeStaysInChainEditViewOnly: Unit = {
     val shared = parseXml("app/src/main/res/layout/frag_input_fiat_converter.xml")
     val onChain = parseXml("app/src/main/res/layout/frag_input_on_chain.xml")
