@@ -111,9 +111,10 @@ class OnChainSendLayoutContractSpec {
   }
 
   @Test
-  def firstDialogTitleUsesInlineWalletAndDedicatedAddressLineContract: Unit = {
+  def firstDialogKeepsNeutralSendHeadingAndConfirmUsesConfirmHeading: Unit = {
     val baseActivitySource = read("app/src/main/java/finance/valet/BaseActivity.scala")
     val hubSource = read("app/src/main/java/finance/valet/HubActivity.scala")
+    val strings = parseXml("app/src/main/res/values/strings.xml")
     val titleLayout = parseXml("app/src/main/res/layout/frag_top_tip.xml")
     val styles = parseXml("app/src/main/res/values/styles.xml")
 
@@ -122,8 +123,11 @@ class OnChainSendLayoutContractSpec {
     assertTrue(baseActivitySource.contains("def sendEditTitleViewForBatch(walletLabel: String): TitleView"))
     assertTrue(baseActivitySource.contains("def configureDestinationSubtitle(rawDestination: String): Unit"))
 
-    // Inline heading must be HTML-encoded at render boundary to preserve literal wallet labels.
-    assertTrue(baseActivitySource.contains("TextUtils.htmlEncode(inlineHeading)"))
+    // First dialog must keep a neutral heading and preserve BIP21 metadata in the title caption.
+    assertFalse(baseActivitySource.contains("sendTransactionInlineTitle(getString(dialog_send_transaction), walletLabel)"))
+    assertTrue(baseActivitySource.contains("val caption = BaseActivity.AddressPresentation.sendTransactionTitleCaption(getString(dialog_send_transaction), uri.label, uri.message)"))
+    assertTrue(baseActivitySource.contains("val title = new TitleView(caption)"))
+    assertTrue(baseActivitySource.contains("addFlowChip(title.flow, walletBadge, R.drawable.border_yellow)"))
 
     // Title layout must expose a dedicated subtitle line for destination address.
     val subtitle = elementByAndroidId(titleLayout, "tipSubtitle")
@@ -138,16 +142,13 @@ class OnChainSendLayoutContractSpec {
     val fillingChildren = directElementChildren(fillingView)
     assertTrue(fillingChildren.exists(e => e.getAttribute("name") == "android:layout_width" && e.getTextContent.trim == "match_parent"))
 
-    // Wallet label must be inline; old wallet chip call should be removed from send-edit entry points.
-    assertFalse(hubSource.contains("addFlowChip(title.flow, getString(dialog_send_btc_from).format(fromWallet.info.label), R.drawable.border_yellow)"))
-
     // Single-send and batch must use dedicated first-dialog helpers.
     assertTrue(hubSource.contains("val editTitle = sendEditTitleViewFromUri(uri, fromWallet.info.label)"))
     assertTrue(hubSource.contains("val editTitle = sendEditTitleViewForBatch(fromWallet.info.label)"))
 
-    // Confirmation and non-edit sections must keep the old title policy.
-    assertTrue(hubSource.contains("val confirmTitle = titleViewFromUri(uri)"))
-    assertTrue(hubSource.contains("val confirmTitle = new TitleView(me getString dialog_send_transaction)"))
+    // Confirmation title only switches heading text; all badge wiring remains intact.
+    assertTrue(baseActivitySource.contains("sendTransactionTitleCaption(getString(dialog_confirm_transaction), uri.label, uri.message)"))
+    assertTrue(hubSource.contains("val confirmTitle = new TitleView(me getString dialog_confirm_transaction)"))
     assertTrue(hubSource.contains("addFlowChip(confirmTitle.flow, getString(dialog_send_btc_from).format(fromWallet.info.label), R.drawable.border_yellow)"))
 
     // Section switch callback binds title visibility to actual ChainSendView state transitions.
@@ -159,7 +160,12 @@ class OnChainSendLayoutContractSpec {
     // Subtitle render path must keep middle ellipsis and full accessibility line from one localized source.
     assertTrue(baseActivitySource.contains("tipSubtitle.setEllipsize(TextUtils.TruncateAt.MIDDLE)"))
     assertTrue(baseActivitySource.contains("tipSubtitle.setContentDescription(fullLine)"))
-    assertTrue(baseActivitySource.contains("val prefix = getString(dialog_send_btc_to_prefix)"))
+
+    val stringNodes = strings.getElementsByTagName("string")
+    val toPrefix = (0 until stringNodes.getLength).map(stringNodes.item).collectFirst {
+      case e: Element if e.getAttribute("name") == "dialog_send_btc_to_prefix" => e.getTextContent.trim
+    }.getOrElse(throw new IllegalStateException("string 'dialog_send_btc_to_prefix' not found"))
+    assertEquals("to address", toPrefix)
   }
 
   @Test

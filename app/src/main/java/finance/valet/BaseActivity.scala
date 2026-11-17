@@ -307,7 +307,7 @@ trait BaseActivity extends AppCompatActivity { me =>
   }
 
   def titleViewFromUri(uri: BitcoinUri): TitleView = {
-    val caption = BaseActivity.AddressPresentation.sendTransactionTitleCaption(getString(dialog_send_transaction), uri.label, uri.message)
+    val caption = BaseActivity.AddressPresentation.sendTransactionTitleCaption(getString(dialog_confirm_transaction), uri.label, uri.message)
     val title = new TitleView(caption)
 
     for (amount <- uri.amount) {
@@ -319,12 +319,17 @@ trait BaseActivity extends AppCompatActivity { me =>
     title
   }
 
+  private def sendWalletBadge(walletLabel: String): String = {
+    val safeWalletLabel = TextUtils.htmlEncode(Option(walletLabel).map(_.trim).getOrElse(""))
+    getString(dialog_send_btc_from).format(safeWalletLabel)
+  }
+
   def sendEditTitleViewFromUri(uri: BitcoinUri, walletLabel: String): TitleView = {
-    val inlineHeading = BaseActivity.AddressPresentation.sendTransactionInlineTitle(getString(dialog_send_transaction), walletLabel)
-    val safeInlineHeading = TextUtils.htmlEncode(inlineHeading)
-    val caption = BaseActivity.AddressPresentation.sendTransactionTitleCaption(safeInlineHeading, uri.label, uri.message)
+    val caption = BaseActivity.AddressPresentation.sendTransactionTitleCaption(getString(dialog_send_transaction), uri.label, uri.message)
     val title = new TitleView(caption)
     title.configureDestinationSubtitle(uri.address)
+    val walletBadge = sendWalletBadge(walletLabel)
+    addFlowChip(title.flow, walletBadge, R.drawable.border_yellow)
 
     for (amount <- uri.amount) {
       val amountHuman = WalletApp.denom.parsedWithSign(amount, cardIn, cardZero)
@@ -336,8 +341,10 @@ trait BaseActivity extends AppCompatActivity { me =>
   }
 
   def sendEditTitleViewForBatch(walletLabel: String): TitleView = {
-    val inlineHeading = BaseActivity.AddressPresentation.sendTransactionInlineTitle(getString(dialog_send_transaction), walletLabel)
-    new TitleView(TextUtils.htmlEncode(inlineHeading))
+    val title = new TitleView(getString(dialog_send_transaction))
+    val walletBadge = sendWalletBadge(walletLabel)
+    addFlowChip(title.flow, walletBadge, R.drawable.border_yellow)
+    title
   }
 
   def chainWalletBackground(wallet: ElectrumEclairWallet): Int = if (wallet.isBuiltIn) R.color.cardBitcoinModern else R.color.cardBitcoinLegacy
