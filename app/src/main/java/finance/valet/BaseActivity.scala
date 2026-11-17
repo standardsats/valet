@@ -306,8 +306,8 @@ trait BaseActivity extends AppCompatActivity { me =>
     chooser.unPad(LNParams.chainWallets.usableWallets)
   }
 
-  def titleViewFromUri(uri: BitcoinUri): TitleView = {
-    val caption = BaseActivity.AddressPresentation.sendTransactionTitleCaption(getString(dialog_confirm_transaction), uri.label, uri.message)
+  private def titleViewFromUri(uri: BitcoinUri, titleRes: Int): TitleView = {
+    val caption = BaseActivity.AddressPresentation.sendTransactionTitleCaption(getString(titleRes), uri.label, uri.message)
     val title = new TitleView(caption)
 
     for (amount <- uri.amount) {
@@ -318,6 +318,10 @@ trait BaseActivity extends AppCompatActivity { me =>
 
     title
   }
+
+  def titleViewFromUri(uri: BitcoinUri): TitleView = titleViewFromUri(uri, dialog_send_transaction)
+
+  def confirmTitleViewFromUri(uri: BitcoinUri): TitleView = titleViewFromUri(uri, dialog_confirm_transaction)
 
   private def sendWalletBadge(walletLabel: String): String = {
     val safeWalletLabel = TextUtils.htmlEncode(Option(walletLabel).map(_.trim).getOrElse(""))

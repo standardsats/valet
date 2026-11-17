@@ -1580,7 +1580,7 @@ class HubActivity extends NfcReaderActivity with ChanErrorHandlerActivity with E
       }
 
       val editTitle = sendEditTitleViewFromUri(uri, fromWallet.info.label)
-      val confirmTitle = titleViewFromUri(uri)
+      val confirmTitle = confirmTitleViewFromUri(uri)
       addFlowChip(confirmTitle.flow, getString(dialog_send_btc_from).format(fromWallet.info.label), R.drawable.border_yellow)
 
       val editTitleView = editTitle.asColoredView(me chainWalletBackground fromWallet)

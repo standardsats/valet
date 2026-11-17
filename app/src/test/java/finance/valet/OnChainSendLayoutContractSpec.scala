@@ -125,7 +125,10 @@ class OnChainSendLayoutContractSpec {
 
     // First dialog must keep a neutral heading and preserve BIP21 metadata in the title caption.
     assertFalse(baseActivitySource.contains("sendTransactionInlineTitle(getString(dialog_send_transaction), walletLabel)"))
-    assertTrue(baseActivitySource.contains("val caption = BaseActivity.AddressPresentation.sendTransactionTitleCaption(getString(dialog_send_transaction), uri.label, uri.message)"))
+    assertTrue(baseActivitySource.contains("private def titleViewFromUri(uri: BitcoinUri, titleRes: Int): TitleView = {"))
+    assertTrue(baseActivitySource.contains("sendTransactionTitleCaption(getString(titleRes), uri.label, uri.message)"))
+    assertTrue(baseActivitySource.contains("def titleViewFromUri(uri: BitcoinUri): TitleView = titleViewFromUri(uri, dialog_send_transaction)"))
+    assertTrue(baseActivitySource.contains("def confirmTitleViewFromUri(uri: BitcoinUri): TitleView = titleViewFromUri(uri, dialog_confirm_transaction)"))
     assertTrue(baseActivitySource.contains("val title = new TitleView(caption)"))
     assertTrue(baseActivitySource.contains("addFlowChip(title.flow, walletBadge, R.drawable.border_yellow)"))
 
@@ -145,9 +148,10 @@ class OnChainSendLayoutContractSpec {
     // Single-send and batch must use dedicated first-dialog helpers.
     assertTrue(hubSource.contains("val editTitle = sendEditTitleViewFromUri(uri, fromWallet.info.label)"))
     assertTrue(hubSource.contains("val editTitle = sendEditTitleViewForBatch(fromWallet.info.label)"))
+    assertTrue(hubSource.contains("bringChainWalletChooser(me titleViewFromUri bitcoinUri)"))
 
-    // Confirmation title only switches heading text; all badge wiring remains intact.
-    assertTrue(baseActivitySource.contains("sendTransactionTitleCaption(getString(dialog_confirm_transaction), uri.label, uri.message)"))
+    // Confirmation title must be explicit for single and batch dialogs; badge wiring stays intact.
+    assertTrue(hubSource.contains("val confirmTitle = confirmTitleViewFromUri(uri)"))
     assertTrue(hubSource.contains("val confirmTitle = new TitleView(me getString dialog_confirm_transaction)"))
     assertTrue(hubSource.contains("addFlowChip(confirmTitle.flow, getString(dialog_send_btc_from).format(fromWallet.info.label), R.drawable.border_yellow)"))
 
